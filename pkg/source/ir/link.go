@@ -237,6 +237,14 @@ func (l *linker) linkTypeDef(def *TypeDef) {
 		// it too — otherwise a master row typed by another declaration stays a
 		// detached placeholder after a text round-trip.
 		l.linkType(&def.Master.Row)
+		// The per-row validate checks are value graphs over the row, carrying the
+		// same references a where predicate does, so relink each condition or it
+		// stays detached after a round-trip.
+		for _, c := range def.Master.RowChecks {
+			if c != nil {
+				l.linkValue(&c.Cond)
+			}
+		}
 	}
 	l.linkValue(&def.Where)
 }

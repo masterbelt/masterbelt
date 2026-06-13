@@ -5,6 +5,53 @@ import (
 	"testing"
 )
 
+// TestLinkRelinksMasterRowChecks pins that a master's per-row validate check is
+// relinked across a text round-trip: its condition carries the same by-name
+// references a body does, so Link must re-point them to the module's own
+// declarations or the check keeps a detached placeholder.
+func TestLinkRelinksMasterRowChecks(t *testing.T) {
+	limit := &Const{Name: "Limit", Anchor: "belt:/Limit", Type: &Builtin{Name: "int"}, Value: &IntLiteral{Text: "100"}}
+	skill := &TypeDef{
+		Name:   "Skill",
+		Anchor: "belt:/Skill",
+		Master: &MasterDef{
+			Row:       &Record{Fields: []Field{{Name: "id", Type: &Builtin{Name: "int"}}}},
+			Primary:   []string{"id"},
+			RowChecks: []*AssertStmt{{Cond: &Reference{Target: limit}}},
+		},
+	}
+	data, err := (&Module{Consts: []*Const{limit}, Types: []*TypeDef{skill}}).MarshalText()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back Module
+	if err := back.UnmarshalText(data); err != nil {
+		t.Fatal(err)
+	}
+	if err := back.Link(Resolver{}); err != nil {
+		t.Fatal(err)
+	}
+	var backLimit *Const
+	for _, c := range back.Consts {
+		if c.Name == "Limit" {
+			backLimit = c
+		}
+	}
+	var master *TypeDef
+	for _, td := range back.Types {
+		if td.Master != nil {
+			master = td
+		}
+	}
+	if backLimit == nil || master == nil || len(master.Master.RowChecks) != 1 {
+		t.Fatalf("round-trip lost the constant or the row check")
+	}
+	ref, ok := master.Master.RowChecks[0].Cond.(*Reference)
+	if !ok || ref.Target != backLimit {
+		t.Fatalf("row check condition = %#v, want it relinked to the module's Limit const", master.Master.RowChecks[0].Cond)
+	}
+}
+
 // TestLinkRelinksMasterRowFields pins that a master's row field types are
 // relinked after a text round-trip, the way a body's references are: a field
 // typed by another declaration is re-pointed to the resolved definition instead

@@ -190,6 +190,12 @@ func forEachExpr(file *ast.File, fn func(ast.Expr)) {
 		for _, m := range md.Methods {
 			walkBody(m.Body)
 		}
+		// A per-row validate check is an expression site too: a lambda or a
+		// parameter-hint expression inside it is reached the same way a method
+		// body's is.
+		for _, c := range md.Validations {
+			walkBody(c.Body)
+		}
 	}
 }
 
