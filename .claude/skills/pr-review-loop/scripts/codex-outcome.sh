@@ -91,20 +91,23 @@ probe(){
   [ -n "$revraw" ] || revraw='[]'
   [ -n "$icraw" ]  || icraw='[]'
   [ -n "$rxraw" ]  || rxraw='[]'
-  # findings: inline review comments after the trigger, pinned to the pushed head
-  #     (original_commit_id) so a prior run's comments landing late on the OLD head
-  #     are not mistaken for findings on the new one ...
+  # findings: inline review comments after the trigger, pinned to the pushed head so a
+  #     prior run's comments landing late on the OLD head are not mistaken for findings
+  #     on the new one. Match EITHER commit_id (the SHA the comment applies to) OR
+  #     original_commit_id (where it was first made) — a fresh head comment can carry an
+  #     earlier original_commit_id, so checking only one field would drop it ...
   F=$(printf '%s' "$pc" | jq --arg b "$BOT" --arg s "$SINCE_EFF" --arg sha "$SHA9" \
-        '[.[]|select(.user.login==$b and .created_at>$s and ((.original_commit_id // "")|startswith($sha)))]|length') || rc=1
+        '[.[]|select(.user.login==$b and .created_at>$s and (((.commit_id // "")|startswith($sha)) or ((.original_commit_id // "")|startswith($sha))))]|length') || rc=1
   # ... OR a submitted COMMENTED review with a NON-EMPTY body after the trigger
   #     (findings can ride the review body with no inline comments). The body check
   #     mirrors fetch-findings.sh, so an empty-body review never reports FINDINGS
   #     with nothing to triage.
   REV=$(printf '%s' "$revraw" | jq --arg b "$BOT" --arg s "$SINCE_EFF" --arg sha "$SHA9" \
         '[.[]|select(.user.login==$b and (.submitted_at//"")>$s and .state=="COMMENTED" and ((.body//"")|length>0) and ((.commit_id // "")|startswith($sha)))]|length') || rc=1
-  # clean verdict: the "no issues" comment, pinned to YOUR sha AND this round
-  #     (created_at>$SINCE) — the only COMMIT-SCOPED approval artifact.
-  V=$(printf '%s' "$icraw" | jq --arg b "$BOT" --arg s "$SINCE_EFF" --arg sha "$SHA9" \
+  # clean verdict: the "no issues" comment, pinned to YOUR sha AND STRICTLY after the
+  #     trigger (unbiased $SINCE, like the +1) — an approval artifact must not count a
+  #     prior verdict that landed a second or two before a same-SHA re-trigger.
+  V=$(printf '%s' "$icraw" | jq --arg b "$BOT" --arg s "$SINCE" --arg sha "$SHA9" \
         '[.[]|select(.user.login==$b and .created_at>$s and (.body|test("Didn.t find any major issues")) and (.body|test($sha)))]|length') || rc=1
   # a +1 STRICTLY after the trigger. By an explicit project decision this counts as
   #     approval (so a clean review that leaves only the reaction still converges).

@@ -23,7 +23,7 @@ The point is the triage and the escalation, not the mechanics. Three things make
 
 ## Stage 1 — Fetch the current review, fresh
 
-Pull the inline comments (the usual substance) **and** the submitted review *bodies*. The inline comments are where findings normally live, but Codex can also post a finding in the review body with no inline comment — Stage 7 detects that as `FINDINGS`, so a comments-only fetch would bounce you back here with nothing to triage and the loop would spin. **Paginate** both, or on a multi-page PR you see only the first page and can miss fresh findings (and Stage 7 can falsely declare convergence). `gh api`'s own `--slurp` is rejected together with `--jq`, so paginate and merge the pages through an external `jq -s 'add'`. **Run `.claude/skills/pr-review-loop/scripts/fetch-findings.sh <n> "$SINCE"`** — it fetches and formats both streams, paginated and round-scoped, so a review-body-only finding is never dropped (pinned by `fetch-findings.test.sh`). The snippets below are what it runs:
+Pull the inline comments (the usual substance) **and** the submitted review *bodies*. The inline comments are where findings normally live, but Codex can also post a finding in the review body with no inline comment — Stage 7 detects that as `FINDINGS`, so a comments-only fetch would bounce you back here with nothing to triage and the loop would spin. **Paginate** both, or on a multi-page PR you see only the first page and can miss fresh findings (and Stage 7 can falsely declare convergence). `gh api`'s own `--slurp` is rejected together with `--jq`, so paginate and merge the pages through an external `jq -s 'add'`. **Run `.claude/skills/pr-review-loop/scripts/fetch-findings.sh <n> "$SINCE" "$HEAD_SHA"`** — it fetches and formats both streams, paginated, round-scoped, and pinned to the pushed head, so a review-body-only finding is never dropped and a prior run's old-head comment is not triaged (pinned by `fetch-findings.test.sh`). The snippets below are what it runs:
 
 ```
 # inline review comments (the usual substance)
@@ -134,7 +134,7 @@ BOT="chatgpt-codex-connector[bot]"
 # head (original_commit_id) so a prior run's comments landing late on the OLD head are not
 # mistaken for findings on the new one; >0 ⇒ Stage 1
 gh api --paginate repos/<owner>/<repo>/pulls/<n>/comments \
-  | jq -s --arg b "$BOT" --arg since "$SINCE" --arg sha "$HEAD_SHA" '[add[] | select(.user.login==$b and .created_at > $since and ((.original_commit_id // "")|startswith($sha[0:9])))] | length'
+  | jq -s --arg b "$BOT" --arg since "$SINCE" --arg sha "$HEAD_SHA" '[add[] | select(.user.login==$b and .created_at > $since and (((.commit_id // "")|startswith($sha[0:9])) or ((.original_commit_id // "")|startswith($sha[0:9]))))] | length'
 
 # findings (primary) — OR a submitted COMMENTED review with a NON-EMPTY body after your
 # trigger: Codex can put findings in the review body with no inline comments. The body

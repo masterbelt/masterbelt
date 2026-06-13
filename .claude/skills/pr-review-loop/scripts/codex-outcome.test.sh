@@ -126,6 +126,20 @@ cat > "$D/pulls_reviews.json" <<JSON
 JSON
 assert "stale-head review => not findings" RUNNING "$(run "$D")"
 
+# a fresh finding whose commit_id is the head still counts even if original_commit_id is a base
+D="$TMP/head_via_commit_id"; mk "$D"
+cat > "$D/pulls_comments.json" <<JSON
+[{"user":{"login":"$BOT"},"created_at":"2026-06-13T03:46:40Z","commit_id":"f0a483e061f5e37dbb","original_commit_id":"deadbeef00base","body":"finding"}]
+JSON
+assert "head via commit_id (original is base) => FINDINGS" FINDINGS "$(run "$D")"
+
+# the clean verdict, like the +1, must be STRICTLY after the trigger
+D="$TMP/verdict_trigger_second"; mk "$D"
+cat > "$D/issues_comments.json" <<JSON
+[{"user":{"login":"$BOT"},"created_at":"$SINCE","body":"Codex Review: Didn't find any major issues. Reviewed commit: $SHA"}]
+JSON
+assert "verdict at the trigger second => not approved" RUNNING "$(run "$D")"
+
 # a reactions read error must not be read as "no eyes" and fire a false NO_EYES
 D="$TMP/rx_err_watch"; mk "$D"; echo 'ERROR' > "$D/issues_reactions.json"
 assert "watch, reactions unreadable => not NO_EYES" TIMEOUT_NO_FINDINGS \

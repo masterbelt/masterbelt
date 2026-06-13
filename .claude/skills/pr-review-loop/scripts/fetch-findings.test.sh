@@ -52,5 +52,17 @@ JSON
 OUT3=$(FINDINGS_FIXTURE="$D3" bash "$SUT" 43 "$SINCE")
 assert "same-second inline finding printed" 1 "$(grep -c '^ID:9|' <<<"$OUT3")"
 
+# with a head SHA, only findings on that head are printed; old-head ones are dropped
+D4="$TMP/head_filter"; mkdir -p "$D4"; for f in pulls_comments pulls_reviews; do echo '[]' > "$D4/$f.json"; done
+cat > "$D4/pulls_comments.json" <<JSON
+[{"id":1,"user":{"login":"$BOT"},"path":"a.go","line":1,"commit_id":"f0a483e061head","original_commit_id":"f0a483e061head","created_at":"2026-06-13T03:46:40Z","body":"head finding"},
+ {"id":2,"user":{"login":"$BOT"},"path":"a.go","line":2,"commit_id":"deadbeefold00","original_commit_id":"deadbeefold00","created_at":"2026-06-13T03:46:41Z","body":"old-head finding"}]
+JSON
+OUT4=$(FINDINGS_FIXTURE="$D4" bash "$SUT" 43 "$SINCE" "f0a483e061head")
+assert "head finding shown with head filter"     1 "$(grep -c '^ID:1|' <<<"$OUT4")"
+assert "old-head finding hidden with head filter" 0 "$(grep -c '^ID:2|' <<<"$OUT4")"
+OUT4b=$(FINDINGS_FIXTURE="$D4" bash "$SUT" 43 "$SINCE")
+assert "no head arg shows all findings (compat)" 2 "$(grep -c '^ID:' <<<"$OUT4b")"
+
 echo "---"
 [ "$fails" -eq 0 ] && { echo "all green"; exit 0; } || { echo "$fails failed"; exit 1; }
