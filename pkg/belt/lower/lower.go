@@ -280,10 +280,15 @@ func Body(body []ast.Stmt, b Binder) []ir.Stmt {
 // member resolved through the declared result type (return Legend, in a fn
 // whose result is an enum) is left for the post-check write-back to fill from
 // the checker's resolution — the one position whose enum expectation the binder
-// genuinely cannot see, unlike a switch arm or a let annotation. Every resolved
-// value, and a non-identifier or recovered (nil) value, lowers as before; a
-// placeholder that no resolution fills is a hole that folds to nothing, exactly
-// as the nil it replaced did.
+// genuinely cannot see, unlike a switch arm, a let annotation, or an operator
+// argument, each of which the lowering already resolves through an expected-enum
+// binder. (A bare member nested in a returned ternary or collection still relies
+// on that direct resolution; widening the placeholder to reach through nested
+// expressions is the next migration slice, which also streams the call-argument
+// enum resolution the operator channel uses today.) Every resolved value, and a
+// non-identifier or recovered (nil) value, lowers as before; a placeholder that
+// no resolution fills is a hole that folds to nothing, exactly as the nil it
+// replaced did.
 func returnValue(e ast.Expr, b Binder) ir.Value {
 	if v := Value(e, b); v != nil {
 		return v

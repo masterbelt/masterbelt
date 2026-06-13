@@ -134,6 +134,31 @@ func TestBareMemberReturnUnknown(t *testing.T) {
 	}
 }
 
+func TestBareMemberEnumPositionTypeName(t *testing.T) {
+	// A bare type name in an enum-expecting body position is a compile-time type
+	// value that fails its own type check (type_mismatch) — never a mistyped enum
+	// member, so it earns no unknown_enum_member. The same exemption the const
+	// path makes, applied across the body positions that share the reporter: a
+	// return and a let annotation.
+	for _, c := range []struct {
+		name string
+		src  string
+	}{
+		{"return", bareMemberPrelude + "pub fn f(): Rarity {\n  return byte\n}\n"},
+		{"let", bareMemberPrelude + "pub fn g(): Rarity {\n  let r: Rarity = byte\n  return r\n}\n"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			_, diags := analyze(c.src)
+			if hasCode(diags, CodeUnknownEnumMember) {
+				t.Errorf("a bare type name should not report unknown_enum_member, got %v", codes(diags))
+			}
+			if !hasCode(diags, CodeTypeMismatch) {
+				t.Errorf("a bare type name in an enum position should be a type mismatch, got %v", codes(diags))
+			}
+		})
+	}
+}
+
 func TestBareMemberCompareArg(t *testing.T) {
 	src := bareMemberPrelude + "pub fn f(rarity: Rarity): bool {\n  return rarity == Legend\n}\n"
 	m, diags := analyze(src)

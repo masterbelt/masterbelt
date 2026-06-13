@@ -288,6 +288,11 @@ func reportBareEnumMember(value ast.Expr, enumDef *ir.TypeDef, bs infer.BodyScop
 	if env.q != nil && env.q.resolve(env.file, id) != nil {
 		return // a top-level constant: a legitimate reference
 	}
+	if env.q != nil && env.q.universe(env.file)[id.Name] != nil {
+		return // a bare type name: a compile-time type value, not a mistyped member
+		// (it fails its own type check) — the same exemption the const path's
+		// reportRefIssues makes before issuing an enum-member diagnostic.
+	}
 	s := at(id)
 	diags.Add(newUnknownEnumMemberDiagnostic(s.offset, s.width, enumDef.Name, id.Name))
 }
