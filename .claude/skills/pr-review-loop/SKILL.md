@@ -23,7 +23,7 @@ The point is the triage and the escalation, not the mechanics. Three things make
 
 ## Stage 1 — Fetch the current review, fresh
 
-Pull the inline comments (the usual substance) **and** the submitted review *bodies*. The inline comments are where findings normally live, but Codex can also post a finding in the review body with no inline comment — Stage 7 detects that as `FINDINGS`, so a comments-only fetch would bounce you back here with nothing to triage and the loop would spin. **Paginate** both, or on a multi-page PR you see only the first page and can miss fresh findings (and Stage 7 can falsely declare convergence). `gh api`'s own `--slurp` is rejected together with `--jq`, so paginate and merge the pages through an external `jq -s 'add'`. **Run `scripts/fetch-findings.sh <n> "$SINCE"`** — it fetches and formats both streams, paginated and round-scoped, so a review-body-only finding is never dropped (pinned by `fetch-findings.test.sh`). The snippets below are what it runs:
+Pull the inline comments (the usual substance) **and** the submitted review *bodies*. The inline comments are where findings normally live, but Codex can also post a finding in the review body with no inline comment — Stage 7 detects that as `FINDINGS`, so a comments-only fetch would bounce you back here with nothing to triage and the loop would spin. **Paginate** both, or on a multi-page PR you see only the first page and can miss fresh findings (and Stage 7 can falsely declare convergence). `gh api`'s own `--slurp` is rejected together with `--jq`, so paginate and merge the pages through an external `jq -s 'add'`. **Run `.claude/skills/pr-review-loop/scripts/fetch-findings.sh <n> "$SINCE"`** — it fetches and formats both streams, paginated and round-scoped, so a review-body-only finding is never dropped (pinned by `fetch-findings.test.sh`). The snippets below are what it runs:
 
 ```
 # inline review comments (the usual substance)
@@ -33,7 +33,7 @@ gh api --paginate repos/<owner>/<repo>/pulls/<n>/comments \
 # submitted review BODIES from the bot, scoped to this round — catches a finding
 # that rides the review body with no inline comment (else FINDINGS → Stage 1 spins)
 gh api --paginate repos/<owner>/<repo>/pulls/<n>/reviews \
-  | jq -s --arg b "chatgpt-codex-connector[bot]" --arg since "$SINCE" 'add | map(select(.user.login==$b and .state=="COMMENTED" and (.submitted_at // "") > $since and (.body|length>0))) | .[] | "REVIEW:\(.submitted_at)\n\(.body)\n==="'
+  | jq -s --arg b "chatgpt-codex-connector[bot]" --arg since "$SINCE" 'add | map(select(.user.login==$b and .state=="COMMENTED" and (.submitted_at // "") > $since and (.body|length>0))) | .[] | "REVIEW_ID:\(.id)|\(.submitted_at)\n\(.body)\n==="'
 ```
 
 - Process only comments **from the reviewer** that you have **not addressed yet**. Decide "mine vs the bot's" by the comment's author (`user.login`), **not** by `in_reply_to_id`: the reviewer can post a *fresh finding* as a reply inside an existing thread, so it carries `in_reply_to_id` too — skipping every reply with that field set would silently drop it. A comment is "already handled" only when *you* authored it or its id is in the set you have already addressed.
@@ -85,7 +85,7 @@ gh api repos/<owner>/<repo>/pulls/<n>/comments/<comment-id>/replies \
 
 A reply per comment is what lets the reviewer (and the human) see the loop is actually closing, not stalling.
 
-- **Resolve the thread once it is handled** — a reply is not the same as resolving, and an open thread reads as "still outstanding" and **keeps the PR from going merge-ready**, so you must resolve, not just reply. After you have *fixed* or *disproven* a finding, mark its review thread resolved (leave a thread you escalated to the human open — that one is theirs to close). Resolving is a GraphQL mutation keyed by the thread id, so map the comment you addressed to its thread, then resolve. Heads-up: resolving the *bot's* thread is a separate external write, so an automated-permission mode may gate it independently of your replies — if it gets denied, surface it so the human can authorize it or add a permission rule (e.g. allow the `resolveReviewThread` mutation); do not treat the denial as "resolving is optional". **Run `scripts/resolve-thread.sh <n> <comment-id>…`** — it maps each comment to its thread by an **exact** match on *any* comment's `databaseId` (a finding posted as a *reply* is not the thread's first comment) across the **paginated** threads connection, then resolves; both traps that bite a hand-written `grep`/`jq` are baked in and pinned by `resolve-thread.test.sh`. The snippets below are what it runs:
+- **Resolve the thread once it is handled** — a reply is not the same as resolving, and an open thread reads as "still outstanding" and **keeps the PR from going merge-ready**, so you must resolve, not just reply. After you have *fixed* or *disproven* a finding, mark its review thread resolved (leave a thread you escalated to the human open — that one is theirs to close). Resolving is a GraphQL mutation keyed by the thread id, so map the comment you addressed to its thread, then resolve. Heads-up: resolving the *bot's* thread is a separate external write, so an automated-permission mode may gate it independently of your replies — if it gets denied, surface it so the human can authorize it or add a permission rule (e.g. allow the `resolveReviewThread` mutation); do not treat the denial as "resolving is optional". **Run `.claude/skills/pr-review-loop/scripts/resolve-thread.sh <n> <comment-id>…`** — it maps each comment to its thread by an **exact** match on *any* comment's `databaseId` (a finding posted as a *reply* is not the thread's first comment) across the **paginated** threads connection, then resolves; both traps that bite a hand-written `grep`/`jq` are baked in and pinned by `resolve-thread.test.sh`. The snippets below are what it runs:
 
 ```
 # every unresolved thread, paged, with ALL of its comment ids
@@ -93,7 +93,7 @@ gh api graphql --paginate -F owner=<owner> -F repo=<repo> -F number=<n> -f query
 query($owner:String!,$repo:String!,$number:Int!,$endCursor:String){
   repository(owner:$owner,name:$repo){ pullRequest(number:$number){
     reviewThreads(first:100, after:$endCursor){
-      nodes{ id isResolved comments(first:50){ nodes{ databaseId } } }
+      nodes{ id isResolved comments(first:100){ nodes{ databaseId } } }
       pageInfo{ hasNextPage endCursor } } } } }' \
   --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved|not) | "\(.id)\t\([.comments.nodes[].databaseId]|join(","))"'
 
@@ -119,7 +119,7 @@ Triggering — the part the earlier "never touch `@codex review`" advice got wro
 Detecting the outcome: after the trigger/push, run the bundled helper instead of re-deriving the probes by hand — it packages exactly the checks below (paginated, SHA-pinned, SINCE-scoped) and prints one verdict line:
 
 ```
-scripts/codex-outcome.sh <n> "$SINCE" "$HEAD_SHA" [--watch [max_polls] [interval_sec]]
+.claude/skills/pr-review-loop/scripts/codex-outcome.sh <n> "$SINCE" "$HEAD_SHA" [--watch [max_polls] [interval_sec]]
 # → OUTCOME=FINDINGS | APPROVED | RUNNING | TIMEOUT_NO_FINDINGS | NO_EYES | ERROR
 ```
 
@@ -154,7 +154,7 @@ gh api --paginate repos/<owner>/<repo>/issues/<n>/reactions \
 Then decide: **any findings probe > 0 → Stage 1.** Approve on either round-scoped positive artifact — the commit-scoped verdict comment for your SHA, **or** a `+1` after your trigger (a deliberate decision, so a reaction-only clean review still converges; the residual risk of a prior run's late `+1` is bounded only by the `created_at > $SINCE` scope). Never approve on silence: a 👀 with nothing after it means the review is still running or has stalled, **not** that it passed — keep polling, and after a generous wait surface it to the human, because delayed findings still arrive. And **fail closed** — if a findings source cannot be read (a transient `gh`/API failure → the helper's `ERROR`), retry; never read an unread source as "no findings".
 
 - **Poll in modest intervals**, not tightly — the verdict takes minutes (observed on this repo: the 👀 lands within seconds of the trigger, but the 👍 / comments arrive roughly 10–20 minutes later). Schedule a wake-up / background poll rather than blocking the turn. Record your trigger/push time so you only count signals newer than it.
-- **No 👀 well after your trigger means the trigger did not take** — the helper mechanizes this as `OUTCOME=NO_EYES` (grace `EYES_GRACE_POLLS`, default 12 polls). The grace is deliberately generous: a review here has started anywhere from seconds to ~18 minutes after a push, so a short grace re-triggers a review that was merely slow (observed: a `NO_EYES` re-trigger followed by the original review landing ~13 min later). On a genuine `NO_EYES`, re-post `@codex review` once and re-run the watch; if it recurs, the trigger is stuck — surface it to the human. A 👀 *with* no verdict after a generous wait is the other case — the review started but stalled — and is also worth surfacing.
+- **No 👀 well after your trigger means the trigger did not take** — the helper mechanizes this as `OUTCOME=NO_EYES` (grace `NO_EYES_GRACE_SECONDS`, default 1200s / 20 min — time-based, so it holds at any poll interval). The grace is deliberately generous: a review here has started anywhere from seconds to ~18 minutes after a push, so a short grace re-triggers a review that was merely slow (observed: a `NO_EYES` re-trigger followed by the original review landing ~13 min later). On a genuine `NO_EYES`, re-post `@codex review` once and re-run the watch; if it recurs, the trigger is stuck — surface it to the human. A 👀 *with* no verdict after a generous wait is the other case — the review started but stalled — and is also worth surfacing.
 - **Convergence is a round-scoped approval, not a stalled silence** — a clean pass is the "Didn't find any major issues" comment for *your* SHA, or a `+1` after your trigger (the helper's `APPROVED`). Scope both to `created_at > $SINCE` so a prior run's reaction does not count. If neither lands but a 👀 did and then nothing, that is a stall to surface to the human, not an approval.
 - **Non-convergence guard:** if the loop keeps surfacing *new substantive* issues after several rounds, or the same finding keeps coming back, that is itself a signal — pause and summarize to the human rather than grinding. A reviewer can also drift into self-contradiction or nits; recognising "this has converged enough" or "this needs a human" is part of the skill.
 

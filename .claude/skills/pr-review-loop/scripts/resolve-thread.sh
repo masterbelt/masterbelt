@@ -32,11 +32,15 @@ threads_tsv(){ # emits "<thread-id>\t<cid,cid,...>" for UNRESOLVED threads
     cat "$RESOLVE_THREAD_FIXTURE"
   else
     local or; or=$(gh repo view --json nameWithOwner -q .nameWithOwner) || return 1
+    # The outer thread connection is paged; the inner comments are capped at 100,
+    # which covers any real Codex thread. A comment id in a larger thread simply
+    # will not map, and map_cid's caller then reports it unresolved with a non-zero
+    # exit (not a silent success) — full nested pagination is deliberately deferred.
     gh api graphql --paginate -F owner="${or%/*}" -F repo="${or#*/}" -F number="$PR" -f query='
       query($owner:String!,$repo:String!,$number:Int!,$endCursor:String){
         repository(owner:$owner,name:$repo){ pullRequest(number:$number){
           reviewThreads(first:100, after:$endCursor){
-            nodes{ id isResolved comments(first:50){ nodes{ databaseId } } }
+            nodes{ id isResolved comments(first:100){ nodes{ databaseId } } }
             pageInfo{ hasNextPage endCursor } } } } }' \
       --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved|not) | "\(.id)\t\([.comments.nodes[].databaseId]|join(","))"'
   fi

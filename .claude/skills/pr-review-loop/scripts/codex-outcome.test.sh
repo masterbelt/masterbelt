@@ -81,7 +81,7 @@ assert "watch persistent error => ERROR (not TIMEOUT)" ERROR \
 # 9) --watch with no 👀 within the grace window => NO_EYES (trigger never took)
 D="$TMP/no_eyes"; mk "$D"
 assert "watch, no eyes within grace => NO_EYES" NO_EYES \
-  "$(EYES_GRACE_POLLS=2 CODEX_OUTCOME_FIXTURE="$D" bash "$SUT" 43 "$SINCE" "$SHA" --watch 3 0 | sed -n 's/^OUTCOME=//p')"
+  "$(NO_EYES_GRACE_SECONDS=1 CODEX_OUTCOME_FIXTURE="$D" bash "$SUT" 43 "$SINCE" "$SHA" --watch 5 1 | sed -n 's/^OUTCOME=//p')"
 
 # 10) --watch WITH 👀 present must NOT cry NO_EYES (review started, just slow)
 D="$TMP/eyes_running"; mk "$D"
@@ -89,7 +89,7 @@ cat > "$D/issues_reactions.json" <<JSON
 [{"user":{"login":"$BOT"},"content":"eyes","created_at":"2026-06-13T03:43:00Z"}]
 JSON
 assert "watch, eyes present => not NO_EYES" TIMEOUT_NO_FINDINGS \
-  "$(EYES_GRACE_POLLS=2 CODEX_OUTCOME_FIXTURE="$D" bash "$SUT" 43 "$SINCE" "$SHA" --watch 3 0 | sed -n 's/^OUTCOME=//p')"
+  "$(NO_EYES_GRACE_SECONDS=1 CODEX_OUTCOME_FIXTURE="$D" bash "$SUT" 43 "$SINCE" "$SHA" --watch 3 1 | sed -n 's/^OUTCOME=//p')"
 
 # an empty-body COMMENTED review with no inline comments is not an actionable finding
 D="$TMP/empty_review_body"; mk "$D"
@@ -108,7 +108,7 @@ assert "same-second +1 => APPROVED" APPROVED "$(run "$D")"
 # a reactions read error must not be read as "no eyes" and fire a false NO_EYES
 D="$TMP/rx_err_watch"; mk "$D"; echo 'ERROR' > "$D/issues_reactions.json"
 assert "watch, reactions unreadable => not NO_EYES" TIMEOUT_NO_FINDINGS \
-  "$(EYES_GRACE_POLLS=2 CODEX_OUTCOME_FIXTURE="$D" bash "$SUT" 43 "$SINCE" "$SHA" --watch 3 0 | sed -n 's/^OUTCOME=//p')"
+  "$(NO_EYES_GRACE_SECONDS=1 CODEX_OUTCOME_FIXTURE="$D" bash "$SUT" 43 "$SINCE" "$SHA" --watch 3 1 | sed -n 's/^OUTCOME=//p')"
 
 # a jq parse/filter failure on a findings source must fail closed, not approve
 D="$TMP/jq_fail"; mk "$D"
@@ -118,10 +118,10 @@ cat > "$D/issues_comments.json" <<JSON
 JSON
 assert "jq failure on a findings source => ERROR" ERROR "$(run "$D")"
 
-# the default 👀 grace is generous, so a short watch must not declare NO_EYES early
+# the default 👀 grace is generous, so a few seconds of elapsed must not declare NO_EYES
 D="$TMP/no_eyes_default"; mk "$D"
-assert "default grace not exceeded in 3 polls => not NO_EYES" TIMEOUT_NO_FINDINGS \
-  "$(CODEX_OUTCOME_FIXTURE="$D" bash "$SUT" 43 "$SINCE" "$SHA" --watch 3 0 | sed -n 's/^OUTCOME=//p')"
+assert "default grace not exceeded in a short watch => not NO_EYES" TIMEOUT_NO_FINDINGS \
+  "$(CODEX_OUTCOME_FIXTURE="$D" bash "$SUT" 43 "$SINCE" "$SHA" --watch 3 1 | sed -n 's/^OUTCOME=//p')"
 
 echo "---"
 [ "$fails" -eq 0 ] && { echo "all green"; exit 0; } || { echo "$fails failed"; exit 1; }

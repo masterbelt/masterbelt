@@ -21,7 +21,7 @@ cat > "$D/pulls_comments.json" <<JSON
 JSON
 cat > "$D/pulls_reviews.json" <<JSON
 [
-  {"user":{"login":"$BOT"},"state":"COMMENTED","commit_id":"abcdef0123","submitted_at":"2026-06-13T03:46:39Z","body":"REVIEW BODY FINDING with no inline comment"},
+  {"id":77,"user":{"login":"$BOT"},"state":"COMMENTED","commit_id":"abcdef0123","submitted_at":"2026-06-13T03:46:39Z","body":"REVIEW BODY FINDING with no inline comment"},
   {"user":{"login":"$BOT"},"state":"COMMENTED","commit_id":"abcdef0123","submitted_at":"2026-06-13T03:47:00Z","body":""},
   {"user":{"login":"$BOT"},"state":"APPROVED","commit_id":"abcdef0123","submitted_at":"2026-06-13T03:48:00Z","body":"lgtm"}
 ]
@@ -33,7 +33,8 @@ assert "this round's inline finding shown"      1 "$(grep -c '^ID:1|' <<<"$OUT")
 assert "pre-round inline finding hidden"        0 "$(grep -c '^ID:2|' <<<"$OUT")"
 assert "non-bot comment hidden"                 0 "$(grep -c '^ID:3|' <<<"$OUT")"
 assert "review-body-only finding shown"         1 "$(grep -c 'REVIEW BODY FINDING' <<<"$OUT")"
-assert "empty-body review hidden"               0 "$(grep -c '^REVIEW:2026-06-13T03:47' <<<"$OUT")"
+assert "review header carries a stable id"      1 "$(grep -c '^REVIEW_ID:77|' <<<"$OUT")"
+assert "empty-body review hidden"               0 "$(grep -c '2026-06-13T03:47:00' <<<"$OUT")"
 assert "non-COMMENTED (approved) review hidden" 0 "$(grep -c 'lgtm' <<<"$OUT")"
 assert "exactly two finding blocks"             2 "$(grep -c '^===' <<<"$OUT")"
 

@@ -19,10 +19,10 @@
 #                                still converges; its residual risk (a prior run's late
 #                                +1) is bounded only by the SINCE round scope.
 #   OUTCOME=RUNNING              only 👀 / nothing terminal yet (single probe)
-#   OUTCOME=NO_EYES              --watch saw no 👀 within the grace window (default 12
-#                                polls; env EYES_GRACE_POLLS) and nothing terminal: the
-#                                push was not picked up — re-post "@codex review" and
-#                                re-watch, rather than wait out a review that never began
+#   OUTCOME=NO_EYES              --watch saw no 👀 within the grace window (default 1200s;
+#                                env NO_EYES_GRACE_SECONDS) and nothing terminal: the push
+#                                was not picked up — re-post "@codex review" and re-watch,
+#                                rather than wait out a review that never began
 #   OUTCOME=TIMEOUT_NO_FINDINGS  --watch elapsed with no findings and no commit-scoped
 #                                verdict. NOT an approval — keep waiting or surface to
 #                                the human; do not treat silence alone as approval.
@@ -42,10 +42,11 @@ PR=$1; SINCE=$2; SHA=$3; shift 3
 WATCH=0; MAXP=20; INT=90
 if [ "${1:-}" = "--watch" ]; then WATCH=1; MAXP=${2:-20}; INT=${3:-90}; fi
 SHA9=${SHA:0:9}
-# Polls to wait for 👀 before declaring the trigger missed. The default is generous
-# because a review here has been seen to start anywhere from seconds to ~18 minutes
-# after a push; too small a grace re-triggers a review that was merely slow to start.
-EYES_GRACE=${EYES_GRACE_POLLS:-12}
+# Seconds to wait for 👀 before declaring the trigger missed — time-based, not a poll
+# count, so the grace holds regardless of the --watch interval. The default is generous:
+# a review here has started anywhere from seconds to ~18 minutes after a push, and too
+# short a grace re-triggers a review that was merely slow to start.
+NO_EYES_GRACE_SECS=${NO_EYES_GRACE_SECONDS:-1200}
 # Bias the round cutoff a couple seconds earlier: GitHub timestamps are second-
 # precision, so an artifact created in the same wall-clock second the trigger was
 # recorded would be dropped by a strict ">". Prior-round artifacts are minutes old,
@@ -133,16 +134,20 @@ if [ "$WATCH" -eq 0 ]; then
 fi
 
 last=RUNNING; eyes_seen=0
+WATCH_START=$(date +%s 2>/dev/null || echo 0)
 for i in $(seq 1 "$MAXP"); do
   probe; d=$(decide); last=$d
   [ "${EYES:-0}" -gt 0 ] && eyes_seen=1
   echo "[poll $i $(date -u +%H:%M:%SZ)] $(line) -> $d"
   case "$d" in FINDINGS|APPROVED) echo "OUTCOME=$d"; exit 0 ;; esac
-  # The trigger never took: no 👀 within the grace window and nothing terminal.
-  # Surface NO_EYES so the caller can re-post "@codex review" instead of waiting
-  # out a review that never started. Only when probes are healthy — an ERROR poll
-  # cannot read reactions reliably, so it keeps polling rather than misfire here.
-  if [ "$d" != ERROR ] && [ "${RX_ERR:-0}" -eq 0 ] && [ "$eyes_seen" -eq 0 ] && [ "$i" -ge "$EYES_GRACE" ]; then
+  # The trigger never took: no 👀 after a generous ELAPSED grace and nothing terminal.
+  # Surface NO_EYES so the caller can re-post "@codex review" instead of waiting out a
+  # review that never started. Elapsed-based (not poll-count) so it holds at any
+  # interval; skipped on an ERROR poll (reactions unreadable) and if the clock is
+  # unavailable, so a review that is merely slow to start is not re-triggered.
+  now=$(date +%s 2>/dev/null || echo 0)
+  if [ "$d" != ERROR ] && [ "${RX_ERR:-0}" -eq 0 ] && [ "$eyes_seen" -eq 0 ] \
+     && [ "$WATCH_START" -gt 0 ] && [ "$now" -gt 0 ] && [ $((now - WATCH_START)) -ge "$NO_EYES_GRACE_SECS" ]; then
     echo "OUTCOME=NO_EYES"; exit 0
   fi
   # ERROR or RUNNING → keep polling (a transient failure may clear next round).

@@ -57,4 +57,4 @@ printf '%s' "$inline" | jq -r --arg b "$BOT" --arg s "$SINCE_EFF" '
 printf '%s' "$reviews" | jq -r --arg b "$BOT" --arg s "$SINCE_EFF" '
   [.[] | select(.user.login==$b and .state=="COMMENTED" and (.submitted_at // "")>$s and ((.body // "")|length>0))]
   | sort_by(.submitted_at) | .[]
-  | "REVIEW:\(.submitted_at)|\((.commit_id // "")[0:9])\n\(.body)\n==="'
+  | "REVIEW_ID:\(.id)|\(.submitted_at)|\((.commit_id // "")[0:9])\n\(.body)\n==="'
