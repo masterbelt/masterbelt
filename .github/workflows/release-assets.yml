@@ -1,0 +1,83 @@
+# release-assets attaches the binaries to a stable GitHub Release after
+# release-please publishes it. The release tag is the source of truth: the job
+# checks out that exact ref, verifies it matches VERSION, then builds the same
+# reproducible archives the nightly workflow exercises.
+name: release assets
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Git tag to build, for example v0.1.1
+        required: true
+        type: string
+
+concurrency:
+  group: release-assets-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build:
+    name: build stable artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+          fetch-depth: 0
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify tag and VERSION agree
+        run: |
+          tag="${{ github.event.release.tag_name || inputs.tag }}"
+          version="$(cat VERSION)"
+          if [ "$tag" != "v$version" ]; then
+            echo "::error::release tag $tag does not match VERSION $version"
+            exit 1
+          fi
+
+      - name: Test
+        run: go test ./...
+
+      - name: Reproducibility check
+        run: make repro-check
+
+      - name: Cross-build and archive
+        run: make dist
+
+      - name: Smoke test
+        run: |
+          tmp="$(mktemp -d)"
+          tar -xzf dist/masterbelt-linux-amd64.tar.gz -C "$tmp"
+          "$tmp/masterbelt" version
+          "$tmp/masterbelt" check pkg/belt/testdata/examples/0009-project
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-path: |
+            dist/masterbelt-*.tar.gz
+            dist/masterbelt-*.zip
+            dist/SHA256SUMS
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ github.event.release.tag_name || inputs.tag }}"
+          gh release upload "$tag" \
+            dist/masterbelt-*.tar.gz \
+            dist/masterbelt-*.zip \
+            dist/SHA256SUMS \
+            dist/VERSION \
+            --clobber
