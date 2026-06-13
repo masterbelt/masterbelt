@@ -533,7 +533,7 @@ func reifiedType(def *ir.TypeDef) ir.Type {
 }
 
 func typeMemberType(reg *builtin.Registry, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, m *ast.MemberExpr) ir.Type {
-	def := memberReceiverDef(universe, qualified, valueShadows, m.Receiver)
+	def := MemberReceiverDef(universe, qualified, valueShadows, m.Receiver)
 	if def == nil {
 		// A namespace-qualified type name used as a value (geo.Item, no trailing
 		// projection) reifies to a type value of the metatype `type` — the qualified
@@ -561,16 +561,13 @@ func typeMemberType(reg *builtin.Registry, universe map[string]*ir.TypeDef, qual
 	return ir.Invalid
 }
 
-// memberReceiverDef resolves a member-access receiver to the type definition a
-// member is read off: a local type name (Item) through the universe, or a
-// namespace-qualified type name (geo.Item) through the import lookup. It returns
-// nil when the receiver is neither — a value receiver, or a name that is no type
-// — which the caller takes as a record-field reading. A nil qualified lookup
-// (no namespaces in scope) leaves the qualified form unresolved. The qualified
-// form is skipped when the namespace identifier is shadowed by a value
-// (valueShadows), so geo.Item.id reads the fields of a const named geo rather
-// than projecting the imported type.
-func memberReceiverDef(universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, recv ast.Expr) *ir.TypeDef {
+// MemberReceiverDef resolves a member access's receiver to the type definition it
+// names — a bare type name through the universe, or a namespace-qualified type name
+// (geo.Item) through the qualified lookup — or nil for any other receiver (a value,
+// or a name a value shadows). It is the one resolver the checker (type position) and
+// the lowering (value position) share, so the two cannot drift on what a
+// member-access receiver names.
+func MemberReceiverDef(universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, recv ast.Expr) *ir.TypeDef {
 	switch r := recv.(type) {
 	case *ast.Identifier:
 		return universe[r.Name]

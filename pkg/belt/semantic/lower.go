@@ -85,7 +85,7 @@ func (b constBinder) leafConstMember(e *ast.MemberExpr, sub func(ast.Expr) ir.Va
 	}
 	shadowed := func(id *ast.Identifier) bool { return b.q.resolve(b.file, id) != nil }
 	qualified := qualifiedFrom(b.q, b.q.importsOf(b.file))
-	if def := memberReceiverDef(b.uni(), qualified, shadowed, e.Receiver); def != nil {
+	if def := infer.MemberReceiverDef(b.uni(), qualified, shadowed, e.Receiver); def != nil {
 		if v := typeMemberValue(b.q.registry(), def, e); v != nil {
 			return v
 		}
@@ -97,29 +97,6 @@ func (b constBinder) leafConstMember(e *ast.MemberExpr, sub func(ast.Expr) ir.Va
 		return v
 	}
 	return &ir.FieldAccess{Receiver: sub(e.Receiver), Field: e.Member.Name, Syntax: e}
-}
-
-// memberReceiverDef resolves a member-access receiver to the type definition a
-// member is read off: a local type name (Item) through the universe, or a
-// namespace-qualified type name (geo.Item) through the import lookup — so a field
-// projected off either (Item.id, geo.Item.id) reaches the type member resolver.
-// It is the value-lowering twin of infer.memberReceiverDef; nil for any other
-// receiver, which the caller takes as a record-field access. The qualified form
-// is skipped when the namespace identifier is shadowed by a value (valueShadows),
-// so a const named geo wins over the import.
-func memberReceiverDef(universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, recv ast.Expr) *ir.TypeDef {
-	switch r := recv.(type) {
-	case *ast.Identifier:
-		return universe[r.Name]
-	case *ast.MemberExpr:
-		if ns, ok := r.Receiver.(*ast.Identifier); ok && qualified != nil {
-			if valueShadows != nil && valueShadows(ns) {
-				return nil
-			}
-			return qualified(ns.Name, r.Member.Name)
-		}
-	}
-	return nil
 }
 
 // qualifiedTypeValue lowers a namespace-qualified type name used as a value
@@ -680,7 +657,7 @@ func (b bodyBinder) leafNamespaceOrTypeMember(e *ast.MemberExpr) ir.Value {
 	// qualified form to a value receiver, the body twin of the const initializer's
 	// resolve check.
 	shadowed := b.valueShadows
-	if v := typeMemberValue(b.reg, memberReceiverDef(b.r.Defs, b.r.Qualified, shadowed, e.Receiver), e); v != nil {
+	if v := typeMemberValue(b.reg, infer.MemberReceiverDef(b.r.Defs, b.r.Qualified, shadowed, e.Receiver), e); v != nil {
 		return v
 	}
 	// A bare namespace-qualified type name used as a value (geo.Item, no trailing
