@@ -315,6 +315,26 @@ func (b placeholdering) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 	return nil
 }
 
+// ExpectedEnum and AnnotationEnum forward the wrapped binder's EnumExpecter
+// capability, which embedding the Binder interface alone would not promote: a
+// returned operator argument reads its expected enum through this (expectedEnumOf),
+// and without the forward the expectation is lost and every such argument falls to
+// a placeholder. They report no enum when the wrapped binder is not an
+// EnumExpecter (a const initializer never carries a return).
+func (b placeholdering) ExpectedEnum(scrutinee ast.Expr) *ir.TypeDef {
+	if e, ok := b.Binder.(EnumExpecter); ok {
+		return e.ExpectedEnum(scrutinee)
+	}
+	return nil
+}
+
+func (b placeholdering) AnnotationEnum(t ast.TypeExpr) *ir.TypeDef {
+	if e, ok := b.Binder.(EnumExpecter); ok {
+		return e.AnnotationEnum(t)
+	}
+	return nil
+}
+
 // assignStmt lowers a reassignment. A plain identifier target names the let local
 // being updated, rebound to the new value. A property write — a member access on
 // a let local, p.name = v — rebinds that same local to a setter call:
@@ -450,6 +470,17 @@ func matchStmt(s *ast.MatchStmt, b Binder) *ir.Match {
 func expectEnum(b Binder, def *ir.TypeDef) Binder {
 	if def == nil {
 		return b
+	}
+	// Compose the expected-enum resolution *inside* a placeholdering binder, not
+	// outside it: a returned operator argument is lowered through both (the return
+	// value carries placeholdering, callValue adds the expected enum), and the
+	// member resolution must run before the placeholder fallback. Re-wrap so a
+	// bare member the expectation can name — directly or nested in the argument —
+	// resolves here, and only a name it cannot becomes a placeholder. Wrapping the
+	// other way around would defer every such member to a placeholder the checker
+	// streams no fact for, leaving a hole where the value folded before.
+	if p, ok := b.(placeholdering); ok {
+		return placeholdering{expectEnum(p.Binder, def)}
 	}
 	res, ok := b.(EnumMemberResolver)
 	if !ok {

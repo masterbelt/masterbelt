@@ -163,12 +163,15 @@ func TestBareMemberReturnNestedFolds(t *testing.T) {
 		"pub fn pick(b: bool): Rarity {\n  return b ? Legend : Common\n}\n" +
 		"pub fn many(): list<Rarity> {\n  return [Legend, Common]\n}\n" +
 		"pub fn isTop(r: Rarity): bool {\n  return r == Legend\n}\n" +
+		"pub fn isWanted(r: Rarity, top: bool): bool {\n  return r == (top ? Legend : Common)\n}\n" +
 		"const Many: list<Rarity> = many()\n" +
 		"assert pick(true) == Rarity.Legend\n" +
 		"assert pick(false) == Rarity.Common\n" +
 		"assert Many.len() == 2\n" +
 		"assert isTop(Rarity.Legend)\n" +
-		"assert !isTop(Rarity.Common)\n"
+		"assert !isTop(Rarity.Common)\n" +
+		"assert isWanted(Rarity.Legend, true)\n" +
+		"assert isWanted(Rarity.Common, false)\n"
 	m, diags := analyze(src)
 	if len(diags) != 0 {
 		t.Fatalf("nested return fold produced diagnostics: %v", codes(diags))
