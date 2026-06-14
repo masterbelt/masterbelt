@@ -258,10 +258,7 @@ func graphValueRaw(v ir.Value, ctx graphCtx) *ir.Constant {
 	case *ir.StaticCall:
 		return graphStaticCall(v, sub)
 	case *ir.Unresolved:
-		// A placeholder the write-back did not fill: a genuine hole (a name that
-		// resolved to nothing the checker could type, reported at the reference).
-		// It folds to nothing, exactly as the unresolved nil it replaced did.
-		return nil
+		return graphUnresolved(v, ctx)
 	case nil:
 		return nil
 	default:
@@ -691,6 +688,29 @@ func graphConvertRange(args []ir.Value, ctx graphCtx) *ir.Constant {
 		return nil
 	}
 	return ir.RangeConstantStep(start.Int, end.Int, step.Int)
+}
+
+// graphUnresolved folds a placeholder the write-back did not reach — a bare enum
+// member returned through a body the module write-back could not fill (a closure
+// captured by the value query, an imported function applied before its provider's
+// write-back). The fold resolves it against the expectation already threaded for
+// the position (the function's result type, the constant's annotation): a member
+// of that enum folds to the member, exactly as the write-back-filled node would,
+// so a returned bare member folds wherever it is reached. The expectation is a
+// universe lookup, not the type query, so the value fold stays independent of
+// typing. A placeholder with no enum expectation, or naming no member of it, is a
+// genuine hole (the checker reported it) and folds to nothing.
+func graphUnresolved(v *ir.Unresolved, ctx graphCtx) *ir.Constant {
+	def := types.EnumDef(ctx.expectedType)
+	if def == nil || def.Enum == nil {
+		return nil
+	}
+	for i, m := range def.Enum.Members {
+		if m.Name == v.Name {
+			return ir.EnumConstant(def, i)
+		}
+	}
+	return nil
 }
 
 // unhandledValue is the panic value an ir.Value walker raises for a node kind

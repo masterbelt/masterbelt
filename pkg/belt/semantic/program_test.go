@@ -74,6 +74,32 @@ func findDiag(t *testing.T, p *Program, file FileID, code diagnostic.Code) diagn
 	return diagnostic.Diagnostic{}
 }
 
+func TestProgramCrossFileEnumReturnFolds(t *testing.T) {
+	// A bare enum member returned from an imported function folds at a cross-file
+	// call site, the same as a returned qualified member. The provider's body is
+	// folded through the value query's own graph, which the importer's write-back
+	// cannot fill; the surviving placeholder resolves against the call's expected
+	// result type at fold time. main.belt sorts before zlib.belt, so this also
+	// pins the order-independence: the importer folds before the provider's
+	// write-back and still gets the value.
+	srcs := map[string]string{
+		"zlib.belt": "pub enum R: byte {\n  A = 1\n  B = 2\n}\npub fn top(): R {\n  return B\n}\n",
+		"main.belt": "use z from \"zlib.belt\"\nconst Top: z.R = z.top()\n",
+	}
+	p := buildProgram(srcs)
+	assertClean(t, p, "main.belt")
+	if typ, eval := constInfo(p, "main.belt", "Top"); typ != "R" || eval != "R.B" {
+		t.Errorf("Top = %s / %s, want R / R.B (an imported bare-member return folds cross-file)", typ, eval)
+	}
+
+	// The qualified form is the control: it folds the same value.
+	srcs["zlib.belt"] = "pub enum R: byte {\n  A = 1\n  B = 2\n}\npub fn top(): R {\n  return R.B\n}\n"
+	pq := buildProgram(srcs)
+	if _, eval := constInfo(pq, "main.belt", "Top"); eval != "R.B" {
+		t.Errorf("qualified cross-file return = %s, want R.B", eval)
+	}
+}
+
 func TestProgramCrossFileValues(t *testing.T) {
 	p := buildProgram(map[string]string{
 		"geometry.belt": "pub const Origin = 0\npub const Unit = 1\nconst hidden = 2\n",
