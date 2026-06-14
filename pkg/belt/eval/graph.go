@@ -693,21 +693,28 @@ func graphConvertRange(args []ir.Value, ctx graphCtx) *ir.Constant {
 // graphUnresolved folds a placeholder the write-back did not reach — a bare enum
 // member returned through a body the module write-back could not fill (a closure
 // captured by the value query, an imported function applied before its provider's
-// write-back). The fold resolves it against the expectation already threaded for
-// the position (the function's result type, the constant's annotation): a member
-// of that enum folds to the member, exactly as the write-back-filled node would,
-// so a returned bare member folds wherever it is reached. The expectation is a
-// universe lookup, not the type query, so the value fold stays independent of
-// typing. A placeholder with no enum expectation, or naming no member of it, is a
-// genuine hole (the checker reported it) and folds to nothing.
+// write-back). It resolves the member against the expectation already threaded
+// for the position (the function's declared result type), a member-by-name
+// reading of the same enum the checker resolved. The expectation is a universe
+// lookup, not the type query, so the value fold stays independent of typing.
+//
+// Only a direct enum result folds here, and only as the immediate value. A union
+// carrying the enum would need the member tagged into it, a self result would
+// need the receiver definition resolved, and a placeholder nested in a returned
+// ternary or collection carries no expectation at this point — each would
+// reproduce a slice of the write-back's resolution in the fold, and a half-done
+// union fold would publish an untagged value that diverges from the qualified
+// path. So those are left holes (the qualified form folds them), never a wrong
+// value; a name that is no member of the enum is a hole too (the checker
+// reported it).
 func graphUnresolved(v *ir.Unresolved, ctx graphCtx) *ir.Constant {
-	def := types.EnumDef(ctx.expectedType)
-	if def == nil || def.Enum == nil {
+	named, ok := ctx.expectedType.(*ir.Named)
+	if !ok || named.Def == nil || named.Def.Enum == nil {
 		return nil
 	}
-	for i, m := range def.Enum.Members {
+	for i, m := range named.Def.Enum.Members {
 		if m.Name == v.Name {
-			return ir.EnumConstant(def, i)
+			return ir.EnumConstant(named.Def, i)
 		}
 	}
 	return nil

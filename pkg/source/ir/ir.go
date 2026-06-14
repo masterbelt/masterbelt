@@ -707,13 +707,14 @@ func (*TypeValue) value() {}
 // EnumMemberValue the checker settled) wherever it reaches the node, so the
 // lowering stays type-blind and the checker is the single source of truth for
 // the IR. Where the write-back cannot reach — a body the value query folds
-// through its own graph (a captured closure, an imported function applied before
-// its provider's write-back) — a surviving placeholder folds against the
-// expectation already threaded for its position (the function's result type),
-// the same enum-member-by-name reading the checker made; with no such
-// expectation, or naming no member of it, it is a genuine hole (the checker
-// reported it) and folds to nothing. Name is the bare name as written; Syntax is
-// the identifier, the write-back's pairing key.
+// through its own graph (an imported function applied before its provider's
+// write-back) — a surviving placeholder folds against the expectation already
+// threaded for its position when that is a direct enum result type, the same
+// enum-member-by-name reading the checker made. With no such expectation — a
+// union carrying the enum, a self result, a nested position, or a name that is
+// no member — it is a hole the qualified form folds instead, never a wrong
+// value. Name is the bare name as written; Syntax is the identifier, the
+// write-back's pairing key.
 type Unresolved struct {
 	Name   string
 	Syntax *ast.Identifier `tree:"-"`
