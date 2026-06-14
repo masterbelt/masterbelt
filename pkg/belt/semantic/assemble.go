@@ -604,19 +604,38 @@ func (a *assembler) refoldConsts(genv graphFoldEnv) {
 			}
 			// A union value the type-blind query folded untagged (a composite or
 			// reference inflow whose kind several members back) is corrected here:
-			// the annotated graph tags it through the checker's Adapt. Adopt only a
-			// tagged re-fold — strictly more precise — so a value the annotated graph
-			// also leaves untagged (a call returning the union directly) keeps its
-			// blind value; and a same-file reader then folds the tagged value through
-			// the published-value preference in graphFoldEnv.ConstValue.
-			if c.Eval.UnionTag == nil && types.UnionType(c.Type) != nil {
-				if v := eval.GraphExpecting(c.Value, c.Type, genv); v != nil && v.UnionTag != nil {
+			// the annotated graph tags it through the checker's explicit Adapt. This
+			// reaches a union inflow nested in a record field or collection element
+			// too, where the const's own type is not the union — the trigger is a
+			// union-targeted Adapt anywhere in the value, found by the walk. Re-fold
+			// over the annotated graph and adopt a strictly more precise result (the
+			// tagged value differs from the untagged blind one); a value the
+			// annotated graph also leaves untagged re-folds equal and is kept.
+			if valueHasUnionAdapt(c.Value) {
+				if v := eval.GraphExpecting(c.Value, c.Type, genv); v != nil && !ir.ConstantsEqual(v, c.Eval) {
 					c.Eval = v
 					progress = true
 				}
 			}
 		}
 	}
+}
+
+// valueHasUnionAdapt reports whether a value graph carries, anywhere within it, an
+// explicit adaption into a union — the checker's mark of a value flowing into a
+// union member. It is the trigger for the late re-fold's union-tag correction: a
+// union inflow at the top level, or nested in a record field or collection
+// element, is one the type-blind value query may have folded untagged. A value
+// with no such adaption needs no correction (the blind fold already settled it).
+func valueHasUnionAdapt(v ir.Value) bool {
+	found := false
+	ir.WalkValues(v, func(n ir.Value) bool {
+		if a, ok := n.(*ir.Adapt); ok && types.UnionType(a.To) != nil {
+			found = true
+		}
+		return !found // stop descending once one is found
+	})
+	return found
 }
 
 // reportMasterValidationRefs reports the reference problems of a master's per-row

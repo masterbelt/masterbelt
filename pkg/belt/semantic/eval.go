@@ -27,19 +27,17 @@ func (e graphFoldEnv) ConstValue(c *ir.Const) *ir.Constant {
 	if c.Syntax == nil {
 		return nil
 	}
-	blind := e.q.valueOf(c.Syntax)
+	// This file's published value is the late re-fold's over the annotated graph,
+	// which is at least as precise as the type-blind value query's and strictly
+	// more so where a union inflow the blind query could not tag is tagged here
+	// through the checker's Adapt — including one nested in a record field or
+	// collection element. Prefer it for a same-file reader, so a match dispatch
+	// folds the tagged value. A cross-file reader has no own entry and reads the
+	// blind value unchanged.
 	if own := e.own[c.Syntax]; own != nil && own.Eval != nil {
-		// This file's published value is the late re-fold's, which can be strictly
-		// more precise than the type-blind query's: a union inflow the blind query
-		// could not tag is tagged here through the checker's Adapt. Prefer it when
-		// the blind value is missing or carries no union tag the published one
-		// does, so a same-file reader (a match dispatch) folds the tagged value.
-		// A cross-file reader has no own entry and reads the blind value unchanged.
-		if blind == nil || (blind.UnionTag == nil && own.Eval.UnionTag != nil) {
-			return own.Eval
-		}
+		return own.Eval
 	}
-	return blind
+	return e.q.valueOf(c.Syntax)
 }
 func (e graphFoldEnv) LookupType(name string) *ir.TypeDef { return e.q.universe(e.file)[name] }
 func (e graphFoldEnv) Registry() *builtin.Registry        { return e.q.registry() }
