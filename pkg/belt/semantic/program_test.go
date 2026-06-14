@@ -100,6 +100,23 @@ func TestProgramCrossFileEnumReturnFolds(t *testing.T) {
 	}
 }
 
+func TestProgramCrossFileUnionInflowFolds(t *testing.T) {
+	// An exported constant whose value flows into a same-kind union is published
+	// folded (the type-blind value query the importer reads keeps folding it), so
+	// a cross-file reference to it still folds to a value — the late re-fold's
+	// union-tag correction is same-file only and must not withhold the importer's
+	// value. (Cross-file dispatch on the member is a separate, pre-existing
+	// limitation: the importer reads the blind, untagged value.)
+	p := buildProgram(map[string]string{
+		"lib.belt":  "pub type n = short | byte\npub const Tern: n = true ? short(20) : byte(5)\n",
+		"main.belt": "use lib from \"lib.belt\"\nconst R = lib.Tern\n",
+	})
+	assertClean(t, p, "main.belt")
+	if _, eval := constInfo(p, "main.belt", "R"); eval != "20" {
+		t.Errorf("cross-file R = %s, want 20 (an imported union-inflow const stays foldable)", eval)
+	}
+}
+
 func TestProgramCrossFileValues(t *testing.T) {
 	p := buildProgram(map[string]string{
 		"geometry.belt": "pub const Origin = 0\npub const Unit = 1\nconst hidden = 2\n",

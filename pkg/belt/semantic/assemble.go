@@ -593,8 +593,25 @@ func (a *assembler) refoldConsts(genv graphFoldEnv) {
 		progress = false
 		for _, decl := range a.file.Decls {
 			c := a.shells[decl]
-			if c.Eval == nil && c.Value != nil {
+			if c.Value == nil {
+				continue
+			}
+			if c.Eval == nil {
 				if c.Eval = eval.GraphExpecting(c.Value, c.Type, genv); c.Eval != nil {
+					progress = true
+				}
+				continue
+			}
+			// A union value the type-blind query folded untagged (a composite or
+			// reference inflow whose kind several members back) is corrected here:
+			// the annotated graph tags it through the checker's Adapt. Adopt only a
+			// tagged re-fold — strictly more precise — so a value the annotated graph
+			// also leaves untagged (a call returning the union directly) keeps its
+			// blind value; and a same-file reader then folds the tagged value through
+			// the published-value preference in graphFoldEnv.ConstValue.
+			if c.Eval.UnionTag == nil && types.UnionType(c.Type) != nil {
+				if v := eval.GraphExpecting(c.Value, c.Type, genv); v != nil && v.UnionTag != nil {
+					c.Eval = v
 					progress = true
 				}
 			}
