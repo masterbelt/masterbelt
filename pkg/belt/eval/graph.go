@@ -238,9 +238,7 @@ func graphValueRaw(v ir.Value, ctx graphCtx) *ir.Constant {
 	case *ir.RangeLit:
 		return graphRangeLit(v, sub)
 	case *ir.FuncLiteral:
-		// A function literal folds to a closure over the bindings in scope —
-		// the IR node itself, whose lowered Body the application interprets.
-		return ir.FuncConstant(v, maps.Clone(ctx.locals))
+		return graphFuncLiteral(v, ctx)
 	case *ir.FieldAccess:
 		return graphFieldAccess(v, sub)
 	case *ir.Conversion:
@@ -691,6 +689,37 @@ func graphConvertRange(args []ir.Value, ctx graphCtx) *ir.Constant {
 		return nil
 	}
 	return ir.RangeConstantStep(start.Int, end.Int, step.Int)
+}
+
+// graphFuncLiteral folds a function literal to a closure over the bindings in
+// scope — the IR node itself, whose lowered Body the application interprets. A
+// body still holding an unfilled placeholder (a bare member the type-blind
+// lowering left for the write-back to resolve) is not yet foldable: the closure
+// would capture the hole and any application would read nothing. Defer it — the
+// type-blind value query returns nothing, the post-check re-fold over the
+// written-back (filled) body produces the real closure, and the monotone
+// widening picks that up.
+func graphFuncLiteral(v *ir.FuncLiteral, ctx graphCtx) *ir.Constant {
+	if bodyHasPlaceholder(v.Body) {
+		return nil
+	}
+	return ir.FuncConstant(v, maps.Clone(ctx.locals))
+}
+
+// bodyHasPlaceholder reports whether a function body still holds an unfilled
+// ir.Unresolved — a bare name the type-blind lowering deferred to the write-back.
+// A closure over such a body cannot fold (an application would read the hole), so
+// the value query defers the whole function literal until the re-fold runs over
+// the written-back, placeholder-filled body.
+func bodyHasPlaceholder(body []ir.Stmt) bool {
+	found := false
+	ir.WalkBody(body, func(v ir.Value) bool {
+		if _, ok := v.(*ir.Unresolved); ok {
+			found = true
+		}
+		return !found // stop descending once one is found
+	})
+	return found
 }
 
 // unhandledValue is the panic value an ir.Value walker raises for a node kind

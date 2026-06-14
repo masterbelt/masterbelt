@@ -183,6 +183,39 @@ func TestBareMemberReturnNestedFolds(t *testing.T) {
 	}
 }
 
+func TestBareMemberFuncValuedConstFolds(t *testing.T) {
+	// A bare member returned from a function-valued constant's body folds when the
+	// constant is applied: the type-blind value query defers the closure (its body
+	// holds the placeholder), and the post-check re-fold over the written-back body
+	// produces the real closure, so applying it folds the member. The qualified
+	// form folds the same way, the comparison the gap was visible against.
+	src := bareMemberPrelude +
+		"const Pick: fn(): Rarity = fn(): Rarity { return Legend }\n" +
+		"const X: Rarity = Pick()\n" +
+		"const PickQ: fn(): Rarity = fn(): Rarity { return Rarity.Legend }\n" +
+		"const XQ: Rarity = PickQ()\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	eval := func(name string) string {
+		for _, c := range m.Consts {
+			if c != nil && c.Name == name {
+				if c.Eval == nil {
+					return "<nil>"
+				}
+				return c.Eval.String()
+			}
+		}
+		return "<missing>"
+	}
+	for _, name := range []string{"X", "XQ"} {
+		if got := eval(name); got != "Rarity.Legend" {
+			t.Errorf("%s = %s, want Rarity.Legend (a function-valued const's bare return folds when applied)", name, got)
+		}
+	}
+}
+
 func TestBareMemberReturnUnknown(t *testing.T) {
 	src := bareMemberPrelude + "pub fn f(): Rarity {\n  return Bogus\n}\n"
 	m, diags := analyze(src)
