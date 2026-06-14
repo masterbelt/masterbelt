@@ -656,6 +656,29 @@ func TestMissingEffectOnMethod(t *testing.T) {
 	}
 }
 
+func TestMissingEffectOnImplicitSelfMethodCall(t *testing.T) {
+	// A method calling a sibling method with self omitted (roll(), not self.roll())
+	// uses that sibling's effects: a pure method making an effectful implicit call
+	// is missing the effect, the same as the explicit self.roll() form. The bare
+	// callee resolves through self after a top-level function, so the effect walk
+	// must reach it there or the implicit call escapes the check.
+	src := "pub type T = sbyte impl {\n" +
+		"  pub fn nondet roll(): datetime {\n    return datetime.now()\n  }\n" +
+		"  pub fn pick(): datetime {\n    return roll()\n  }\n" +
+		"}\n"
+	if _, diags := analyze(src); !hasCode(diags, CodeMissingEffect) {
+		t.Fatalf("want missing_effect for an implicit self-method effectful call, got %v", codes(diags))
+	}
+	// Declaring the effect on the caller satisfies it — no spurious missing_effect.
+	ok := "pub type T = sbyte impl {\n" +
+		"  pub fn nondet roll(): datetime {\n    return datetime.now()\n  }\n" +
+		"  pub fn nondet pick(): datetime {\n    return roll()\n  }\n" +
+		"}\n"
+	if _, diags := analyze(ok); hasCode(diags, CodeMissingEffect) {
+		t.Fatalf("a caller declaring the effect must not report missing_effect, got %v", codes(diags))
+	}
+}
+
 func TestMissingEffectOnNativeStaticCall(t *testing.T) {
 	// The registry's effectful native is a root like any other effectful
 	// callee: a pure fn reading datetime.now() directly is missing nondet.

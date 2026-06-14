@@ -294,6 +294,27 @@ func TestMasterValidateRejectsEffect(t *testing.T) {
 	}
 }
 
+// TestMasterValidateRejectsImplicitSelfMethodEffect pins that the effect check
+// reaches an implicit self-method call (assert ok(), self omitted), not only an
+// explicit one (assert self.ok()): an effectful row method called either way is a
+// missing effect, since a validate has nowhere to declare one. Without the
+// implicit arm the bare call escaped the check entirely — the effectful call typed
+// fine and folded, so an effectful row validation was silently accepted.
+func TestMasterValidateRejectsImplicitSelfMethodEffect(t *testing.T) {
+	row := "master M {\n  record { id: int } impl {\n    pub fn nondet ok(): bool {\n      return self.id > 0\n    }\n  }\n  primary id\n  validate {\n    each {\n      assert %s\n    }\n  }\n}\n"
+	// Both the implicit and explicit forms report the missing effect.
+	for _, call := range []string{"ok()", "self.ok()"} {
+		if _, diags := analyze(strings.Replace(row, "%s", call, 1)); !hasCode(diags, CodeMissingEffect) {
+			t.Fatalf("want missing_effect for an effectful %q validate check, got %v", call, codes(diags))
+		}
+	}
+	// A pure row method called implicitly is not a missing effect — no false report.
+	pure := "master M {\n  record { id: int } impl {\n    pub fn ok(): bool {\n      return self.id > 0\n    }\n  }\n  primary id\n  validate {\n    each {\n      assert ok()\n    }\n  }\n}\n"
+	if _, diags := analyze(pure); hasCode(diags, CodeMissingEffect) {
+		t.Fatalf("a pure implicit self-method call must not report missing_effect, got %v", codes(diags))
+	}
+}
+
 // TestEnclosingDeclMaster pins that an offset inside a master maps to the
 // master's stable anchor — the anchor lookup reads the master backpointer like
 // it does a type/enum/interface, so a diagnostic anchored in a master resolves.
