@@ -704,12 +704,16 @@ func (*TypeValue) value() {}
 // not carry — a bare enum member in a return, resolved through the declared
 // result type the checker has but the binder does not. The post-check
 // write-back fills it from the checker's resolution (it becomes the
-// EnumMemberValue the checker settled), so the lowering stays type-blind and
-// the checker is the single source of truth for the type-directed reading. A
-// placeholder that survives the write-back is a genuine hole — a name that
-// resolved to nothing the checker could type, its own diagnostic reported at the
-// reference — so it folds to nothing, exactly as the unresolved nil it replaced
-// did. Name is the bare name as written; Syntax is the identifier, the
+// EnumMemberValue the checker settled) wherever it reaches the node, so the
+// lowering stays type-blind and the checker is the single source of truth for
+// the IR. Where the write-back cannot reach — a body the value query folds
+// through its own graph (an imported function applied before its provider's
+// write-back) — a surviving placeholder folds against the expectation already
+// threaded for its position when that is a direct enum result type, the same
+// enum-member-by-name reading the checker made. With no such expectation — a
+// union carrying the enum, a self result, a nested position, or a name that is
+// no member — it is a hole the qualified form folds instead, never a wrong
+// value. Name is the bare name as written; Syntax is the identifier, the
 // write-back's pairing key.
 type Unresolved struct {
 	Name   string
