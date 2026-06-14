@@ -532,7 +532,7 @@ func (a *assembler) resolveFuncDecls() {
 	nsShadows := namespaceShadowsFrom(a.q, a.fileID)
 	checkMethodBodies(a.reg, a.module.Types, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, constShadows, nsShadows, bodyEnv, bodySink(a.at, a.diags, a.reg, bodyEnv, a.res), a.at, a.diags)
 	checkFuncBodies(a.reg, a.file, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, constShadows, nsShadows, bodyEnv, bodySink(a.at, a.diags, a.reg, bodyEnv, a.res), a.at, a.diags)
-	checkEffects(a.reg, a.file, a.module.Types, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, constShadows, a.at, a.diags)
+	checkEffects(a.reg, a.file, a.module.Types, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, constShadows, a.res, a.at, a.diags)
 }
 
 // checkAssocConstRefs reports the reference diagnostics for the associated-
@@ -802,9 +802,10 @@ func (a *assembler) evaluateAssert(decl *ast.AssertDecl, genv graphFoldEnv) {
 // matching purity check.
 func (a *assembler) checkPureContexts() {
 	scope := infer.BodyScope{Reg: a.reg, Universe: a.q.universe(a.fileID), Qualified: qualifiedFrom(a.q, a.imp), Self: ir.Invalid, Funcs: a.funcs, QualifiedFuncs: a.qfns, ConstShadows: constShadowsFrom(a.q, a.fileID)}
+	resolved := callEffectsFrom(a.res)
 	check := func(e ast.Expr, position string) {
 		if e != nil {
-			checkPureContext(e, position, scope, a.at, a.diags)
+			checkPureContext(e, position, scope, resolved, a.at, a.diags)
 		}
 	}
 	for _, decl := range a.file.Decls {

@@ -679,6 +679,46 @@ func TestMissingEffectOnImplicitSelfMethodCall(t *testing.T) {
 	}
 }
 
+func TestEffectChargesSelectedOverloadOnly(t *testing.T) {
+	// An effect check charges the overload the checker selected, not the union of
+	// every same-named candidate's effects. With a nondet at(string) and a pure
+	// at(int), a pure caller selecting at(int) must not be flagged for nondet —
+	// the false positive the conservative union produced. Selecting the effectful
+	// at(string) must still report, so the precision does not let an effect escape.
+	tBody := func(call string) string {
+		return "pub type T = sbyte impl {\n" +
+			"  pub fn nondet at(s: string): int {\n    return 0\n  }\n" +
+			"  pub fn at(n: int): int {\n    return n\n  }\n" +
+			"  pub fn pick(): int {\n    return " + call + "\n  }\n" +
+			"}\n"
+	}
+	fnBody := func(call string) string {
+		return "pub fn nondet at(s: string): int {\n  return 0\n}\n" +
+			"pub fn at(n: int): int {\n  return n\n}\n" +
+			"pub fn pick(): int {\n  return " + call + "\n}\n"
+	}
+	cases := []struct {
+		name    string
+		src     string
+		wantEff bool
+	}{
+		{"implicit selects pure", tBody("at(1)"), false},
+		{"explicit selects pure", tBody("self.at(1)"), false},
+		{"top-level selects pure", fnBody("at(1)"), false},
+		{"implicit selects effectful", tBody("at(\"x\")"), true},
+		{"explicit selects effectful", tBody("self.at(\"x\")"), true},
+		{"top-level selects effectful", fnBody("at(\"x\")"), true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := analyze(tc.src)
+			if got := hasCode(diags, CodeMissingEffect); got != tc.wantEff {
+				t.Fatalf("missing_effect = %v, want %v (codes %v)", got, tc.wantEff, codes(diags))
+			}
+		})
+	}
+}
+
 func TestMissingEffectOnNativeStaticCall(t *testing.T) {
 	// The registry's effectful native is a root like any other effectful
 	// callee: a pure fn reading datetime.now() directly is missing nondet.
