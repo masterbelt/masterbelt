@@ -230,6 +230,12 @@ func synthMethodArgs(e *ast.CallExpr, recv ir.Type, args []ir.Type, bad *bool, s
 				if mt := enumMemberExpectation(recv, id.Name); mt != nil {
 					args[i] = mt
 					known[i] = mt
+					// Stream the resolution like checkEnumShorthand does, so a
+					// placeholder lowered for this argument (a bare member in a
+					// return that reaches the operator through a nested expression)
+					// is filled by the write-back rather than left a hole.
+					def := mt.(*ir.Named).Def
+					sink.resolvedEnumMember(id, def, enumMemberIndex(def, id.Name))
 					sink.typed(a, mt)
 					continue
 				}
