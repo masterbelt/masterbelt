@@ -28,18 +28,20 @@ import (
 // check never fires for it (the ir.Invalid style of suppression). The silent
 // pass (nil at/diags) decides usability identically and just skips the
 // reporting, so the memoized definitions and the diagnostics never disagree.
-func resolveWhere(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, res *callResolutions) {
+func resolveWhere(q queries, fileID FileID, r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, res *callResolutions) {
 	if td.Where == nil || def.Body == nil || ir.HasInvalid(def.Body) {
 		return
 	}
 	report := at != nil && diags != nil
 	var sink *infer.Sink
+	before := 0
 	if report {
 		// The checking walk's facts stream into res (when the reporting pass
 		// supplies one), keyed by the predicate's expressions — the same AST
 		// the memoized definition's Where graph anchors to — so the write-back
 		// types and adapts the predicate graph like any body's.
 		sink = exprSink(at, diags, res)
+		before = diags.Len()
 	}
 	// The predicate types in a body scope with no parameters: self and literals,
 	// plus a method call on self. self is the nominal type being refined (not its
@@ -52,7 +54,32 @@ func resolveWhere(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl
 	bs := infer.BodyScope{Reg: reg, Universe: r.Defs, Qualified: r.Qualified, Self: self}
 	t := infer.CheckPredicate(td.Where, bs, sink)
 	if t == ir.Invalid {
-		return // the operator error was reported by the sink
+		// A predicate types to Invalid when a reference in it does not resolve. The
+		// checking walk reports an operator error it sees, but a bare name that
+		// resolves to nothing — or to a top-level constant, which a predicate may
+		// not read (its vocabulary is self, literals, and self's own methods) —
+		// types to Invalid with no diagnostic of its own. Left unreported the
+		// refinement would be dropped (Where stays nil) and silently unenforced,
+		// the master cell checks among the casualties, so it must be surfaced here.
+		if report {
+			// self is the refined nominal type, so a bare name reading one of its
+			// members with self omitted — a field, a getter, or an implicit
+			// self-method call (where ok(x)) — is a resolved self reference, not an
+			// undefined name, the same exemption a master per-row check makes. The
+			// callee set keeps the method exemption to a genuine call, not a bare
+			// method name.
+			callees := callCalleeIdents(td.Where)
+			selfMember := func(id *ast.Identifier) bool { return selfReference(reg, self, id, callees) }
+			reportRefIssues(fileID, td.Where, q, at, diags, nil, selfMember)
+			if diags.Len() == before {
+				// Neither the checking walk nor the reference check found anything to
+				// report, so the predicate reads a resolvable value a refinement may
+				// not use: it is not a usable compile-time predicate.
+				s := at(td.Where)
+				diags.Add(newRefinementNotConstantDiagnostic(s.offset, s.width))
+			}
+		}
+		return
 	}
 	if !types.IsBoolean(reg, t) {
 		if report {

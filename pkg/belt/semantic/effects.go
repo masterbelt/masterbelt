@@ -217,8 +217,22 @@ func collectNameCallEffectUses(e *ast.CallExpr, callee *ast.Identifier, bs infer
 		// effects below are not collected for it.
 		return
 	}
-	for _, eff := range declaredEffects(bs.Funcs[callee.Name]) {
-		use(eff, e)
+	if fds := bs.Funcs[callee.Name]; len(fds) > 0 {
+		for _, eff := range declaredEffects(fds) {
+			use(eff, e)
+		}
+		return
+	}
+	// A bare callee that resolves no other way is an implicit self-method call
+	// (ok(), self omitted) — the call form of the self-omission a bare read takes,
+	// resolved last after a function. Its effects reach the body the same as an
+	// explicit self.ok(), so they are collected here; without this an effectful
+	// implicit call (a nondet method in a master per-row validate, which can
+	// declare no effect) escapes the missing-effect check the explicit form gets.
+	if bs.Self != nil && bs.Self != ir.Invalid {
+		if ms, _, ok := types.Candidates(bs.Reg, bs.Self, callee.Name); ok {
+			useMethodEffects(ms, e, use)
+		}
 	}
 }
 
@@ -294,6 +308,13 @@ func collectMethodCallEffectUses(e *ast.CallExpr, callee *ast.MemberExpr, bs inf
 	if !ok {
 		return
 	}
+	useMethodEffects(ms, e, use)
+}
+
+// useMethodEffects reports the union of a resolved method candidate set's
+// declared effects, each once — shared by an explicit member call and an
+// implicit self-method call so the two collect a method's effects identically.
+func useMethodEffects(ms []*ir.Method, e *ast.CallExpr, use func(effect string, node ast.Node)) {
 	seen := map[string]bool{}
 	for _, m := range ms {
 		for _, eff := range m.Effects {

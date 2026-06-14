@@ -102,6 +102,68 @@ func TestRefinementNotConstant(t *testing.T) {
 	}
 }
 
+func TestRefinementUndefinedNameReported(t *testing.T) {
+	// A where-clause referencing a name that resolves to nothing once typed to
+	// Invalid and was dropped without a word: the refinement silently never
+	// applied, so a value the author meant to constrain passed unchecked. The
+	// undefined reference is reported, once, at the declaration, exactly as a
+	// const initializer's would be.
+	m, diags := analyze("pub type Strong = int where self >= UNDEFINED\nconst c: Strong = 5\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeUndefinedName {
+		t.Fatalf("codes = %v, want [undefined_name]", got)
+	}
+	if !strings.Contains(diags[0].Message, "UNDEFINED") {
+		t.Errorf("message %q does not name the undefined reference", diags[0].Message)
+	}
+	// The unusable predicate stays off the definition — no half-applied refinement.
+	if m.Types[0].Where != nil {
+		t.Error("Strong.Where != nil, want nil for an unresolved predicate")
+	}
+}
+
+func TestRefinementConstReferenceReported(t *testing.T) {
+	// A predicate may read only self, literals, and self's own methods — never a
+	// top-level constant. Referencing one once typed to Invalid and was dropped
+	// silently, leaving the refinement unenforced. It is now reported as not a
+	// usable compile-time predicate, at the declaration, and the definition keeps
+	// no half-formed where-clause.
+	m, diags := analyze("const MIN: int = 10\npub type Strong = int where self >= MIN\nconst c: Strong = 5\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeRefinementNotConstant {
+		t.Fatalf("codes = %v, want [refinement_not_constant]", got)
+	}
+	if m.Types[0].Where != nil {
+		t.Error("Strong.Where != nil, want nil for a constant-referencing predicate")
+	}
+}
+
+func TestRefinementImplicitSelfMethodCallee(t *testing.T) {
+	def := "pub type T = sbyte where ok(0) impl {\n  pub ok(x: sbyte): bool {\n    return self > x\n  }\n}\n"
+	// A predicate may call a method of the refined type with self omitted; the
+	// callee resolves through self, so it must not be reported as an undefined
+	// name. The valid form folds and the refinement applies.
+	m, diags := analyze(def + "const c: T = 1\n")
+	if len(diags) != 0 {
+		t.Fatalf("an implicit self-method call should resolve, got %v", codes(diags))
+	}
+	if m.Types[0].Where == nil {
+		t.Error("T.Where = nil, want the validated self-method predicate")
+	}
+	// When such a call is invalid for its arguments, only the real reference error
+	// is reported — the resolved self-method callee is not piled on as a second,
+	// spurious undefined name.
+	bad := "pub type T = sbyte where ok(UNDEFINED) impl {\n  pub ok(x: sbyte): bool {\n    return self > x\n  }\n}\nconst c: T = 1\n"
+	if got := codes(diagsOf(t, bad)); len(got) != 1 || got[0] != CodeUndefinedName {
+		t.Fatalf("codes = %v, want a single [undefined_name] for the argument", got)
+	}
+	// The exemption is for the call-callee position only: a bare method name is
+	// not a value, so it stays an undefined-name report rather than being
+	// silently accepted as a resolved self reference.
+	bare := "pub type T = sbyte where ok impl {\n  pub ok(): bool {\n    return self > 0\n  }\n}\nconst c: T = 1\n"
+	if got := codes(diagsOf(t, bare)); len(got) != 1 || got[0] != CodeUndefinedName {
+		t.Fatalf("codes = %v, want [undefined_name] for a bare method name", got)
+	}
+}
+
 func TestRefinementBadMethod(t *testing.T) {
 	// A method self's body type does not have is an operator type error — the
 	// predicate's problem is reported once, as invalid_operation, and the

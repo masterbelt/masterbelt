@@ -611,13 +611,13 @@ func (a *assembler) refoldConsts(genv graphFoldEnv) {
 func (a *assembler) reportMasterValidationRefs() {
 	for _, md := range a.file.Masters {
 		// A per-row check is a body over the row (self), so a bare name reading a
-		// readable member of the row — a field or getter, self omitted — is a
-		// resolved reference, not an undefined name. The row receiver is the master's
-		// own resolved type, the same self the checker and lowering bind there.
-		var rowMember func(string) bool
+		// readable member of the row — a field or getter, self omitted — or calling
+		// one of its methods is a resolved reference, not an undefined name. The row
+		// receiver is the master's own resolved type, the same self the checker and
+		// lowering bind there.
+		var row ir.Type
 		if def := a.masterDef(md.Name); def != nil {
-			row := ir.Type(&ir.Named{Def: def})
-			rowMember = func(name string) bool { return infer.IsReadableMember(a.reg, row, name) }
+			row = &ir.Named{Def: def}
 		}
 		for _, clause := range md.Validations {
 			if !clause.PerRow {
@@ -625,6 +625,14 @@ func (a *assembler) reportMasterValidationRefs() {
 			}
 			for _, stmt := range clause.Body {
 				if as, ok := stmt.(*ast.AssertStmt); ok && as.Cond != nil {
+					var rowMember func(*ast.Identifier) bool
+					if row != nil {
+						// The callee set is per-condition, so a self-method exemption
+						// reaches only a genuine implicit call (assert ok(x)), not a bare
+						// method name (assert ok), which is not a value.
+						callees := callCalleeIdents(as.Cond)
+						rowMember = func(id *ast.Identifier) bool { return selfReference(a.reg, row, id, callees) }
+					}
 					// reportRefIssues walks with ast.WalkExprs, which stops at a
 					// function literal's boundary — so a name a lambda binds (its own
 					// parameter) is not seen here and not misreported, and an undefined
@@ -635,6 +643,42 @@ func (a *assembler) reportMasterValidationRefs() {
 			}
 		}
 	}
+}
+
+// selfReference reports whether an identifier in a self-bearing predicate — a
+// refinement's where-clause or a master per-row validate — resolves through self
+// (self omitted) rather than as an undefined name. A readable member (a field or
+// getter) is one in any position; an instance method is one only as the callee of
+// an implicit self-method call, as in `where ok(x)` or `assert ok(x)`. A method
+// callee is not a readable member, so a reference check keyed on readable members
+// alone misreports the resolved callee as undefined — even when the call is valid
+// — while a bare method name (assert ok) is not a value and must stay reported, so
+// the method exemption is limited to the call-callee position.
+func selfReference(reg *builtin.Registry, self ir.Type, id *ast.Identifier, callees map[*ast.Identifier]bool) bool {
+	if infer.IsReadableMember(reg, self, id.Name) {
+		return true
+	}
+	if !callees[id] {
+		return false
+	}
+	_, _, ok := types.Candidates(reg, self, id.Name)
+	return ok
+}
+
+// callCalleeIdents collects the identifiers an expression uses as a call callee —
+// the ok in ok(x) — so a self-method exemption applies to a genuine implicit
+// self-method call and not to a bare method name read as a value.
+func callCalleeIdents(e ast.Expr) map[*ast.Identifier]bool {
+	out := map[*ast.Identifier]bool{}
+	ast.WalkExprs(e, func(n ast.Expr) bool {
+		if call, ok := n.(*ast.CallExpr); ok {
+			if id, ok := call.Callee.(*ast.Identifier); ok {
+				out[id] = true
+			}
+		}
+		return true
+	})
+	return out
 }
 
 // masterDef returns the assembled type definition of the named master, or nil
@@ -818,7 +862,7 @@ func reportUnknownNamespaceMember(fileID FileID, m *ast.MemberExpr, q queries, a
 	diags.Add(newUnknownMemberDiagnostic(s.offset, s.width, m.Member.Name, ns.Name))
 }
 
-func reportRefIssues(fileID FileID, e ast.Expr, q queries, at func(ast.Node) span, diags *diagnostic.List, expectedEnum *ir.TypeDef, isSelfMember func(string) bool) {
+func reportRefIssues(fileID FileID, e ast.Expr, q queries, at func(ast.Node) span, diags *diagnostic.List, expectedEnum *ir.TypeDef, isSelfMember func(*ast.Identifier) bool) {
 	walkRefsEnum(fileID, e, q,
 		func(id *ast.Identifier) {
 			if id.Name == "" || q.resolve(fileID, id) != nil {
@@ -830,9 +874,10 @@ func reportRefIssues(fileID FileID, e ast.Expr, q queries, at func(ast.Node) spa
 				return
 			}
 			// In a body with a receiver (a master per-row check), a bare name that
-			// reads a readable member of the row — a field or getter — is a resolved
-			// self read with self omitted, not an undefined name.
-			if isSelfMember != nil && isSelfMember(id.Name) {
+			// reads a readable member of the row — a field or getter — or calls one
+			// of its methods with self omitted is a resolved self reference, not an
+			// undefined name.
+			if isSelfMember != nil && isSelfMember(id) {
 				return
 			}
 			// A bare type name is a compile-time type value (const x = int8), not
