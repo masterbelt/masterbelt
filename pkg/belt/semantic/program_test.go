@@ -420,6 +420,61 @@ func TestProgramValueCutoffKeepsFnIdentity(t *testing.T) {
 	t.Fatal("main.belt declares no g")
 }
 
+func TestProgramConstReadInFnBodyStaysFresh(t *testing.T) {
+	// A constant folded through a function body that reads another constant must
+	// not go stale when that read constant — or the body itself — is edited. The
+	// value query folds `A = f()` by applying f's resolved body, which reads the
+	// other constant, so the value dependency has to be tracked through the body;
+	// were it dropped (e.g. because a reused function shell compares equal by
+	// identity after an in-place re-lower), A would keep the pre-edit fold while a
+	// full rebuild produces the new one. Each case edits one source and checks the
+	// incremental fold matches the value a fresh build of the same text gives.
+	cases := []struct {
+		name, before, after, watch, want string
+	}{
+		{
+			"edit the constant read in the body",
+			"const Base = 10\npub fn f(): int {\n  return Base\n}\nconst A = f()\n",
+			"const Base = 20\npub fn f(): int {\n  return Base\n}\nconst A = f()\n",
+			"A", "20",
+		},
+		{
+			"edit the body itself",
+			"const Base = 10\npub fn f(): int {\n  return Base\n}\nconst A = f()\n",
+			"const Base = 10\npub fn f(): int {\n  return Base + 1\n}\nconst A = f()\n",
+			"A", "11",
+		},
+		{
+			"edit a constant read through a method body",
+			"const Base = 10\npub type T = int impl {\n  pub fn m(): int {\n    return Base\n  }\n}\nconst A = T(0).m()\n",
+			"const Base = 20\npub type T = int impl {\n  pub fn m(): int {\n    return Base\n  }\n}\nconst A = T(0).m()\n",
+			"A", "20",
+		},
+		{
+			"edit a constant read through a two-hop call",
+			"const Base = 1\npub fn f(): int {\n  return Base\n}\npub fn g(): int {\n  return f()\n}\nconst A = g()\n",
+			"const Base = 7\npub fn f(): int {\n  return Base\n}\npub fn g(): int {\n  return f()\n}\nconst A = g()\n",
+			"A", "7",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := NewProgram()
+			p.SetFile("m.belt", abstract.NewDocument([]byte(tc.before)), nil)
+			p.Refresh()
+			p.SetFile("m.belt", abstract.NewDocument([]byte(tc.after)), nil)
+			p.Refresh()
+			if _, eval := constInfo(p, "m.belt", tc.watch); eval != tc.want {
+				t.Errorf("after edit, %s = %s, want %s", tc.watch, eval, tc.want)
+			}
+			// The incremental fold must equal a fresh build of the edited text.
+			if _, full := constInfo(buildProgram(map[string]string{"m.belt": tc.after}), "m.belt", tc.watch); full != tc.want {
+				t.Errorf("full rebuild %s = %s, want %s (test fixture wrong)", tc.watch, full, tc.want)
+			}
+		})
+	}
+}
+
 func TestProgramQualifiedTypes(t *testing.T) {
 	// geo.Point works in an annotation, a generic application, a type-decl
 	// body, and a function-literal signature — and names the same definition
