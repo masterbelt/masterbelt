@@ -136,6 +136,27 @@ func TestRefinementConstReferenceReported(t *testing.T) {
 	}
 }
 
+func TestRefinementImplicitSelfMethodCallee(t *testing.T) {
+	def := "pub type T = sbyte where ok(0) impl {\n  pub ok(x: sbyte): bool {\n    return self > x\n  }\n}\n"
+	// A predicate may call a method of the refined type with self omitted; the
+	// callee resolves through self, so it must not be reported as an undefined
+	// name. The valid form folds and the refinement applies.
+	m, diags := analyze(def + "const c: T = 1\n")
+	if len(diags) != 0 {
+		t.Fatalf("an implicit self-method call should resolve, got %v", codes(diags))
+	}
+	if m.Types[0].Where == nil {
+		t.Error("T.Where = nil, want the validated self-method predicate")
+	}
+	// When such a call is invalid for its arguments, only the real reference error
+	// is reported — the resolved self-method callee is not piled on as a second,
+	// spurious undefined name.
+	bad := "pub type T = sbyte where ok(UNDEFINED) impl {\n  pub ok(x: sbyte): bool {\n    return self > x\n  }\n}\nconst c: T = 1\n"
+	if got := codes(diagsOf(t, bad)); len(got) != 1 || got[0] != CodeUndefinedName {
+		t.Fatalf("codes = %v, want a single [undefined_name] for the argument", got)
+	}
+}
+
 func TestRefinementBadMethod(t *testing.T) {
 	// A method self's body type does not have is an operator type error — the
 	// predicate's problem is reported once, as invalid_operation, and the

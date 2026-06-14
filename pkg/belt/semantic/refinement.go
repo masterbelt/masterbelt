@@ -62,10 +62,11 @@ func resolveWhere(q queries, fileID FileID, r *infer.TypeResolver, reg *builtin.
 		// refinement would be dropped (Where stays nil) and silently unenforced,
 		// the master cell checks among the casualties, so it must be surfaced here.
 		if report {
-			// self is the refined nominal type, so a bare name reading a readable
-			// member of it (a getter, self omitted) is a resolved self read, not an
-			// undefined name — the same exemption a master per-row check makes.
-			selfMember := func(name string) bool { return infer.IsReadableMember(reg, self, name) }
+			// self is the refined nominal type, so a bare name reading one of its
+			// members with self omitted — a field, a getter, or an implicit
+			// self-method call (where ok(x)) — is a resolved self reference, not an
+			// undefined name, the same exemption a master per-row check makes.
+			selfMember := func(name string) bool { return selfReference(reg, self, name) }
 			reportRefIssues(fileID, td.Where, q, at, diags, nil, selfMember)
 			if diags.Len() == before {
 				// Neither the checking walk nor the reference check found anything to

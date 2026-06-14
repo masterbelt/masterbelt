@@ -488,3 +488,23 @@ func TestMasterFieldBrokenRefinementReported(t *testing.T) {
 		})
 	}
 }
+
+// TestMasterValidateImplicitSelfMethodCallee pins that a per-row validate may call
+// a row method with self omitted: the callee resolves through the row, so the
+// reference check must not report it as an undefined name. A valid call is
+// diagnostic-free, and an invalid one reports only the real argument error — not a
+// second, spurious undefined name for the resolved self-method callee.
+func TestMasterValidateImplicitSelfMethodCallee(t *testing.T) {
+	row := "master M {\n  record { id: int } impl {\n    pub ok(x: int): bool {\n      return self.id > x\n    }\n  }\n  primary id\n  validate {\n    each {\n      assert %s\n    }\n  }\n}\n"
+	if _, diags := analyze(strings.Replace(row, "%s", "ok(0)", 1)); len(diags) != 0 {
+		t.Fatalf("a valid implicit self-method call should resolve, got %v", codes(diags))
+	}
+	if got := codes(diagsFrom(analyze(strings.Replace(row, "%s", "ok(UNDEFINED)", 1)))); len(got) != 1 || got[0] != CodeUndefinedName {
+		t.Fatalf("codes = %v, want a single [undefined_name] for the argument", got)
+	}
+}
+
+// diagsFrom drops the module from an analyze result, keeping the diagnostics.
+func diagsFrom(_ *ir.Module, diags []diagnostic.Diagnostic) []diagnostic.Diagnostic {
+	return diags
+}

@@ -617,7 +617,7 @@ func (a *assembler) reportMasterValidationRefs() {
 		var rowMember func(string) bool
 		if def := a.masterDef(md.Name); def != nil {
 			row := ir.Type(&ir.Named{Def: def})
-			rowMember = func(name string) bool { return infer.IsReadableMember(a.reg, row, name) }
+			rowMember = func(name string) bool { return selfReference(a.reg, row, name) }
 		}
 		for _, clause := range md.Validations {
 			if !clause.PerRow {
@@ -635,6 +635,22 @@ func (a *assembler) reportMasterValidationRefs() {
 			}
 		}
 	}
+}
+
+// selfReference reports whether a bare name in a self-bearing predicate — a
+// refinement's where-clause or a master per-row validate — resolves through self
+// (self omitted) rather than as an undefined name. A readable member (a field or
+// getter) is one; so is an instance method the predicate calls implicitly, as in
+// `where ok(x)` or `assert ok(x)` with ok declared on the type. A method callee
+// is not a readable member, so a reference check keyed on readable members alone
+// misreports the resolved callee as undefined — even when the call is itself
+// valid — which this covers.
+func selfReference(reg *builtin.Registry, self ir.Type, name string) bool {
+	if infer.IsReadableMember(reg, self, name) {
+		return true
+	}
+	_, _, ok := types.Candidates(reg, self, name)
+	return ok
 }
 
 // masterDef returns the assembled type definition of the named master, or nil
