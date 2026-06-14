@@ -19,9 +19,42 @@ import (
 // (unused_effect, a warning that keeps signatures canonical). An extern
 // declaration is a root: its effects are axiomatic, so it is never checked.
 
+// resolvedCallEffects returns the declared effects of the overload the checker
+// pinned for a call, when it pinned one. That is the precise set the call uses —
+// a subset of the syntactic overload union — so charging it instead of the union
+// drops the false positive an effect-differing overload set otherwise produces.
+// It reports false when the checker recorded no resolution (a call it did not
+// reach, or one that resolves to a local function value), leaving the
+// conservative union as the sound fallback.
+type resolvedCallEffects func(*ast.CallExpr) ([]string, bool)
+
+// callEffectsFrom builds the resolved-overload effect lookup from the checking
+// walk's resolutions, which the body checks streamed in before this phase: a
+// method or static call reads the resolved ir.Method's effects, a function call
+// the resolved declaration's. A nil collector resolves nothing, so every call
+// stays on the conservative union.
+func callEffectsFrom(res *callResolutions) resolvedCallEffects {
+	return func(call *ast.CallExpr) ([]string, bool) {
+		if res == nil {
+			return nil, false
+		}
+		if m := res.methods[call]; m != nil {
+			return m.Effects, true
+		}
+		if m := res.statics[call]; m != nil {
+			return m.Effects, true
+		}
+		if fd := res.funcs[call]; fd != nil {
+			return fd.Effects, true
+		}
+		return nil, false
+	}
+}
+
 // checkEffects runs the declaration-completeness check over a file's
 // functions and its types' methods.
-func checkEffects(reg *builtin.Registry, file *ast.File, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, constShadows func(*ast.Identifier) bool, at func(ast.Node) span, diags *diagnostic.List) {
+func checkEffects(reg *builtin.Registry, file *ast.File, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, constShadows func(*ast.Identifier) bool, res *callResolutions, at func(ast.Node) span, diags *diagnostic.List) {
+	resolved := callEffectsFrom(res)
 	// The registry lets a parameter typed by a bounded projection (fn f<T: HasC>(c:
 	// T.c)) resolve to the bound's member type rather than ir.Invalid, so the effect
 	// collector sees the real type of such a parameter and the calls made on it.
@@ -40,7 +73,7 @@ func checkEffects(reg *builtin.Registry, file *ast.File, defs []*ir.TypeDef, uni
 			params[p.Name] = r.ResolveType(p.Type, tscope)
 		}
 		bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Invalid, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: tscope}
-		checkDeclEffects(fd.Name, fd.Effects, fd, fd.Body, bs, at, diags)
+		checkDeclEffects(fd.Name, fd.Effects, fd, fd.Body, bs, resolved, at, diags)
 	}
 	for _, def := range defs {
 		self := &ir.Named{Def: def}
@@ -66,7 +99,7 @@ func checkEffects(reg *builtin.Registry, file *ast.File, defs []*ir.TypeDef, uni
 			// (T(v)) is read as a conversion here, the same as in the function path and
 			// in the checker, rather than falling through to a same-named function.
 			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: methodSelf, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: methodTScope(r, def, m)}
-			checkDeclEffects(def.Name+"."+irm.Name, m.Effects, m, m.Body, bs, at, diags)
+			checkDeclEffects(def.Name+"."+irm.Name, m.Effects, m, m.Body, bs, resolved, at, diags)
 		}
 		// A master's per-row validate checks are pure: they fold against each row
 		// at compile time and have no place to declare an effect, so an effectful
@@ -80,7 +113,7 @@ func checkEffects(reg *builtin.Registry, file *ast.File, defs []*ir.TypeDef, uni
 					continue // a per-table check (validate all) is a later concern
 				}
 				bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: self, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows}
-				checkDeclEffects(def.Name+" validate", nil, clause, clause.Body, bs, at, diags)
+				checkDeclEffects(def.Name+" validate", nil, clause, clause.Body, bs, resolved, at, diags)
 			}
 		}
 	}
@@ -90,7 +123,7 @@ func checkEffects(reg *builtin.Registry, file *ast.File, defs []*ir.TypeDef, uni
 // an effect used but not declared is missing_effect, anchored at the first
 // site that uses it; one declared but never used is unused_effect, a warning
 // at the declaration.
-func checkDeclEffects(name string, declared []string, decl ast.Node, body []ast.Stmt, bs infer.BodyScope, at func(ast.Node) span, diags *diagnostic.List) {
+func checkDeclEffects(name string, declared []string, decl ast.Node, body []ast.Stmt, bs infer.BodyScope, resolved resolvedCallEffects, at func(ast.Node) span, diags *diagnostic.List) {
 	has := make(map[string]bool, len(declared))
 	for _, eff := range declared {
 		has[eff] = true
@@ -103,7 +136,7 @@ func checkDeclEffects(name string, declared []string, decl ast.Node, body []ast.
 		}
 		used[effect] = true
 	}
-	collectBodyEffectUses(body, bs, use)
+	collectBodyEffectUses(body, bs, resolved, use)
 	for _, eff := range declared {
 		if !used[eff] {
 			s := at(decl)
@@ -115,7 +148,7 @@ func checkDeclEffects(name string, declared []string, decl ast.Node, body []ast.
 // collectBodyEffectUses walks a statement body collecting its effect uses,
 // descending through a switch's scrutinee, arm value patterns, arm bodies, and
 // wildcard body so an effectful call anywhere in a switch counts.
-func collectBodyEffectUses(body []ast.Stmt, bs infer.BodyScope, use func(effect string, node ast.Node)) {
+func collectBodyEffectUses(body []ast.Stmt, bs infer.BodyScope, resolved resolvedCallEffects, use func(effect string, node ast.Node)) {
 	// The body walk is the shared ast.WalkBodyExprs skeleton — the one place a
 	// new statement form is wired in — so effect collection cannot drift out of
 	// sync with it or silently skip a kind. WalkBodyExprs yields the top
@@ -125,7 +158,7 @@ func collectBodyEffectUses(body []ast.Stmt, bs infer.BodyScope, use func(effect 
 	// the effects of each. (It also yields an assignment's target — an
 	// identifier — which collectEffectUses treats as a no-op, exactly right.)
 	ast.WalkBodyExprs(body, func(e ast.Expr) {
-		collectEffectUses(e, bs, use)
+		collectEffectUses(e, bs, resolved, use)
 	})
 }
 
@@ -135,14 +168,14 @@ func collectBodyEffectUses(body []ast.Stmt, bs infer.BodyScope, use func(effect 
 // the resolved method's. A function literal's body counts toward the
 // enclosing declaration — effects are monomorphic — with the literal's
 // parameters shadowing same-named functions and types, exactly as in typing.
-func collectEffectUses(e ast.Expr, bs infer.BodyScope, use func(effect string, node ast.Node)) {
+func collectEffectUses(e ast.Expr, bs infer.BodyScope, resolved resolvedCallEffects, use func(effect string, node ast.Node)) {
 	switch e := e.(type) {
 	case nil:
 		return
 	case *ast.AwaitExpr:
 		// The explicit suspension point: awaiting is itself the async effect.
 		use("async", e)
-		collectEffectUses(e.Value, bs, use)
+		collectEffectUses(e.Value, bs, resolved, use)
 	case *ast.FuncLit:
 		inner := bs
 		inner.Params = maps.Clone(bs.Params)
@@ -152,27 +185,27 @@ func collectEffectUses(e ast.Expr, bs infer.BodyScope, use func(effect string, n
 		for _, p := range e.Params {
 			inner.Params[p.Name] = ir.Invalid
 		}
-		collectBodyEffectUses(e.Body, inner, use)
+		collectBodyEffectUses(e.Body, inner, resolved, use)
 	case *ast.CollectionLit:
 		for _, entry := range e.Entries {
-			collectEffectUses(entry.Key, bs, use)
-			collectEffectUses(entry.Value, bs, use)
+			collectEffectUses(entry.Key, bs, resolved, use)
+			collectEffectUses(entry.Value, bs, resolved, use)
 		}
 	case *ast.RecordLit:
 		for _, f := range e.Fields {
-			collectEffectUses(f.Value, bs, use)
+			collectEffectUses(f.Value, bs, resolved, use)
 		}
 	case *ast.TernaryExpr:
 		// A ternary's condition and both branches run (one at compile time, but
 		// the type and effect surface spans both), so an effect anywhere in it
 		// counts — mirroring ast.WalkExprs, which descends all three operands.
-		collectEffectUses(e.Cond, bs, use)
-		collectEffectUses(e.Then, bs, use)
-		collectEffectUses(e.Else, bs, use)
+		collectEffectUses(e.Cond, bs, resolved, use)
+		collectEffectUses(e.Then, bs, resolved, use)
+		collectEffectUses(e.Else, bs, resolved, use)
 	case *ast.MemberExpr:
-		collectEffectUses(e.Receiver, bs, use)
+		collectEffectUses(e.Receiver, bs, resolved, use)
 	case *ast.CallExpr:
-		collectCallEffectUses(e, bs, use)
+		collectCallEffectUses(e, bs, resolved, use)
 	}
 }
 
@@ -180,7 +213,25 @@ func collectEffectUses(e ast.Expr, bs infer.BodyScope, use func(effect string, n
 // top-level overload set's effects, a member callee a namespace function's, a
 // static fn's, or a method's — then the arguments. A static fn call short-
 // circuits (it already descended its arguments), so it returns early.
-func collectCallEffectUses(e *ast.CallExpr, bs infer.BodyScope, use func(effect string, node ast.Node)) {
+func collectCallEffectUses(e *ast.CallExpr, bs infer.BodyScope, resolved resolvedCallEffects, use func(effect string, node ast.Node)) {
+	// When the checker pinned this call's overload, charge exactly its declared
+	// effects — the precise set the call uses — rather than the union over every
+	// same-named candidate the syntactic arms below would charge. The arms remain
+	// the sound fallback for a call the checker did not resolve (or one resolving
+	// to a local function value, which has no recorded overload and whose effects
+	// were already counted where the value was formed).
+	if effs, ok := resolved(e); ok {
+		for _, eff := range effs {
+			use(eff, e)
+		}
+		if m, ok := e.Callee.(*ast.MemberExpr); ok {
+			collectEffectUses(m.Receiver, bs, resolved, use)
+		}
+		for _, a := range e.Arguments {
+			collectEffectUses(a, bs, resolved, use)
+		}
+		return
+	}
 	switch callee := e.Callee.(type) {
 	case *ast.Identifier:
 		collectNameCallEffectUses(e, callee, bs, use)
@@ -188,14 +239,14 @@ func collectCallEffectUses(e *ast.CallExpr, bs infer.BodyScope, use func(effect 
 		if collectNamespaceCallEffectUses(e, callee, bs, use) {
 			break
 		}
-		if collectStaticCallEffectUses(e, callee, bs, use) {
+		if collectStaticCallEffectUses(e, callee, bs, resolved, use) {
 			return // a static fn call already descended its arguments
 		}
 		collectMethodCallEffectUses(e, callee, bs, use)
-		collectEffectUses(callee.Receiver, bs, use)
+		collectEffectUses(callee.Receiver, bs, resolved, use)
 	}
 	for _, a := range e.Arguments {
-		collectEffectUses(a, bs, use)
+		collectEffectUses(a, bs, resolved, use)
 	}
 }
 
@@ -262,7 +313,7 @@ func collectNamespaceCallEffectUses(e *ast.CallExpr, callee *ast.MemberExpr, bs 
 // call follows; a local or parameter of the type name shadows the type (it is
 // a value receiver). It reports whether the call resolved to a static fn, in
 // which case it has already descended the arguments.
-func collectStaticCallEffectUses(e *ast.CallExpr, callee *ast.MemberExpr, bs infer.BodyScope, use func(effect string, node ast.Node)) bool {
+func collectStaticCallEffectUses(e *ast.CallExpr, callee *ast.MemberExpr, bs infer.BodyScope, resolved resolvedCallEffects, use func(effect string, node ast.Node)) bool {
 	recv, ok := callee.Receiver.(*ast.Identifier)
 	if !ok {
 		return false
@@ -280,7 +331,7 @@ func collectStaticCallEffectUses(e *ast.CallExpr, callee *ast.MemberExpr, bs inf
 		if bound, ok := bs.TScope[recv.Name]; ok && bound != nil {
 			if ms, _, ok := types.StaticCandidates(bs.Reg, &ir.TypeVar{Name: recv.Name, Bound: bound}, callee.Member.Name); ok && len(ms) > 0 {
 				for _, a := range e.Arguments {
-					collectEffectUses(a, bs, use)
+					collectEffectUses(a, bs, resolved, use)
 				}
 				return true
 			}
@@ -295,7 +346,7 @@ func collectStaticCallEffectUses(e *ast.CallExpr, callee *ast.MemberExpr, bs inf
 		use(eff, e)
 	}
 	for _, a := range e.Arguments {
-		collectEffectUses(a, bs, use)
+		collectEffectUses(a, bs, resolved, use)
 	}
 	return true
 }
@@ -367,9 +418,9 @@ func declaredEffects(fds []*ast.FuncDecl) []string {
 // fold to values, so an effectful call cannot appear in them at all: pure
 // folds, effectful cannot even be written. Each effect is reported once, at
 // the first site that uses it.
-func checkPureContext(e ast.Expr, context string, bs infer.BodyScope, at func(ast.Node) span, diags *diagnostic.List) {
+func checkPureContext(e ast.Expr, context string, bs infer.BodyScope, resolved resolvedCallEffects, at func(ast.Node) span, diags *diagnostic.List) {
 	reported := map[string]bool{}
-	collectEffectUses(e, bs, func(effect string, node ast.Node) {
+	collectEffectUses(e, bs, resolved, func(effect string, node ast.Node) {
 		if reported[effect] {
 			return
 		}
