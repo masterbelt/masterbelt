@@ -118,6 +118,71 @@ func TestBareMemberReturn(t *testing.T) {
 	}
 }
 
+func TestBareMemberReturnNestedStructure(t *testing.T) {
+	// The result-type expectation reaches a bare member nested in a returned
+	// ternary; both branches lower to placeholders the write-back fills, so the
+	// branches resolve to the enum members rather than staying holes.
+	src := bareMemberPrelude + "pub fn p(b: bool): Rarity {\n  return b ? Legend : Common\n}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	ret, ok := fnNamed(t, m, "p").Body[0].(*ir.Return)
+	if !ok {
+		t.Fatal("body did not lower to a return")
+	}
+	tern, ok := ret.Value.(*ir.Ternary)
+	if !ok {
+		t.Fatalf("return value is not a ternary: %T", ret.Value)
+	}
+	if enumMemberOf(tern.Then) != "Rarity.Legend" || enumMemberOf(tern.Else) != "Rarity.Common" {
+		t.Errorf("ternary branches did not resolve the bare members: then=%+v else=%+v", tern.Then, tern.Else)
+	}
+
+	// The same reach into a returned collection literal: each element resolves.
+	src2 := bareMemberPrelude + "pub fn xs(): list<Rarity> {\n  return [Legend, Common]\n}\n"
+	m2, diags2 := analyze(src2)
+	if len(diags2) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags2))
+	}
+	ret2 := fnNamed(t, m2, "xs").Body[0].(*ir.Return)
+	coll, ok := ret2.Value.(*ir.CollectionLiteral)
+	if !ok || len(coll.Entries) != 2 {
+		t.Fatalf("return value is not a 2-entry collection: %+v", ret2.Value)
+	}
+	if enumMemberOf(coll.Entries[0].Value) != "Rarity.Legend" || enumMemberOf(coll.Entries[1].Value) != "Rarity.Common" {
+		t.Errorf("collection entries did not resolve the bare members: %+v", coll.Entries)
+	}
+}
+
+func TestBareMemberReturnNestedFolds(t *testing.T) {
+	// A bare member nested where the result-type expectation reaches it — a
+	// ternary branch, a collection element, an operator argument — folds
+	// end-to-end through the placeholder the write-back fills.
+	src := bareMemberPrelude +
+		"pub fn pick(b: bool): Rarity {\n  return b ? Legend : Common\n}\n" +
+		"pub fn many(): list<Rarity> {\n  return [Legend, Common]\n}\n" +
+		"pub fn isTop(r: Rarity): bool {\n  return r == Legend\n}\n" +
+		"pub fn isWanted(r: Rarity, top: bool): bool {\n  return r == (top ? Legend : Common)\n}\n" +
+		"const Many: list<Rarity> = many()\n" +
+		"assert pick(true) == Rarity.Legend\n" +
+		"assert pick(false) == Rarity.Common\n" +
+		"assert Many.len() == 2\n" +
+		"assert isTop(Rarity.Legend)\n" +
+		"assert !isTop(Rarity.Common)\n" +
+		"assert isWanted(Rarity.Legend, true)\n" +
+		"assert isWanted(Rarity.Common, false)\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("nested return fold produced diagnostics: %v", codes(diags))
+	}
+	for _, a := range m.Asserts {
+		if !a.Held() {
+			t.Errorf("assert did not hold (a nested bare-member return did not fold): %s", a.Cond)
+		}
+	}
+}
+
 func TestBareMemberReturnUnknown(t *testing.T) {
 	src := bareMemberPrelude + "pub fn f(): Rarity {\n  return Bogus\n}\n"
 	m, diags := analyze(src)

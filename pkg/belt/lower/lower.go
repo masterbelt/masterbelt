@@ -274,27 +274,63 @@ func Body(body []ast.Stmt, b Binder) []ir.Stmt {
 	return stmts
 }
 
-// returnValue lowers a return statement's value. A bare name the binder cannot
-// resolve in this scope becomes an ir.Unresolved placeholder rather than
-// nothing: the type-blind lowering has no result-type surface, so a bare enum
-// member resolved through the declared result type (return Legend, in a fn
-// whose result is an enum) is left for the post-check write-back to fill from
-// the checker's resolution — the one position whose enum expectation the binder
-// genuinely cannot see, unlike a switch arm, a let annotation, or an operator
-// argument, each of which the lowering already resolves through an expected-enum
-// binder. (A bare member nested in a returned ternary or collection still relies
-// on that direct resolution; widening the placeholder to reach through nested
-// expressions is the next migration slice, which also streams the call-argument
-// enum resolution the operator channel uses today.) Every resolved value, and a
-// non-identifier or recovered (nil) value, lowers as before; a placeholder that
-// no resolution fills is a hole that folds to nothing, exactly as the nil it
-// replaced did.
+// returnValue lowers a return statement's value through a placeholdering binder.
+// The type-blind lowering has no result-type surface, so a bare enum member
+// resolved through the declared result type — whether returned directly
+// (return Legend) or nested where the result-type expectation still reaches it
+// (return cond ? Legend : Common, a returned collection or record element, an
+// operator argument like return rarity == Legend) — is left for the post-check
+// write-back to fill from the checker's resolution. The return is the position
+// whose enum expectation the binder genuinely cannot see, unlike a switch arm or
+// a let annotation, and the expectation reaches the whole returned expression,
+// so the placeholdering reaches it too. A resolved value lowers unchanged, and a
+// placeholder that no resolution fills is a hole that folds to nothing, exactly
+// as the nil it replaced did.
 func returnValue(e ast.Expr, b Binder) ir.Value {
-	if v := Value(e, b); v != nil {
+	return Value(e, placeholdering{b})
+}
+
+// placeholdering wraps a Binder so a bare identifier the wrapped binder cannot
+// resolve lowers to an ir.Unresolved placeholder rather than nothing — the
+// post-check write-back fills it from the checker's resolution. It is the
+// reaching counterpart of an expected-enum binder: where expectingEnum resolves
+// a bare member against an enum the lowering can name, placeholdering defers a
+// bare name to a type the lowering cannot, applied where a return value carries
+// the result-type expectation through nested expressions. It composes with
+// expectingEnum (an operator argument inside a return is lowered through both):
+// the wrapped binder resolves what it can first, and only an otherwise-unresolved
+// name becomes a placeholder, which the checker's argument-resolution stream then
+// fills.
+type placeholdering struct {
+	Binder
+}
+
+func (b placeholdering) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
+	if v := b.Binder.Leaf(e, sub); v != nil {
 		return v
 	}
 	if id, ok := e.(*ast.Identifier); ok {
 		return &ir.Unresolved{Name: id.Name, Syntax: id}
+	}
+	return nil
+}
+
+// ExpectedEnum and AnnotationEnum forward the wrapped binder's EnumExpecter
+// capability, which embedding the Binder interface alone would not promote: a
+// returned operator argument reads its expected enum through this (expectedEnumOf),
+// and without the forward the expectation is lost and every such argument falls to
+// a placeholder. They report no enum when the wrapped binder is not an
+// EnumExpecter (a const initializer never carries a return).
+func (b placeholdering) ExpectedEnum(scrutinee ast.Expr) *ir.TypeDef {
+	if e, ok := b.Binder.(EnumExpecter); ok {
+		return e.ExpectedEnum(scrutinee)
+	}
+	return nil
+}
+
+func (b placeholdering) AnnotationEnum(t ast.TypeExpr) *ir.TypeDef {
+	if e, ok := b.Binder.(EnumExpecter); ok {
+		return e.AnnotationEnum(t)
 	}
 	return nil
 }
@@ -434,6 +470,17 @@ func matchStmt(s *ast.MatchStmt, b Binder) *ir.Match {
 func expectEnum(b Binder, def *ir.TypeDef) Binder {
 	if def == nil {
 		return b
+	}
+	// Compose the expected-enum resolution *inside* a placeholdering binder, not
+	// outside it: a returned operator argument is lowered through both (the return
+	// value carries placeholdering, callValue adds the expected enum), and the
+	// member resolution must run before the placeholder fallback. Re-wrap so a
+	// bare member the expectation can name — directly or nested in the argument —
+	// resolves here, and only a name it cannot becomes a placeholder. Wrapping the
+	// other way around would defer every such member to a placeholder the checker
+	// streams no fact for, leaving a hole where the value folded before.
+	if p, ok := b.(placeholdering); ok {
+		return placeholdering{expectEnum(p.Binder, def)}
 	}
 	res, ok := b.(EnumMemberResolver)
 	if !ok {
