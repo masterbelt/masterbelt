@@ -155,6 +155,13 @@ func TestRefinementImplicitSelfMethodCallee(t *testing.T) {
 	if got := codes(diagsOf(t, bad)); len(got) != 1 || got[0] != CodeUndefinedName {
 		t.Fatalf("codes = %v, want a single [undefined_name] for the argument", got)
 	}
+	// The exemption is for the call-callee position only: a bare method name is
+	// not a value, so it stays an undefined-name report rather than being
+	// silently accepted as a resolved self reference.
+	bare := "pub type T = sbyte where ok impl {\n  pub ok(): bool {\n    return self > 0\n  }\n}\nconst c: T = 1\n"
+	if got := codes(diagsOf(t, bare)); len(got) != 1 || got[0] != CodeUndefinedName {
+		t.Fatalf("codes = %v, want [undefined_name] for a bare method name", got)
+	}
 }
 
 func TestRefinementBadMethod(t *testing.T) {

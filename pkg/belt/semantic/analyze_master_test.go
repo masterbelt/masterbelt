@@ -495,12 +495,20 @@ func TestMasterFieldBrokenRefinementReported(t *testing.T) {
 // diagnostic-free, and an invalid one reports only the real argument error — not a
 // second, spurious undefined name for the resolved self-method callee.
 func TestMasterValidateImplicitSelfMethodCallee(t *testing.T) {
-	row := "master M {\n  record { id: int } impl {\n    pub ok(x: int): bool {\n      return self.id > x\n    }\n  }\n  primary id\n  validate {\n    each {\n      assert %s\n    }\n  }\n}\n"
+	row := "master M {\n  record { id: int } impl {\n    pub ok(x: int): bool {\n      return self.id > x\n    }\n    pub flag(): bool {\n      return self.id > 0\n    }\n  }\n  primary id\n  validate {\n    each {\n      assert %s\n    }\n  }\n}\n"
 	if _, diags := analyze(strings.Replace(row, "%s", "ok(0)", 1)); len(diags) != 0 {
 		t.Fatalf("a valid implicit self-method call should resolve, got %v", codes(diags))
 	}
 	if got := codes(diagsFrom(analyze(strings.Replace(row, "%s", "ok(UNDEFINED)", 1)))); len(got) != 1 || got[0] != CodeUndefinedName {
 		t.Fatalf("codes = %v, want a single [undefined_name] for the argument", got)
+	}
+	// The exemption is for the call-callee position only: a bare method name is not
+	// a value, so it stays an undefined-name report. Without this an invalid
+	// validation (assert ok / assert flag) is accepted with no diagnostic at all,
+	// since the bare method value types to Invalid and assertion_not_bool is then
+	// suppressed.
+	if got := codes(diagsFrom(analyze(strings.Replace(row, "%s", "flag", 1)))); len(got) != 1 || got[0] != CodeUndefinedName {
+		t.Fatalf("codes = %v, want [undefined_name] for a bare method name", got)
 	}
 }
 

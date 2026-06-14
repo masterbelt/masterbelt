@@ -65,8 +65,11 @@ func resolveWhere(q queries, fileID FileID, r *infer.TypeResolver, reg *builtin.
 			// self is the refined nominal type, so a bare name reading one of its
 			// members with self omitted — a field, a getter, or an implicit
 			// self-method call (where ok(x)) — is a resolved self reference, not an
-			// undefined name, the same exemption a master per-row check makes.
-			selfMember := func(name string) bool { return selfReference(reg, self, name) }
+			// undefined name, the same exemption a master per-row check makes. The
+			// callee set keeps the method exemption to a genuine call, not a bare
+			// method name.
+			callees := callCalleeIdents(td.Where)
+			selfMember := func(id *ast.Identifier) bool { return selfReference(reg, self, id, callees) }
 			reportRefIssues(fileID, td.Where, q, at, diags, nil, selfMember)
 			if diags.Len() == before {
 				// Neither the checking walk nor the reference check found anything to
