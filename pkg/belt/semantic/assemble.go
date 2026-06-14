@@ -602,16 +602,18 @@ func (a *assembler) refoldConsts(genv graphFoldEnv) {
 				}
 				continue
 			}
-			// A union value the type-blind query folded untagged (a composite or
-			// reference inflow whose kind several members back) is corrected here:
-			// the annotated graph tags it through the checker's explicit Adapt. This
-			// reaches a union inflow nested in a record field or collection element
-			// too, where the const's own type is not the union — the trigger is a
-			// union-targeted Adapt anywhere in the value, found by the walk. Re-fold
-			// over the annotated graph and adopt a strictly more precise result (the
-			// tagged value differs from the untagged blind one); a value the
-			// annotated graph also leaves untagged re-folds equal and is kept.
-			if valueHasUnionAdapt(c.Value) {
+			// A union value the type-blind query folded untagged (an inflow with no
+			// static type to disambiguate — a ternary, a reference, a call whose
+			// result is the union, an alias of a union-typed constant) is corrected
+			// here: the annotated graph tags it (through the checker's Adapt, or by
+			// re-folding a callee body that now returns a tagged value). The trigger
+			// is the const's type carrying a union anywhere — at the top, or nested
+			// in a record field or collection element — since that is exactly where
+			// an inflow can be left untagged. Re-fold over the annotated graph and
+			// adopt a strictly more precise result; a value the annotated graph also
+			// leaves untagged (a same-kind union it cannot tag either) re-folds equal
+			// and is kept, and a non-union const is never revisited.
+			if typeHasUnion(c.Type) {
 				if v := eval.GraphExpecting(c.Value, c.Type, genv); v != nil && !ir.ConstantsEqual(v, c.Eval) {
 					c.Eval = v
 					progress = true
@@ -621,21 +623,48 @@ func (a *assembler) refoldConsts(genv graphFoldEnv) {
 	}
 }
 
-// valueHasUnionAdapt reports whether a value graph carries, anywhere within it, an
-// explicit adaption into a union — the checker's mark of a value flowing into a
-// union member. It is the trigger for the late re-fold's union-tag correction: a
-// union inflow at the top level, or nested in a record field or collection
-// element, is one the type-blind value query may have folded untagged. A value
-// with no such adaption needs no correction (the blind fold already settled it).
-func valueHasUnionAdapt(v ir.Value) bool {
-	found := false
-	ir.WalkValues(v, func(n ir.Value) bool {
-		if a, ok := n.(*ir.Adapt); ok && types.UnionType(a.To) != nil {
-			found = true
+// typeHasUnion reports whether a type is, or structurally contains, a union — the
+// trigger for the late re-fold's union-tag correction. A constant whose type
+// carries a union anywhere (the type itself, a record field, a collection
+// element, a generic argument or the body it instantiates) has a position an
+// inflow can be left untagged at by the type-blind value query, so it is re-folded
+// over the annotated graph; a type with no union is never revisited. It errs
+// toward revisiting (a union reachable through a generic body counts), since an
+// unnecessary re-fold of an already-settled value is a harmless no-op.
+func typeHasUnion(t ir.Type) bool {
+	return typeHasUnionSeen(t, map[*ir.TypeDef]bool{})
+}
+
+func typeHasUnionSeen(t ir.Type, seen map[*ir.TypeDef]bool) bool {
+	switch t := t.(type) {
+	case *ir.Union:
+		return true
+	case *ir.Named:
+		if t.Def == nil || seen[t.Def] {
+			return false
 		}
-		return !found // stop descending once one is found
-	})
-	return found
+		seen[t.Def] = true
+		return typeHasUnionSeen(t.Def.Body, seen)
+	case *ir.Record:
+		for _, f := range t.Fields {
+			if typeHasUnionSeen(f.Type, seen) {
+				return true
+			}
+		}
+	case *ir.App:
+		if t.Def != nil && !seen[t.Def] {
+			seen[t.Def] = true
+			if typeHasUnionSeen(t.Def.Body, seen) {
+				return true
+			}
+		}
+		for _, a := range t.Args {
+			if typeHasUnionSeen(a, seen) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // reportMasterValidationRefs reports the reference problems of a master's per-row

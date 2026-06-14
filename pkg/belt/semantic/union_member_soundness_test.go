@@ -48,21 +48,26 @@ func countCode(diags []diagnostic.Diagnostic, code diagnostic.Code) int {
 func TestUnionSameKindInflowTags(t *testing.T) {
 	src := "pub type n = short | byte\n" +
 		"pub fn which(x: n): nint {\n  match x {\n    short s -> return 1\n    byte b -> return 2\n  }\n}\n" +
+		"pub fn make(): n {\n  return true ? short(20) : byte(5)\n}\n" +
 		"pub type Box = { x: n }\n" +
 		"const Tern: n = true ? short(20) : byte(5)\n" +
 		"const Ref0: short = 5\n" +
 		"const Ref: n = Ref0\n" +
 		"const Direct: n = short(20)\n" +
+		"const Call: n = make()\n" +
+		"const Alias: n = Tern\n" +
 		"const Nested: Box = { x: true ? short(20) : byte(5) }\n" +
 		"const RT = which(Tern)\n" +
 		"const RR = which(Ref)\n" +
 		"const RD = which(Direct)\n" +
+		"const RC = which(Call)\n" +
+		"const RA = which(Alias)\n" +
 		"const RN = which(Nested.x)\n"
 	m, diags := analyze(src)
 	if len(diags) != 0 {
 		t.Fatalf("a same-kind union inflow must fold clean, got %v", codes(diags))
 	}
-	for _, name := range []string{"Tern", "Ref", "Direct"} {
+	for _, name := range []string{"Tern", "Ref", "Direct", "Call", "Alias"} {
 		c := constEval(m, name)
 		if c == nil || c.UnionTag == nil || c.UnionTag.String() != "short" {
 			tag := "<nil>"
@@ -72,9 +77,10 @@ func TestUnionSameKindInflowTags(t *testing.T) {
 			t.Errorf("%s published tag %s, want short (the member it flows in as)", name, tag)
 		}
 	}
-	// RN exercises a union inflow nested in a record field: the field must carry
-	// its tag so the match on Nested.x dispatches, the same as the top-level forms.
-	for _, name := range []string{"RT", "RR", "RD", "RN"} {
+	// Each inflow with no static type the blind query reads — a ternary, a
+	// reference, a call returning the union, an alias of a union const, and a
+	// union nested in a record field — must carry its tag so the match dispatches.
+	for _, name := range []string{"RT", "RR", "RD", "RC", "RA", "RN"} {
 		if c := constEval(m, name); c == nil || c.String() != "1" {
 			got := "<unfolded>"
 			if c != nil {
