@@ -7,6 +7,7 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/belt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/belt/eval"
 	"github.com/masterbelt/masterbelt/pkg/belt/lower"
+	"github.com/masterbelt/masterbelt/pkg/belt/types"
 	"github.com/masterbelt/masterbelt/pkg/belt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -113,7 +114,24 @@ func computeValue(file FileID, decl *ast.ConstDecl, q queries) *ir.Constant {
 		irOf: q.constShellTable(), fnOf: q.funcShellTable(),
 		expected: annotationEnum(q, file, decl),
 	})
-	return eval.GraphExpecting(graph, annotationResolved(q, file, decl), graphFoldEnv{q: q, file: file})
+	want := annotationResolved(q, file, decl)
+	v := eval.GraphExpecting(graph, want, graphFoldEnv{q: q, file: file})
+	// The type-blind value query is conservative about a union inflow it cannot
+	// tag: a value it folds into a union but leaves untagged (a composite or
+	// reference whose kind several of the union's members back, with no static
+	// type to disambiguate) is an incomplete fold — the annotated graph the
+	// write-back builds tags it through the checker's explicit Adapt. Publish
+	// nothing rather than the untagged value: a downstream match would mis-fold
+	// it, and it would diverge from the published re-fold. refoldConsts then
+	// re-folds over the annotated graph and publishes the tagged value, keeping
+	// the blind query a conservative subset of the published one. A value the
+	// annotated graph also leaves untagged (a call returning the union directly,
+	// no inflow Adapt) re-folds to the same untagged value there, so nothing is
+	// lost.
+	if v != nil && v.UnionTag == nil && types.UnionType(want) != nil {
+		return nil
+	}
+	return v
 }
 
 // annotationResolved resolves a constant's type annotation to its full type

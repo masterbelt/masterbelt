@@ -36,6 +36,50 @@ func countCode(diags []diagnostic.Diagnostic, code diagnostic.Code) int {
 	return n
 }
 
+// TestUnionSameKindInflowTags pins that a value flowing into a union whose
+// members share a constant kind (short | byte, both integer-backed) publishes
+// the member it tags, not an untagged value. The type-blind value query cannot
+// tag such an inflow on a composite (ternary) or reference node — its kind
+// fallback is ambiguous — so it now defers, and the published re-fold tags it
+// through the checker's explicit Adapt, exactly as the direct conversion does.
+// The soundness end is the dispatch: an untagged same-kind union value would
+// make a downstream match unable to choose an arm (a spurious unfolded_const);
+// all three inflow forms must dispatch to the short arm.
+func TestUnionSameKindInflowTags(t *testing.T) {
+	src := "pub type n = short | byte\n" +
+		"pub fn which(x: n): nint {\n  match x {\n    short s -> return 1\n    byte b -> return 2\n  }\n}\n" +
+		"const Tern: n = true ? short(20) : byte(5)\n" +
+		"const Ref0: short = 5\n" +
+		"const Ref: n = Ref0\n" +
+		"const Direct: n = short(20)\n" +
+		"const RT = which(Tern)\n" +
+		"const RR = which(Ref)\n" +
+		"const RD = which(Direct)\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("a same-kind union inflow must fold clean, got %v", codes(diags))
+	}
+	for _, name := range []string{"Tern", "Ref", "Direct"} {
+		c := constEval(m, name)
+		if c == nil || c.UnionTag == nil || c.UnionTag.String() != "short" {
+			tag := "<nil>"
+			if c != nil && c.UnionTag != nil {
+				tag = c.UnionTag.String()
+			}
+			t.Errorf("%s published tag %s, want short (the member it flows in as)", name, tag)
+		}
+	}
+	for _, name := range []string{"RT", "RR", "RD"} {
+		if c := constEval(m, name); c == nil || c.String() != "1" {
+			got := "<unfolded>"
+			if c != nil {
+				got = c.String()
+			}
+			t.Errorf("%s = %s, want 1 (the match dispatched to the short arm)", name, got)
+		}
+	}
+}
+
 // TestUnionMemberArithOverflow covers system 1: a sized-integer arithmetic result
 // flowing into a union is range-checked against the selected sized member, not the
 // union (whose Fits passes through). The overflowing value must not fold tagged.
