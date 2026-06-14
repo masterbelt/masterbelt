@@ -282,6 +282,108 @@ func TestSelfOmissionEnumNamedFieldReadsField(t *testing.T) {
 	}
 }
 
+// TestBareMethodCallFoldsLikeExplicit pins the call twin of self omission: a bare
+// method call in a body (scaled(2), self omitted) folds to the same value the
+// explicit self.scaled(2) does — a method of self is called with self omitted,
+// the same desugar a written self-call uses. The two methods differ only in the
+// bare vs explicit call (both read self.base inside scaled), so the test isolates
+// the implicit self-call. It is a red→green gate: drop the implicit self-method
+// step from the body binder and the checker's call resolution and the bare call no
+// longer resolves, so Bare stops folding and the test fails.
+func TestBareMethodCallFoldsLikeExplicit(t *testing.T) {
+	src := "pub type Box = { base: nint } impl {\n" +
+		"  pub scaled(k: nint): nint {\n    return self.base * k\n  }\n" +
+		"  pub total(): nint {\n    return scaled(2) + scaled(3)\n  }\n" +
+		"}\n" +
+		"pub type BoxX = { base: nint } impl {\n" +
+		"  pub scaled(k: nint): nint {\n    return self.base * k\n  }\n" +
+		"  pub total(): nint {\n    return self.scaled(2) + self.scaled(3)\n  }\n" +
+		"}\n" +
+		"const B: Box = { base: 4 }\n" +
+		"const X: BoxX = { base: 4 }\n" +
+		"const Bare = B.total()\n" +
+		"const Explicit = X.total()\n"
+	bare := evalOf(t, src, "Bare")
+	explicit := evalOf(t, src, "Explicit")
+	if bare.Kind != ir.ConstInt || explicit.Kind != ir.ConstInt {
+		t.Fatalf("kinds = %v/%v, want int/int", bare.Kind, explicit.Kind)
+	}
+	if bare.Int.Int64() != 20 || explicit.Int.Int64() != 20 {
+		t.Fatalf("Bare=%s Explicit=%s, want 20/20 (4*2 + 4*3)", bare.Int, explicit.Int)
+	}
+}
+
+// TestBareMethodCallLowersToSelfCall pins that a bare method call lowers to the
+// same Call-over-SelfValue the explicit self.scaled(2) does — the "same desugar"
+// guarantee checked on the IR: an ir.Call whose receiver is the implicit self,
+// carrying the method name and the argument.
+func TestBareMethodCallLowersToSelfCall(t *testing.T) {
+	src := "pub type Box = { base: nint } impl {\n" +
+		"  pub scaled(k: nint): nint {\n    return self.base * k\n  }\n" +
+		"  pub total(): nint {\n    return scaled(2)\n  }\n" +
+		"}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	body := methodBody(t, m, "Box", "total")
+	ret, ok := body[0].(*ir.Return)
+	if !ok {
+		t.Fatalf("body[0] = %T, want *ir.Return", body[0])
+	}
+	call, ok := ret.Value.(*ir.Call)
+	if !ok {
+		t.Fatalf("return value = %T, want *ir.Call (bare scaled(2) desugared to self.scaled(2))", ret.Value)
+	}
+	if call.Method != "scaled" {
+		t.Fatalf("method = %q, want scaled", call.Method)
+	}
+	if _, ok := call.Receiver.(*ir.SelfValue); !ok {
+		t.Fatalf("receiver = %T, want *ir.SelfValue (the implicit self)", call.Receiver)
+	}
+	if len(call.Args) != 1 {
+		t.Fatalf("args = %d, want 1 (the bare call's argument)", len(call.Args))
+	}
+}
+
+// TestBareMethodCallTopLevelFunctionWins pins that a bare callee that names a
+// top-level function calls that function even when the receiver type has a method
+// of the same name — self omission is last resort, so the top-level function wins
+// and self.tag() is the explicit form. This is the method twin of
+// TestSelfOmissionTopLevelFunctionWins (which uses a function-valued field), and
+// the checker and lowering apply the same precedence so they cannot diverge.
+func TestBareMethodCallTopLevelFunctionWins(t *testing.T) {
+	src := "pub fn tag(): nint { return 99 }\n" +
+		"pub type Box = { n: nint } impl {\n" +
+		"  pub tag(): nint { return 1 }\n" +
+		"  pub call(): nint { return tag() }\n" +
+		"}\n" +
+		"const B: Box = { n: 0 }\n" +
+		"const V = B.call()\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	if ev := constEval(m, "V"); ev == nil || ev.Int.Int64() != 99 {
+		t.Fatalf("V did not fold to 99 (the top-level function wins over the self method)")
+	}
+}
+
+// TestBareMethodCallInGetterBody pins that the implicit self-call works in a getter
+// body too, not only a method body — self omission applies uniformly to every
+// self-receiver body, so a getter calling a sibling method bare resolves and folds.
+func TestBareMethodCallInGetterBody(t *testing.T) {
+	src := "pub type Box = { base: nint } impl {\n" +
+		"  pub helper(): nint {\n    return self.base\n  }\n" +
+		"  pub get g(): nint {\n    return helper() + 1\n  }\n" +
+		"}\n" +
+		"const B: Box = { base: 7 }\n" +
+		"const G = B.g\n"
+	if got := evalOf(t, src, "G").Int.Int64(); got != 8 {
+		t.Fatalf("G = %d, want 8 (helper() reads self.base=7, +1)", got)
+	}
+}
+
 // methodBody returns the lowered statement body of a named method on a named
 // type — the IR the bare-read desugar produces.
 func methodBody(t *testing.T, m *ir.Module, typ, method string) []ir.Stmt {
