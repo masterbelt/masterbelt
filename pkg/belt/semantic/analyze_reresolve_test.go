@@ -1,14 +1,14 @@
 package semantic
 
-// Step-5 regression gates for the write-back re-resolution of a bare enum member
+// Regression gates for the write-back re-resolution of a bare enum member
 // returned through a function's result type. The value never carries the member
 // the lowering resolved (the lowering is type-blind and emits a placeholder); the
 // post-check write-back fills it from the checker's resolution. These gates pin
 // that the fill is re-derived per analysis — never a stale fact carried across an
 // incremental edit — so reordering the enum's members or changing which member a
 // body returns re-resolves correctly on the incremental path, the same as a full
-// re-analysis would. The fold gate (a non-incremental member-value change) pins
-// that the resolved member's value folds, not a cached one.
+// re-analysis would, and editing a returned member to a non-member withholds the
+// fold rather than keeping the prior value.
 
 import (
 	"strings"
