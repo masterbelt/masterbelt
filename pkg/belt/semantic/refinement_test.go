@@ -102,6 +102,40 @@ func TestRefinementNotConstant(t *testing.T) {
 	}
 }
 
+func TestRefinementUndefinedNameReported(t *testing.T) {
+	// A where-clause referencing a name that resolves to nothing once typed to
+	// Invalid and was dropped without a word: the refinement silently never
+	// applied, so a value the author meant to constrain passed unchecked. The
+	// undefined reference is reported, once, at the declaration, exactly as a
+	// const initializer's would be.
+	m, diags := analyze("pub type Strong = int where self >= UNDEFINED\nconst c: Strong = 5\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeUndefinedName {
+		t.Fatalf("codes = %v, want [undefined_name]", got)
+	}
+	if !strings.Contains(diags[0].Message, "UNDEFINED") {
+		t.Errorf("message %q does not name the undefined reference", diags[0].Message)
+	}
+	// The unusable predicate stays off the definition — no half-applied refinement.
+	if m.Types[0].Where != nil {
+		t.Error("Strong.Where != nil, want nil for an unresolved predicate")
+	}
+}
+
+func TestRefinementConstReferenceReported(t *testing.T) {
+	// A predicate may read only self, literals, and self's own methods — never a
+	// top-level constant. Referencing one once typed to Invalid and was dropped
+	// silently, leaving the refinement unenforced. It is now reported as not a
+	// usable compile-time predicate, at the declaration, and the definition keeps
+	// no half-formed where-clause.
+	m, diags := analyze("const MIN: int = 10\npub type Strong = int where self >= MIN\nconst c: Strong = 5\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeRefinementNotConstant {
+		t.Fatalf("codes = %v, want [refinement_not_constant]", got)
+	}
+	if m.Types[0].Where != nil {
+		t.Error("Strong.Where != nil, want nil for a constant-referencing predicate")
+	}
+}
+
 func TestRefinementBadMethod(t *testing.T) {
 	// A method self's body type does not have is an operator type error — the
 	// predicate's problem is reported once, as invalid_operation, and the

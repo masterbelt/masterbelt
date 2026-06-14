@@ -453,3 +453,38 @@ func TestMasterSharesTypeNamespace(t *testing.T) {
 		})
 	}
 }
+
+// TestMasterFieldBrokenRefinementReported pins the master casualty of a silently
+// dropped where-clause: a row field typed by a refinement whose predicate reads
+// an undefined name (or a top-level constant, outside a predicate's vocabulary)
+// once left the refinement unenforced, so a CSV cell the constraint should have
+// rejected loaded clean. The broken predicate is now reported at the type
+// declaration — before any data is read against it — so the unenforceable
+// constraint can never reach the loader.
+func TestMasterFieldBrokenRefinementReported(t *testing.T) {
+	cases := []struct {
+		name, src string
+		want      diagnostic.Code
+	}{
+		{
+			"undefined name",
+			"pub type Strong = int where self >= UNDEFINED\n" +
+				"master Item {\n  record {\n    id: int,\n    power: Strong,\n  }\n  primary id\n}\n",
+			CodeUndefinedName,
+		},
+		{
+			"constant reference",
+			"const MIN: int = 1\npub type Strong = int where self >= MIN\n" +
+				"master Item {\n  record {\n    id: int,\n    power: Strong,\n  }\n  primary id\n}\n",
+			CodeRefinementNotConstant,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := analyze(tc.src)
+			if got := codes(diags); len(got) != 1 || got[0] != tc.want {
+				t.Fatalf("codes = %v, want [%v]", got, tc.want)
+			}
+		})
+	}
+}

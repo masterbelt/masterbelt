@@ -240,7 +240,7 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	// the whole graph, so they run once all parents are populated.
 	checkInterfaceInheritance(file.Interfaces, ifaceOut, at, diags)
 	for i, td := range file.Types {
-		resolveDecl(r, reg, td, out[i], at, diags, res, fns)
+		resolveDecl(folder.q, folder.file, r, reg, td, out[i], at, diags, res, fns)
 	}
 	for i, ed := range file.Enums {
 		resolveEnumDecl(folder, defs, r, reg, ed, enumOut[i], at, diags, fns)
@@ -1203,7 +1203,7 @@ func bodyDef(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
 // associated constants, the refinement predicate, and the method signatures.
 // env folds the associated-constant initializers (it is nil in callers that do
 // not evaluate).
-func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, res *callResolutions, fns bodyFuncs) {
+func resolveDecl(q queries, fileID FileID, r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, res *callResolutions, fns bodyFuncs) {
 	// Resolve every parameter bound through the two-pass settle, so a bound may
 	// name a later parameter or project off one (T: Box<U.x>); the resolved bounds
 	// are back-filled, so the body, associated constants, and methods that name a
@@ -1264,7 +1264,7 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 	// The where-clause is resolved last, after the methods, so a predicate that
 	// calls a method of the type (`where self.isValid()`) can resolve it — self
 	// is the nominal type, and its impl methods are now on the definition.
-	resolveWhere(r, reg, td, def, at, diags, res)
+	resolveWhere(q, fileID, r, reg, td, def, at, diags, res)
 }
 
 // resolveMasterDecl resolves a master declaration into its definition. The row
