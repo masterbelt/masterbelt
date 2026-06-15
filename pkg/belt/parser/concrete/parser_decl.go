@@ -796,10 +796,10 @@ func (p *parser) parseSourceEntry(lead []cst.Green) *cst.Node {
 //
 // The block holds the master's data checks. Its clauses are introduced by
 // context keywords just as the master's members are: each opens a per-row block
-// (this slice), and all (a per-table block) is a later concern — both lower to the
-// one ValidateClause node, told apart by the keyword, so all adds no new node
-// form. validate, each, and all are ordinary identifiers everywhere else. The
-// cursor sits on the validate keyword.
+// and all a per-table (aggregate) block — both lower to the one ValidateClause
+// node, told apart by the keyword, so all adds no new node form. validate, each,
+// and all are ordinary identifiers everywhere else. The cursor sits on the
+// validate keyword.
 func (p *parser) parseMasterValidate(lead []cst.Green) *cst.Node {
 	children := lead
 	children = append(children, p.masterKeyword()) // "validate"
@@ -820,7 +820,7 @@ func (p *parser) parseMasterValidate(lead []cst.Green) *cst.Node {
 			return cst.NewNode(cst.MasterValidate, children)
 		case p.peekSignificant() == token.EOF:
 			return cst.NewNode(cst.MasterValidate, children)
-		case p.masterMemberIs("each"):
+		case p.masterMemberIs("each"), p.masterMemberIs("all"):
 			var lead []cst.Green
 			p.skipTrivia(&lead)
 			children = append(children, p.parseValidateClause(lead))
@@ -837,15 +837,14 @@ func (p *parser) parseMasterValidate(lead []cst.Green) *cst.Node {
 //
 //	( each | all ) Block
 //
-// The leading context keyword names the clause's scope — each is per-row (this
-// slice), all per-table (a later concern) — and the body is the ordinary
-// statement block (parseBlock): the per-row checks, assert statements in
-// practice, each reading the row through self. Both scopes share this one node,
-// distinguished by the keyword, so adding all needs no new clause form. The
-// cursor sits on the scope keyword.
+// The leading context keyword names the clause's scope — each is per-row, all
+// per-table — and the body is the ordinary statement block (parseBlock): the
+// checks, assert statements in practice (an each reads the row through self; an
+// all the table). Both scopes share this one node, distinguished by the keyword,
+// so all needs no new clause form. The cursor sits on the scope keyword.
 func (p *parser) parseValidateClause(lead []cst.Green) *cst.Node {
 	children := lead
-	children = append(children, p.masterKeyword()) // "each" (or "all", a later concern)
+	children = append(children, p.masterKeyword()) // "each" or "all"
 
 	if p.peekSignificant() == token.LBrace {
 		p.skipTrivia(&children)

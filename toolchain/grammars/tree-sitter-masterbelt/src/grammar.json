@@ -1006,8 +1006,17 @@
         {
           "type": "ALIAS",
           "content": {
-            "type": "STRING",
-            "value": "each"
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "each"
+              },
+              {
+                "type": "STRING",
+                "value": "all"
+              }
+            ]
           },
           "named": true,
           "value": "master_keyword"

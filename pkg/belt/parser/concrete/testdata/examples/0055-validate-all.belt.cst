@@ -1,0 +1,97 @@
+# tree
+File
+  MasterDecl
+    LineComment "// A validate all clause checks the master as a whole — the relation of every"
+    Newline "\n"
+    LineComment "// row — rather than each row in turn. count is the relation's row count, read"
+    Newline "\n"
+    LineComment "// with self omitted (like a column in an each clause, but a member of the"
+    Newline "\n"
+    LineComment "// relation rather than of a row), so `assert count < 2000` caps the table's"
+    Newline "\n"
+    LineComment "// size. Where an each assert reads a row, an all assert reads the relation."
+    Newline "\n"
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    MasterKeyword
+      Ident "master"
+    Whitespace " "
+    Ident "Skill"
+    Whitespace " "
+    LBrace "{"
+    MasterRecord
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "record"
+      Whitespace " "
+      RecordType
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        Field
+          Ident "id"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+        Comma ","
+        Newline "\n"
+        Whitespace "    "
+        Field
+          Ident "power"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+        Comma ","
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+    MasterPrimary
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "primary"
+      Whitespace " "
+      Ident "id"
+    MasterValidate
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "validate"
+      Whitespace " "
+      LBrace "{"
+      ValidateClause
+        Newline "\n"
+        Whitespace "    "
+        MasterKeyword
+          Ident "all"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "      "
+          AssertStmt
+            Assert "assert"
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "count"
+              Whitespace " "
+              Lt "<"
+              Whitespace " "
+              Literal
+                Int "2000"
+          Newline "\n"
+          Whitespace "    "
+          RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      RBrace "}"
+    Newline "\n"
+    RBrace "}"
+  Newline "\n"
+  EOF ""
+# diagnostics
