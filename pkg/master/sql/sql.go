@@ -48,6 +48,25 @@ func (p Predicate) SQL(d Dialect) string {
 // Binds are the predicate's bind values, positional and dialect-independent.
 func (p Predicate) Binds() []Bind { return p.binds }
 
+// and returns the conjunction of two predicates, so a consumer intersecting two
+// filters (a scope's and an aggregate's) gets both rather than the second alone.
+// An empty predicate matches every row, so it is the identity and drops out of the
+// conjunction. The binds concatenate in operand order — left then right — which is
+// the order the rendered placeholders appear in, so they stay aligned.
+func (p Predicate) and(q Predicate) Predicate {
+	switch {
+	case p.root == nil:
+		return q
+	case q.root == nil:
+		return p
+	default:
+		binds := make([]Bind, 0, len(p.binds)+len(q.binds))
+		binds = append(binds, p.binds...)
+		binds = append(binds, q.binds...)
+		return Predicate{root: binary{op: "AND", l: p.root, r: q.root}, binds: binds}
+	}
+}
+
 // BindKind is the type of a bind value: the three literal kinds the core
 // supports.
 type BindKind int
