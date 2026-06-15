@@ -200,6 +200,20 @@ func TestColumnOrderingRequiresOrderable(t *testing.T) {
 	}
 }
 
+// TestColumnEqualityRequiresComparable pins the equality half of the same rule: a
+// column whose element type is not comparable has no == either, just as the value
+// comparison would be invalid — so the comparison guard covers eql/neq, not only the
+// orderings.
+func TestColumnEqualityRequiresComparable(t *testing.T) {
+	src := "type Blob = { x: int }\n" +
+		"master M {\n  record { id: int, b: Blob }\n  primary id\n}\n" +
+		"fn probe(c: columns<M>): predicate<M> {\n  return c.b == c.b\n}\n"
+	_, diags := analyze(src)
+	if len(diags) == 0 {
+		t.Fatal("want a type error: a non-comparable column element has no == in a query")
+	}
+}
+
 // TestBareBoolIsNotPredicate pins the guarantee the typed algebra exists for: a
 // plain bool is not a predicate, so a where condition that is "just true" — or any
 // non-SQL-expressible bool — is a type error, caught at compile time rather than

@@ -139,12 +139,12 @@ func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method str
 	// the suppression style survives overloading.
 	known := synthMethodArgs(e, recv, args, &bad, s, sink)
 
-	// A query column's ordering comparison is valid only when its element type is
-	// orderable: column<M, T> offers lt/lteq/gt/gteq for every T, but the comparison
-	// stands only if T itself has the operator, mirroring value mode (a bool column
-	// has no >, just as a bool value has none). The type system cannot bound the
-	// column's methods by T, so the rule is checked here.
-	if !queryColumnOrderingValid(reg, recv, method) {
+	// A query column's comparison is valid only when its element type supports the
+	// same comparison as a value: column<M, T> offers the comparison operators for
+	// every T, but a comparison stands only if T itself has the operator, mirroring
+	// value mode (a bool column has no >, a non-comparable column no ==). The type
+	// system cannot bound the column's methods by T, so the rule is checked here.
+	if !queryColumnComparisonValid(reg, recv, method) {
 		if !bad {
 			sink.invalidOp(e, method, typesList(recv, args))
 		}
@@ -249,19 +249,22 @@ func synthMethodArgs(e *ast.CallExpr, recv ir.Type, args []ir.Type, bad *bool, s
 	return known
 }
 
-// queryOrderingMethods are the column ordering comparisons — the operators a query
-// column should offer only when its element type is orderable. Equality (eql/neq)
-// is not here: it is available on every comparable element and needs no guard.
-var queryOrderingMethods = map[string]bool{"lt": true, "lteq": true, "gt": true, "gteq": true}
+// queryComparisonMethods are the comparison operators a query column offers — the
+// equality pair and the orderings. A column comparison stands only when its element
+// type has the same operator, so each of these is guarded against the element type.
+var queryComparisonMethods = map[string]bool{
+	"eql": true, "neq": true, "lt": true, "lteq": true, "gt": true, "gteq": true,
+}
 
-// queryColumnOrderingValid reports whether a method call is allowed under the
-// query-column ordering rule: true unless the receiver is a query column<M, T>, the
-// method is an ordering comparison, and the element type T has no such operator of
-// its own. It mirrors value mode — a column ordering stands exactly where the value
-// ordering would — closing the gap that column<M, T> offers the orderings for every
-// T regardless of whether T is orderable.
-func queryColumnOrderingValid(reg *builtin.Registry, recv ir.Type, method string) bool {
-	if !queryOrderingMethods[method] {
+// queryColumnComparisonValid reports whether a method call is allowed under the
+// query-column comparison rule: true unless the receiver is a query column<M, T>,
+// the method is a comparison, and the element type T has no such operator of its
+// own. It mirrors value mode — a column comparison stands exactly where the value
+// comparison would — closing the gap that column<M, T> offers every comparison for
+// every T regardless of whether T supports it (a bool column has no ordering, a
+// non-comparable column no equality).
+func queryColumnComparisonValid(reg *builtin.Registry, recv ir.Type, method string) bool {
+	if !queryComparisonMethods[method] {
 		return true
 	}
 	elem, ok := queryColumnElem(reg, recv)
