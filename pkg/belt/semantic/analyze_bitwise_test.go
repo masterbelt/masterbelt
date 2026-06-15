@@ -76,3 +76,103 @@ func TestBitwiseShiftBudget(t *testing.T) {
 		t.Errorf("byte(1).shl(2097153): classified as an evaluator gap, want a budget refusal: %q", msg)
 	}
 }
+
+// A self-unified operand or receiver of an integer operator must inhabit the
+// type's width — the same rule a free function's argument follows. The result
+// site is not a sufficient backstop: a masking or reducing operator folds an
+// out-of-range input to an in-range result it would accept. These tests pin the
+// input-site range check across the operators where that happens.
+
+// TestSelfOperandMaskedToRangeChecked pins the soundness fix: an operator that
+// folds an out-of-range self operand to an in-range result — AND masks, division
+// and remainder reduce, a multiply by zero collapses, an add of a negative shrinks
+// — leaves the result check satisfied, so the operand is range-checked at its own
+// site. Red→green: drop the self-operand check and these fold in range unreported.
+func TestSelfOperandMaskedToRangeChecked(t *testing.T) {
+	for _, src := range []string{
+		"const X: byte = byte(1).band(300)\n",
+		"const X: byte = byte(1).band(-1)\n",
+		"const X: byte = byte(1).add(-1)\n",
+		"const X: byte = byte(5).div(300)\n",
+		"const X: byte = byte(7).mul(300)\n",
+		"const X: byte = byte(0) * 300\n",
+		"pub fn f(): byte { return byte(1).band(300) }\n",
+	} {
+		_, diags := analyze(src)
+		if !slices.Contains(codes(diags), CodeConstantOverflow) {
+			t.Errorf("%q: codes = %v, want a constant_overflow at the masked operand", src, codes(diags))
+		}
+	}
+}
+
+// TestSelfReceiverMaskedToRangeChecked pins the same for the receiver: a too-wide
+// receiver an operator reduces into range (300.band(byte(1)) folds to 0,
+// 300.rem(byte(5)) to 0) is range-checked at its own site.
+func TestSelfReceiverMaskedToRangeChecked(t *testing.T) {
+	for _, src := range []string{
+		"const X: byte = 300.band(byte(1))\n",
+		"const X: byte = 300.rem(byte(5))\n",
+	} {
+		_, diags := analyze(src)
+		if !slices.Contains(codes(diags), CodeConstantOverflow) {
+			t.Errorf("%q: codes = %v, want a constant_overflow at the masked receiver", src, codes(diags))
+		}
+	}
+}
+
+// TestComparisonOperandRangeChecked pins that a comparison's operand is range-
+// checked too: byte(1) == 300 folds to a bool, so the result is never out of range,
+// but 300 cannot inhabit byte and is reported at the operand.
+func TestComparisonOperandRangeChecked(t *testing.T) {
+	_, diags := analyze("const X: bool = byte(1) == 300\n")
+	if !slices.Contains(codes(diags), CodeConstantOverflow) {
+		t.Errorf("byte(1)==300: codes = %v, want a constant_overflow at the operand", codes(diags))
+	}
+}
+
+// TestSelfOperandInRangeNoOverflow pins that the input range check does not
+// over-fire: in-range operands and receivers across the operators fold cleanly.
+func TestSelfOperandInRangeNoOverflow(t *testing.T) {
+	for _, src := range []string{
+		"const X: byte = byte(7).band(byte(3))\n",
+		"const X: byte = byte(255).band(1)\n",
+		"const X: byte = byte(5) + byte(10)\n",
+		"const X: byte = 200.rem(byte(7))\n",
+		"const X: bool = byte(1) == 100\n",
+	} {
+		if _, diags := analyze(src); len(diags) != 0 {
+			t.Errorf("%q: want no diagnostics, got %v", src, codes(diags))
+		}
+	}
+}
+
+// TestRefinedTypeOperandNotRefinementChecked guards the underlying-width design: a
+// self operand of a refined nominal type is range-checked against the sized width
+// beneath it, not the refined type's predicate — a comparison bound (self <= 100)
+// is not a value of the refined type, so it must not be run through the refinement
+// (which would spuriously report a refinement_violation). The bound is in range, so
+// no diagnostic fires.
+func TestRefinedTypeOperandNotRefinementChecked(t *testing.T) {
+	src := "pub type Lvl = sbyte where self.positive() && self <= 100 impl {\n" +
+		"  pub positive(): bool {\n    return self > 0\n  }\n}\n" +
+		"const Ok: Lvl = 10\n"
+	if _, diags := analyze(src); len(diags) != 0 {
+		t.Errorf("a comparison bound in a refined where-clause must not be refinement-checked, got %v", codes(diags))
+	}
+}
+
+// TestBitwiseOrXorStillReported pins that OR, XOR, and a left shift still report an
+// out-of-range input — they set bits or grow the magnitude, so the result is out of
+// range and reported there, and the input check reports it too.
+func TestBitwiseOrXorStillReported(t *testing.T) {
+	for _, src := range []string{
+		"const X: byte = byte(1).bor(300)\n",
+		"const X: byte = byte(1).bxor(300)\n",
+		"const X: byte = 300.shl(1)\n",
+	} {
+		_, diags := analyze(src)
+		if !slices.Contains(codes(diags), CodeConstantOverflow) {
+			t.Errorf("%q: codes = %v, want a constant_overflow", src, codes(diags))
+		}
+	}
+}

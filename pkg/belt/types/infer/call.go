@@ -168,7 +168,7 @@ func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method str
 		if len(subst) > 0 {
 			sink.callSubst(e, subst)
 		}
-		adaptedOperands(e, recvExpr, recv, m, subst, operand, args, sink)
+		adaptedOperands(reg, e, recvExpr, recv, m, subst, operand, args, sink)
 		return operand
 	}
 	result := types.Substitute(m.Result, subst)
@@ -182,7 +182,7 @@ func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method str
 	if len(subst) > 0 {
 		sink.callSubst(e, subst)
 	}
-	adaptedOperands(e, recvExpr, recv, m, subst, operand, args, sink)
+	adaptedOperands(reg, e, recvExpr, recv, m, subst, operand, args, sink)
 	return result
 }
 
@@ -290,7 +290,7 @@ func checkMethodLits(e *ast.CallExpr, m *ir.Method, subst map[string]ir.Type, ar
 // checking walk, so only the synthesized ones are read here. A parameter that
 // still carries an unsolved variable adapts at its monomorphized site, not
 // here.
-func adaptedOperands(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, m *ir.Method, subst map[string]ir.Type, operand ir.Type, args []ir.Type, sink *Sink) {
+func adaptedOperands(reg *builtin.Registry, e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, m *ir.Method, subst map[string]ir.Type, operand ir.Type, args []ir.Type, sink *Sink) {
 	for i, a := range e.Arguments {
 		if _, isLit := a.(*ast.FuncLit); isLit || i >= len(m.Params) {
 			continue
@@ -301,13 +301,22 @@ func adaptedOperands(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, m *ir.Met
 		pt := types.Substitute(m.Params[i].Type, subst)
 		if _, isSelf := pt.(*ir.SelfType); isSelf {
 			pt = operand
+			// A self-typed operand unifies with the receiver into the sized integer
+			// type, and a constant flowing into it must inhabit that type's width —
+			// the same rule a free function's argument and a conversion follow. The
+			// result site is not a sufficient backstop: a masking or reducing operator
+			// (AND, division, remainder, a multiply by zero, an add of a negative)
+			// folds a too-wide operand to an in-range result the result check accepts,
+			// so the out-of-range operand would slip through. It is range-checked here
+			// against the underlying width — not the unified type itself, which may be
+			// a refined nominal whose predicate must not run on a bare operand (a
+			// comparison bound like self <= 100 is not a value of the refined type).
+			rangeCheckInput(reg, a, pt, sink)
 		} else if !hasTypeVar(pt) {
 			// A concrete (non-self) parameter range-checks its argument the way a
 			// free function's parameter does — a constant that cannot inhabit the
 			// type (a negative amount in a shift's nuint operand, say) is
-			// constant_overflow at the argument. A self-typed operand unifies with
-			// the receiver and is range-checked at the call's own result site, so it
-			// is not re-checked here.
+			// constant_overflow at the argument.
 			sink.checked(a, pt)
 		}
 		if !hasTypeVar(pt) && !types.Identical(args[i], pt) {
@@ -316,6 +325,46 @@ func adaptedOperands(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, m *ir.Met
 	}
 	if recvExpr != nil && !types.Identical(recv, operand) {
 		sink.adapted(recvExpr, operand)
+		// The receiver adapts into the unified sized type the same way a self operand
+		// does (the default-integer receiver unifying with a sized argument), and a
+		// constant receiver an operator reduces into range — 300.rem(byte(5)) folds to
+		// 0 — would otherwise go unchecked, so it is range-checked at its own site too.
+		rangeCheckInput(reg, recvExpr, operand, sink)
+	}
+}
+
+// rangeCheckInput range-checks a self-unified operand or receiver expression
+// against the underlying integer width of its type. It checks the width, not the
+// type itself: a refined nominal type carries a predicate that must not run on a
+// bare operand (a comparison bound, self <= 100, is not a value of the refined
+// type), so the check is keyed off the sized builtin beneath any nominal wrapper.
+// A non-integer operand has no such width and is left alone.
+func rangeCheckInput(reg *builtin.Registry, e ast.Expr, t ir.Type, sink *Sink) {
+	if u := underlyingSizedInt(reg, t); u != nil {
+		sink.checked(e, u)
+	}
+}
+
+// underlyingSizedInt returns the sized integer builtin beneath t — peeling any
+// nominal or refined wrapper to its body — or nil when t is not integer-backed.
+func underlyingSizedInt(reg *builtin.Registry, t ir.Type) ir.Type {
+	seen := map[*ir.TypeDef]bool{}
+	for {
+		switch x := t.(type) {
+		case *ir.Builtin:
+			if n, ok := reg.Native(x.Name); ok && n.IsInteger() {
+				return x
+			}
+			return nil
+		case *ir.Named:
+			if x.Def == nil || x.Def.Body == nil || seen[x.Def] {
+				return nil
+			}
+			seen[x.Def] = true
+			t = x.Def.Body
+		default:
+			return nil
+		}
 	}
 }
 
