@@ -84,6 +84,26 @@ func TestValidateAllRowCountCap(t *testing.T) {
 	}
 }
 
+// TestValidateAllCountIgnoresCellValues pins that a whole-table count does not
+// depend on cell values: a row whose nint value is outside SQLite's int64 range is
+// still counted, so `count < 1` fails for it. Regression: counting by loading every
+// cell into SQLite let an out-of-range value fail the load and silently skip the
+// check, passing a file that should fail.
+func TestValidateAllCountIgnoresCellValues(t *testing.T) {
+	const belt = "master Big {\n" +
+		"  record { id: int, n: nint }\n" +
+		"  primary id\n" +
+		"  validate {\n    all {\n      assert count < 1\n    }\n  }\n" +
+		"  source { csv \"big.csv\" }\n" +
+		"}\n"
+	// One row with a value far past int64: it is counted (count 1), so count < 1 fails.
+	if _, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/big.csv": "id,n\n1,999999999999999999999999999\n",
+	}); countTableFailures(diags) != 1 {
+		t.Errorf("table_validation_failed = %d, want 1 (count 1 not < 1, despite the out-of-range cell)", countTableFailures(diags))
+	}
+}
+
 func TestLoadTypedRows(t *testing.T) {
 	loaded, diags := run(t, skillBelt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,name,power\n1,Fireball,30\n2,Heal,12\n",

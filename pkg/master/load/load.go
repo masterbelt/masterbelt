@@ -25,8 +25,6 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/belt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/master"
-	mastersql "github.com/masterbelt/masterbelt/pkg/master/sql"
-	"github.com/masterbelt/masterbelt/pkg/master/sqlite"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -140,7 +138,7 @@ func readMaster(def *ir.TypeDef, doc *abstract.Document, env eval.GraphEnv, root
 		refineDiags, refined := checkRefinements(typed, fields, spec, env)
 		diags = append(diags, refineDiags...)
 		diags = append(diags, checkRowValidations(typed, fields, refined, def, doc, spec, env)...)
-		diags = append(diags, checkAllValidations(typed, fields, def, doc, spec, env)...)
+		diags = append(diags, checkAllValidations(typed, def, doc, spec, env)...)
 		diags = append(diags, checkDuplicatePrimaryKeys(typed, def, spec)...)
 
 		loaded = append(loaded, Loaded{Master: def.Name, Display: spec.Display, Table: typed})
@@ -229,29 +227,18 @@ func checkRowValidations(typed master.Table, fields []ir.Field, refined map[int]
 
 // checkAllValidations folds each of the master's per-table validate checks over
 // the loaded rows. Unlike a per-row check (run once per row), an all check folds
-// once over the whole table: the relation's row count is evaluated against the
-// rows in the in-memory SQLite engine, substituted into the check, and the rest
-// folded by the interpreter — the same one-mechanism path the per-row evaluator
-// and the SQL engine share. A check that does not fold to a definite true fails,
-// the fail-safe a data check wants. A failure anchors at the assert in the .belt
-// declaration, naming the source as path. If the engine cannot load the rows (an
-// out-of-range integer, say, already reported as a cell error), the checks are
-// skipped rather than piling a derived error on.
-func checkAllValidations(typed master.Table, fields []ir.Field, def *ir.TypeDef, doc *abstract.Document, spec master.SourceSpec, env eval.GraphEnv) []diagnostic.Diagnostic {
+// once over the whole table: the relation's row count is substituted into the
+// check and the rest folded by the interpreter. An unfiltered count is the table's
+// row count — computed directly here, not by loading every cell into SQLite, since
+// a count reads no cell and a value outside SQLite's range must not silently skip
+// the check (a filtered count, where the engine runs the predicate, is a later
+// slice). A check that does not fold to a definite true fails, the fail-safe a
+// data check wants, anchored at its assert and naming the source as path.
+func checkAllValidations(typed master.Table, def *ir.TypeDef, doc *abstract.Document, spec master.SourceSpec, env eval.GraphEnv) []diagnostic.Diagnostic {
 	if len(def.Master.AllChecks) == 0 {
 		return nil
 	}
-	engine, err := sqlite.Load(fields, typed)
-	if err != nil {
-		return nil
-	}
-	defer func() { _ = engine.Close() }()
-	count, err := engine.Count(mastersql.All())
-	if err != nil {
-		return nil
-	}
-	rows := ir.IntConstant(big.NewInt(count))
-
+	rows := ir.IntConstant(big.NewInt(int64(len(typed.Rows))))
 	var diags []diagnostic.Diagnostic
 	for _, check := range def.Master.AllChecks {
 		// A check passes only when it folds to a definite true with the count in

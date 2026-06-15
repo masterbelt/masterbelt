@@ -37,11 +37,13 @@ Module
               Args:
                 IntLiteral
                   Text: "2000"
-                  Type: ~
+                  Type: Builtin
+                    Name: "nint"
               Setter: false
               Resolved: ~
               Subst: ~
-              Type: ~
+              Type: Builtin
+                Name: "bool"
       Where: ~
   Funcs: ~
   Asserts: ~
