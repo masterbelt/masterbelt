@@ -12,28 +12,20 @@ const queryCardsMaster = "master Cards {\n" +
 	"  primary id\n" +
 	"}\n"
 
-// funcNamed returns the resolved top-level function of the given name, or nil.
-func funcNamed(m *ir.Module, name string) *ir.Function {
+// probeReturnType is the resolved type of the value the probe function's single
+// return yields — the type the query algebra settled the body expression to.
+func probeReturnType(m *ir.Module) ir.Type {
 	if m == nil {
 		return nil
 	}
 	for _, f := range m.Funcs {
-		if f.Name == name {
-			return f
+		if f.Name != "probe" {
+			continue
 		}
-	}
-	return nil
-}
-
-// returnedType is the resolved type of the value a single-return function body
-// yields — the type the query algebra settled the body expression to.
-func returnedType(fn *ir.Function) ir.Type {
-	if fn == nil {
-		return nil
-	}
-	for _, s := range fn.Body {
-		if r, ok := s.(*ir.Return); ok && r.Value != nil {
-			return ir.TypeOf(r.Value)
+		for _, s := range f.Body {
+			if r, ok := s.(*ir.Return); ok && r.Value != nil {
+				return ir.TypeOf(r.Value)
+			}
 		}
 	}
 	return nil
@@ -53,7 +45,7 @@ func TestColumnComparisonYieldsPredicate(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
-	if got := returnedType(funcNamed(m, "probe")); got == nil || got.String() != "predicate<Cards>" {
+	if got := probeReturnType(m); got == nil || got.String() != "predicate<Cards>" {
 		t.Errorf("return type = %v, want predicate<Cards>", got)
 	}
 }
@@ -70,7 +62,7 @@ func TestColumnEqualityYieldsPredicate(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
-	if got := returnedType(funcNamed(m, "probe")); got == nil || got.String() != "predicate<Cards>" {
+	if got := probeReturnType(m); got == nil || got.String() != "predicate<Cards>" {
 		t.Errorf("return type = %v, want predicate<Cards>", got)
 	}
 }
@@ -86,7 +78,7 @@ func TestPredicateNegationYieldsPredicate(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
-	if got := returnedType(funcNamed(m, "probe")); got == nil || got.String() != "predicate<Cards>" {
+	if got := probeReturnType(m); got == nil || got.String() != "predicate<Cards>" {
 		t.Errorf("return type = %v, want predicate<Cards>", got)
 	}
 }
@@ -105,7 +97,7 @@ func TestColumnsBindingFieldIsColumn(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
-	if got := returnedType(funcNamed(m, "probe")); got == nil || got.String() != "predicate<Cards>" {
+	if got := probeReturnType(m); got == nil || got.String() != "predicate<Cards>" {
 		t.Errorf("return type = %v, want predicate<Cards>", got)
 	}
 }
@@ -122,7 +114,7 @@ func TestColumnsFieldType(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
-	if got := returnedType(funcNamed(m, "probe")); got == nil || got.String() != "column<Cards, int>" {
+	if got := probeReturnType(m); got == nil || got.String() != "column<Cards, int>" {
 		t.Errorf("return type = %v, want column<Cards, int>", got)
 	}
 }
@@ -138,7 +130,7 @@ func TestColumnsUnknownFieldNotAColumn(t *testing.T) {
 		"  return c.missing\n" +
 		"}\n"
 	m, _ := analyze(src)
-	if got := returnedType(funcNamed(m, "probe")); got != nil && got.String() == "column<Cards, int>" {
+	if got := probeReturnType(m); got != nil && got.String() == "column<Cards, int>" {
 		t.Errorf("c.missing must not resolve to a column, got %v", got)
 	}
 }

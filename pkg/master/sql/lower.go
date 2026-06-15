@@ -3,31 +3,31 @@ package sql
 import (
 	"math/big"
 
+	"github.com/masterbelt/masterbelt/pkg/belt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/belt/eval"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
-// Lower lowers a row predicate to a backend-neutral Predicate and its bind
-// values. fields are the row's stored columns (name and type), which the
-// lowering needs to tell a real column from a getter read — both surface as a
-// field access — and to tell a builtin operator from one a column's nominal type
-// overrides. A predicate the core cannot express yields one or more Unsupported
-// entries; a caller treats any Unsupported as a rejection (it does not render or
-// run a partial predicate).
-func Lower(pred ir.Value, fields []ir.Field) (Predicate, []Unsupported) {
-	cols := make(map[string]ir.Type, len(fields))
-	for _, f := range fields {
-		cols[f.Name] = f.Type
-	}
-	l := &lowering{cols: cols}
+// Lower lowers a query condition — a predicate<M> over a master's columns — to a
+// backend-neutral Predicate and its bind values. The predicate is the typed query
+// algebra's construction tree: a comparison of columns (a column<M,T> field access
+// read off the query binding) against a value or another column, composed by the
+// logical operators. A condition the core cannot express yields one or more
+// Unsupported entries; a caller treats any Unsupported as a rejection (it does not
+// render or run a partial predicate).
+//
+// The lowering is type-driven: a column is a field access whose type is the query
+// algebra's column<M,T>, not a read off self — value-mode reads (self.field in a
+// per-row validate) are folded by the evaluator, never lowered to SQL, so they do
+// not reach here.
+func Lower(pred ir.Value) (Predicate, []Unsupported) {
+	l := &lowering{}
 	root := l.expr(pred)
 	return Predicate{root: root, binds: l.binds}, l.unsupported
 }
 
-// lowering accumulates the bind values and the unsupported nodes as it walks. cols
-// is the row's stored columns by name, the truth for what is a column.
+// lowering accumulates the bind values and the unsupported nodes as it walks.
 type lowering struct {
-	cols        map[string]ir.Type
 	binds       []Bind
 	unsupported []Unsupported
 }
@@ -57,6 +57,8 @@ func (l *lowering) expr(v ir.Value) sqlExpr {
 	case *ir.BoolLiteral:
 		l.binds = append(l.binds, Bind{Kind: BindBool, Bool: n.Value})
 		return placeholder{}
+	case *ir.EnumMemberValue:
+		return l.enumMember(n)
 	default:
 		return l.reject(v, "expression")
 	}
@@ -74,19 +76,19 @@ var comparisonOps = map[string]string{
 	opEql: "=", opNeq: "<>", "lt": "<", "lteq": "<=", "gt": ">", "gteq": ">=",
 }
 
-// call lowers a method call — the desugared form of every operator. The
-// comparison, logical, and negation operators map to SQL, and a unary sign over
-// an integer literal folds to a signed bind; anything else (an arithmetic
-// operator over columns, a column or row method) is outside the core.
+// call lowers a method call — the desugared form of every operator. The column
+// comparisons and the predicate's logical operators map to SQL, and a unary sign
+// over an integer literal folds to a signed bind; anything else (an arithmetic
+// operator, a row method) is outside the core.
 func (l *lowering) call(c *ir.Call) sqlExpr {
 	// A unary sign over a literal is the literal's value, signed — the form a
-	// negative threshold (self.id >= -1) takes, where -1 is neg over the literal 1.
+	// negative threshold (c.id >= -1) takes, where -1 is neg over the literal 1.
 	if c.Method == "neg" || c.Method == "pos" {
 		return l.signedLiteral(c)
 	}
-	// The operator forms below must be the builtin operator, not one a column's
-	// type overrides — SQL's builtin =/AND/NOT would otherwise apply different
-	// semantics than the column's own. Reject an overridden operator on any operand.
+	// A comparison over a column whose element type overrides the operator does not
+	// carry the builtin's SQL semantics — SQL's = would apply different semantics
+	// than the column value's own — so reject it rather than mis-lower it.
 	if l.overridden(c) {
 		return l.reject(c, "overridden operator "+c.Method)
 	}
@@ -125,7 +127,8 @@ func (l *lowering) signedLiteral(c *ir.Call) sqlExpr {
 }
 
 // overridden reports whether any operand of an operator call is a column whose
-// type overrides the operator method — so the call is not the builtin operator.
+// element type overrides the operator method — so the call would not carry the
+// builtin operator's SQL semantics.
 func (l *lowering) overridden(c *ir.Call) bool {
 	if l.overrides(c.Receiver, c.Method) {
 		return true
@@ -179,7 +182,7 @@ func (l *lowering) compare(c *ir.Call) sqlExpr {
 
 // nullCompare lowers a comparison against the null literal: only equality and
 // inequality have a null form (IS [NOT] NULL); an ordering against null is not a
-// row predicate the core expresses.
+// query condition the core expresses.
 func (l *lowering) nullCompare(c *ir.Call, operand ir.Value) sqlExpr {
 	if c.Method != opEql && c.Method != opNeq {
 		return l.reject(c, "null comparison")
@@ -190,18 +193,14 @@ func (l *lowering) nullCompare(c *ir.Call, operand ir.Value) sqlExpr {
 	return nil
 }
 
-// column lowers a column reference: a read of a stored row column off self (an
-// implicit-self read, lowered to self.field). A read off anything other than self
-// is not a single column of this table; a read whose name is not a stored column
-// is a getter (which also surfaces as a field access) computing a value no table
-// column holds. Both are outside the core and rejected rather than emitted as a
-// column that does not exist.
+// column lowers a column reference: a field access whose type is the query
+// algebra's column<M,T>, read off the query binding. Its SQL is the column named by
+// the field. A field access of any other type is not a column of this table (a
+// value read, a getter) and is rejected rather than emitted as a column that does
+// not exist.
 func (l *lowering) column(f *ir.FieldAccess) sqlExpr {
-	if _, ok := f.Receiver.(*ir.SelfValue); !ok {
-		return l.reject(f, "non-self field access")
-	}
-	if _, ok := l.cols[f.Field]; !ok {
-		return l.reject(f, "non-column read "+f.Field)
+	if _, ok := columnElem(f); !ok {
+		return l.reject(f, "non-column field access")
 	}
 	return column{name: f.Field}
 }
@@ -215,6 +214,31 @@ func (l *lowering) intLiteral(n *ir.IntLiteral) sqlExpr {
 	return placeholder{}
 }
 
+// enumMember binds an enum member used as a comparison value by its underlying
+// base value — the integer or string the member stands for — so a column compared
+// against an enum compares against the value stored for it.
+func (l *lowering) enumMember(m *ir.EnumMemberValue) sqlExpr {
+	if m.Def == nil || m.Def.Enum == nil || m.Index < 0 || m.Index >= len(m.Def.Enum.Members) {
+		return l.reject(m, "enum member")
+	}
+	v := m.Def.Enum.Members[m.Index].Value
+	if v == nil {
+		return l.reject(m, "enum member value")
+	}
+	switch v.Kind {
+	case ir.ConstInt:
+		l.binds = append(l.binds, Bind{Kind: BindInt, Int: v.Int})
+		return placeholder{}
+	case ir.ConstString:
+		l.binds = append(l.binds, Bind{Kind: BindText, Text: v.Str})
+		return placeholder{}
+	default:
+		// An enum's base is an integer or a string, so no other kind is a member
+		// value; reject anything else rather than emit a bind for it.
+		return l.reject(m, "enum member value")
+	}
+}
+
 // intLiteralOf returns the integer literal beneath a value, seen through the
 // Adapt a typed literal is wrapped in, or false for anything else.
 func intLiteralOf(v ir.Value) (*ir.IntLiteral, bool) {
@@ -225,16 +249,39 @@ func intLiteralOf(v ir.Value) (*ir.IntLiteral, bool) {
 	return lit, ok
 }
 
-// overrides reports whether a value is a column whose nominal type declares the
+// columnElem returns the element type T of a column<M, T> field access — the type
+// the column's value has — and whether f is a column reference at all. The lowering
+// keys a column on its type rather than its receiver: a field access typed
+// column<M, T> names a table column (by its field name) wherever the binding it
+// reads off came from.
+func columnElem(f *ir.FieldAccess) (ir.Type, bool) {
+	app, ok := f.Type.(*ir.App)
+	if !ok || app.Def == nil || app.Def.Name != builtin.NameColumn || len(app.Args) != 2 {
+		return nil, false
+	}
+	return app.Args[1], true
+}
+
+// overrides reports whether a value is a column whose element type declares the
 // operator method itself — a user-defined operator that does not carry the
-// builtin's SQL semantics. A builtin scalar, or an alias/refinement that inherits
-// the operator rather than declaring it, does not override.
+// builtin's SQL semantics. A column of a builtin scalar, or of an alias/refinement
+// that inherits the operator rather than declaring it, does not override.
 func (l *lowering) overrides(v ir.Value, method string) bool {
 	f, ok := v.(*ir.FieldAccess)
 	if !ok {
 		return false
 	}
-	return declaresMethod(l.cols[f.Field], method)
+	elem, ok := columnElem(f)
+	if !ok {
+		return false
+	}
+	// An enum compares by its base value (an integer or string), which SQL's own
+	// comparison reproduces — its standard comparison methods are not an override
+	// SQL cannot express, unlike a user nominal type that declares its own operator.
+	if n, ok := elem.(*ir.Named); ok && n.Def != nil && n.Def.Enum != nil {
+		return false
+	}
+	return declaresMethod(elem, method)
 }
 
 // declaresMethod reports whether a nominal type, or one in its underlying chain,
