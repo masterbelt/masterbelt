@@ -59,9 +59,13 @@ func graphApplyBody(c graphCallable, self *ir.Constant, vals []*ir.Constant, sub
 	return graphBody(c.body, graphCtx{
 		env: ctx.env, locals: locals, self: self,
 		selfDef: c.selfDef, depth: ctx.depth + 1, budgetHit: ctx.budgetHit,
-		resultColl: CollKindOf(c.result),
-		resultType: c.result,
-		subst:      subst,
+		// The relation count carries into a called routine the same way self does,
+		// so a count reached through a helper (apply(fn(): bool { return count < 3 }))
+		// folds to the table's row count rather than nil.
+		relationCount: ctx.relationCount,
+		resultColl:    CollKindOf(c.result),
+		resultType:    c.result,
+		subst:         subst,
 	})
 }
 

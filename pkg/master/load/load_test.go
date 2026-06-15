@@ -123,6 +123,25 @@ func TestValidateAllCountInClosure(t *testing.T) {
 	}
 }
 
+// TestValidateAllCountThroughHelper pins that count keeps its value when a closure
+// that references it is invoked through a helper function. Regression: the helper
+// application built a fresh fold context without the relation count, so count
+// folded to nil through the helper and the check failed despite the row count.
+func TestValidateAllCountThroughHelper(t *testing.T) {
+	const belt = "fn apply(f: fn(): bool): bool {\n  return f()\n}\n\n" +
+		"master Item {\n" +
+		"  record { id: int }\n" +
+		"  primary id\n" +
+		"  validate {\n    all {\n      assert apply(fn(): bool { return count < 3 })\n    }\n  }\n" +
+		"  source { csv \"items.csv\" }\n" +
+		"}\n"
+	if _, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/items.csv": "id\n1\n2\n",
+	}); countTableFailures(diags) != 0 {
+		t.Errorf("table_validation_failed = %d, want 0 (count 2 < 3 through a helper)", countTableFailures(diags))
+	}
+}
+
 func TestLoadTypedRows(t *testing.T) {
 	loaded, diags := run(t, skillBelt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,name,power\n1,Fireball,30\n2,Heal,12\n",
