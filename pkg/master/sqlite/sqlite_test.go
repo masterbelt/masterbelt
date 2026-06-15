@@ -1,9 +1,11 @@
 package sqlite_test
 
 import (
+	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/belt/parser/abstract"
@@ -212,6 +214,87 @@ func TestLoadIntegerOutOfRange(t *testing.T) {
 	}}
 	if _, err := sqlite.Load([]ir.Field{builtinField("id", "int")}, table); err == nil {
 		t.Fatal("Load accepted an integer outside SQLite's range; want an error")
+	}
+}
+
+// TestViolationsWithRowidColumn pins that a master column named "rowid" does not
+// corrupt the violation mapping: SQLite resolves an unquoted rowid to such a
+// column, so the engine keys rows on a synthetic column it controls instead. The
+// user "rowid" values here are non-sequential, so relying on them would map the
+// violation to the wrong row.
+func TestViolationsWithRowidColumn(t *testing.T) {
+	fields := []ir.Field{builtinField("rowid", "int"), builtinField("val", "int")}
+	table := master.Table{Columns: []string{"rowid", "val"}, Rows: []master.Row{
+		introw(2, 100, 5),  // val 5 >= 0 holds
+		introw(3, 200, -1), // val -1 >= 0 fails, row index 1
+		introw(4, 300, 7),  // holds
+	}}
+	pred, unsupported := mastersql.Lower(call("gteq", selfField("val"), &ir.IntLiteral{Text: "0"}), fields)
+	if len(unsupported) != 0 {
+		t.Fatalf("predicate did not lower: %+v", unsupported)
+	}
+	eng, err := sqlite.Load(fields, table)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	defer closeEngine(t, eng)
+	vios, err := eng.Violations(pred)
+	if err != nil {
+		t.Fatalf("Violations: %v", err)
+	}
+	if got := rowIndexes(vios); !equalInts(got, []int{1}) {
+		t.Fatalf("violating rows = %v, want [1]", got)
+	}
+	if got := vios[0].Origin; got != (master.Origin{Row: 3, Col: 1}) {
+		t.Errorf("violation origin = %+v, want {Row:3 Col:1}", got)
+	}
+}
+
+// TestViolationsConcurrent pins that the in-memory database is reachable from
+// overlapping queries: with :memory: each connection is a private database, so the
+// pool must be held to one connection or a query can run on a connection where the
+// table was never created and fail with "no such table". Many goroutines fire at
+// once to force a second connection if the pool is not pinned.
+func TestViolationsConcurrent(t *testing.T) {
+	fields := []ir.Field{builtinField("id", "int"), builtinField("power", "int")}
+	table := master.Table{Columns: []string{"id", "power"}, Rows: []master.Row{
+		introw(2, 1, 5),
+		introw(3, 2, -1), // fails power >= 0, row index 1
+	}}
+	pred, unsupported := mastersql.Lower(call("gteq", selfField("power"), &ir.IntLiteral{Text: "0"}), fields)
+	if len(unsupported) != 0 {
+		t.Fatalf("predicate did not lower: %+v", unsupported)
+	}
+	eng, err := sqlite.Load(fields, table)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	defer closeEngine(t, eng)
+
+	const workers = 16
+	start := make(chan struct{})
+	errs := make(chan error, workers)
+	var wg sync.WaitGroup
+	for range workers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start // fire together, maximizing the chance of a second connection
+			vios, err := eng.Violations(pred)
+			if err != nil {
+				errs <- err
+				return
+			}
+			if got := rowIndexes(vios); !equalInts(got, []int{1}) {
+				errs <- fmt.Errorf("violating rows = %v, want [1]", got)
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Errorf("concurrent Violations: %v", err)
 	}
 }
 

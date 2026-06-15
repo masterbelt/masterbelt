@@ -6,9 +6,10 @@
 // imports only the IR and the diagnostics, and a code generator or another
 // consumer reaches the engine here rather than the driver directly.
 //
-// The database is in-memory and the rows are inserted in source order, so a query
-// ordered by rowid is deterministic; a golden over the violations it reports is
-// stable. The engine is the basis the aggregate, scope, and reference checks will
+// The database is in-memory and the rows are inserted in source order, keyed by a
+// synthetic row-index column, so a query ordered by that key is deterministic; a
+// golden over the violations it reports is stable. The engine is the basis the
+// aggregate, scope, and reference checks will
 // run on; the per-row validate the language already evaluates row by row stays on
 // its evaluator and is not rebuilt here.
 package sqlite
@@ -37,8 +38,9 @@ var dialect = mastersql.SQLite
 // predicate can be run against them. Close releases the database.
 type Engine struct {
 	db      *sql.DB
-	columns []ir.Field   // the table's columns, in insert (and bind) order
-	rows    []master.Row // kept so a violating rowid maps back to its source cell
+	keyCol  string       // synthetic row-index column the violations map back through
+	columns []ir.Field   // the table's columns — the synthetic key first, then the data columns
+	rows    []master.Row // kept so a violating row maps back to its source cell
 }
 
 // Violation is a row that does not satisfy a predicate. Row is the zero-based
@@ -52,16 +54,25 @@ type Violation struct {
 
 // Load opens an in-memory database, creates a table for the master's loaded
 // columns, and inserts its rows in order. The columns are the typed table's — the
-// scalar fields the loader bound — looked up against fields for their types. The
-// caller must Close the returned Engine. An integer value outside SQLite's 64-bit
-// range is reported rather than silently truncated; arbitrary-precision storage is
-// a later concern.
+// scalar fields the loader bound — looked up against fields for their types, with
+// a synthetic row-index key column prepended (named so it cannot collide with a
+// master's own column). The caller must Close the returned Engine. An integer
+// value outside SQLite's 64-bit range is reported rather than silently truncated;
+// arbitrary-precision storage is a later concern.
 func Load(fields []ir.Field, table master.Table) (*Engine, error) {
+	data := alignColumns(fields, table.Columns)
+	keyCol := uniqueName("_mb_row", table.Columns)
+	columns := append([]ir.Field{{Name: keyCol, Type: &ir.Builtin{Name: "int"}}}, data...)
+
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		return nil, err
 	}
-	e := &Engine{db: db, columns: alignColumns(fields, table.Columns), rows: table.Rows}
+	// A :memory: database is private to its connection, so a second connection
+	// from the pool would see an empty database with no table; pinning the pool to
+	// one connection keeps every query on the one the rows were loaded into.
+	db.SetMaxOpenConns(1)
+	e := &Engine{db: db, keyCol: keyCol, columns: columns, rows: table.Rows}
 	if err := e.create(); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -94,9 +105,13 @@ func (e *Engine) Violations(pred mastersql.Predicate) ([]Violation, error) {
 	}
 	// (frag) IS NOT 1 selects the rows the predicate is not definitely true for:
 	// false rows, and rows where it is NULL (IS NOT is null-aware, so NULL IS NOT 1
-	// is true). Ordering by rowid — the insert order — keeps the result stable.
-	query := "SELECT rowid FROM " + dialect.QuoteIdent(tableName) +
-		" WHERE (" + frag + ") IS NOT 1 ORDER BY rowid"
+	// is true). The synthetic key is selected rather than SQLite's implicit rowid —
+	// a master may declare a column literally named rowid, which would shadow the
+	// implicit one and return user data instead of the insert position — and
+	// ordering by it keeps the result stable.
+	key := dialect.QuoteIdent(e.keyCol)
+	query := "SELECT " + key + " FROM " + dialect.QuoteIdent(tableName) +
+		" WHERE (" + frag + ") IS NOT 1 ORDER BY " + key
 	rows, err := e.db.Query(query, args...)
 	if err != nil {
 		return nil, err
@@ -104,12 +119,11 @@ func (e *Engine) Violations(pred mastersql.Predicate) ([]Violation, error) {
 	defer func() { _ = rows.Close() }()
 	var out []Violation
 	for rows.Next() {
-		var rowid int64
-		if err := rows.Scan(&rowid); err != nil {
+		var idx int64
+		if err := rows.Scan(&idx); err != nil {
 			return nil, err
 		}
-		idx := int(rowid - 1) // rowid is 1-based, in insert order
-		out = append(out, Violation{Row: idx, Origin: e.originOf(idx)})
+		out = append(out, Violation{Row: int(idx), Origin: e.originOf(int(idx))})
 	}
 	return out, rows.Err()
 }
@@ -121,11 +135,13 @@ func (e *Engine) create() error {
 	return err
 }
 
-// insert loads every row in order, so a row's rowid is its source position.
+// insert loads every row in order, binding the synthetic key to the row's index
+// so a violation maps straight back to its source row.
 func (e *Engine) insert(table master.Table) error {
 	stmt := mastersql.InsertInto(tableName, e.columns, dialect)
-	for _, row := range table.Rows {
-		args, err := rowArgs(row, len(e.columns))
+	dataCols := len(e.columns) - 1 // the columns past the synthetic key
+	for i, row := range table.Rows {
+		args, err := rowArgs(i, row, dataCols)
 		if err != nil {
 			return err
 		}
@@ -163,20 +179,37 @@ func alignColumns(fields []ir.Field, columns []string) []ir.Field {
 	return out
 }
 
-// rowArgs converts a row's cells to positional bind arguments, in column order. A
-// row whose cell count does not match the columns is a malformed table and an
-// error rather than a silently short INSERT.
-func rowArgs(row master.Row, n int) ([]any, error) {
-	if len(row.Cells) != n {
-		return nil, fmt.Errorf("row has %d cells, want %d columns", len(row.Cells), n)
+// uniqueName returns base, or base with underscores appended until it matches none
+// of the taken names — so the engine's synthetic key column cannot be shadowed by a
+// master's own column of the same name.
+func uniqueName(base string, taken []string) string {
+	set := make(map[string]bool, len(taken))
+	for _, c := range taken {
+		set[c] = true
 	}
-	args := make([]any, n)
-	for i, c := range row.Cells {
+	name := base
+	for set[name] {
+		name += "_"
+	}
+	return name
+}
+
+// rowArgs converts a row to positional bind arguments: the synthetic key (the
+// row's index) followed by its cell values, in column order. A row whose cell
+// count does not match the data columns is a malformed table and an error rather
+// than a silently short INSERT.
+func rowArgs(index int, row master.Row, dataCols int) ([]any, error) {
+	if len(row.Cells) != dataCols {
+		return nil, fmt.Errorf("row has %d cells, want %d columns", len(row.Cells), dataCols)
+	}
+	args := make([]any, 0, dataCols+1)
+	args = append(args, int64(index))
+	for _, c := range row.Cells {
 		a, err := constArg(c.Value)
 		if err != nil {
 			return nil, err
 		}
-		args[i] = a
+		args = append(args, a)
 	}
 	return args, nil
 }
