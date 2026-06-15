@@ -101,18 +101,20 @@ func checkEffects(reg *builtin.Registry, file *ast.File, defs []*ir.TypeDef, uni
 			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: methodSelf, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: methodTScope(r, def, m)}
 			checkDeclEffects(def.Name+"."+irm.Name, m.Effects, m, m.Body, bs, resolved, at, diags)
 		}
-		// A master's per-row validate checks are pure: they fold against each row
-		// at compile time and have no place to declare an effect, so an effectful
-		// call in one is reported as missing_effect (an undeclared effect) here
-		// rather than failing every row as an unfoldable predicate later. The body
-		// is walked over self (the row) with an empty effect declaration, so any
-		// effect it uses is undeclared.
+		// A master's validate checks are pure: they fold at compile time (a per-row
+		// each against each row, a per-table all over the relation) and have no place
+		// to declare an effect, so an effectful call in one is reported as
+		// missing_effect (an undeclared effect) here rather than failing later as an
+		// unfoldable predicate. A per-row body is walked over self (the row); a
+		// per-table body over the relation (no self), with an empty effect
+		// declaration, so any effect it uses is undeclared.
 		if def.Master != nil && def.MasterSyntax != nil {
 			for _, clause := range def.MasterSyntax.Validations {
-				if !clause.PerRow {
-					continue // a per-table check (validate all) is a later concern
-				}
 				bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: self, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows}
+				if !clause.PerRow {
+					bs.Self = nil
+					bs.Relation = true
+				}
 				checkDeclEffects(def.Name+" validate", nil, clause, clause.Body, bs, resolved, at, diags)
 			}
 		}

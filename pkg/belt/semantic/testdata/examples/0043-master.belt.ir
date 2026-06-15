@@ -209,6 +209,7 @@ Module
                 Def: "SkillKind"
         Primary: "id"
         RowChecks: ~
+        AllChecks: ~
       Where: ~
     TypeDef
       Name: "SkillUpgrade"
@@ -236,6 +237,7 @@ Module
                 Name: "int"
         Primary: "skill" "level"
         RowChecks: ~
+        AllChecks: ~
       Where: ~
   Funcs: ~
   Asserts: ~

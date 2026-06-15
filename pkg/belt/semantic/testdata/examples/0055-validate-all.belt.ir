@@ -22,12 +22,28 @@ Module
               Type: Builtin
                 Name: "int"
             Field
-              Name: "name"
+              Name: "power"
               Type: Builtin
-                Name: "string"
+                Name: "int"
         Primary: "id"
         RowChecks: ~
-        AllChecks: ~
+        AllChecks:
+          AssertStmt
+            Cond: Call
+              Receiver: RelationCount
+                Type: Builtin
+                  Name: "nint"
+              Method: "lt"
+              Args:
+                IntLiteral
+                  Text: "2000"
+                  Type: Builtin
+                    Name: "nint"
+              Setter: false
+              Resolved: ~
+              Subst: ~
+              Type: Builtin
+                Name: "bool"
       Where: ~
   Funcs: ~
   Asserts: ~

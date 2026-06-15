@@ -45,6 +45,103 @@ func run(t *testing.T, beltSrc string, bases map[string]string, files map[string
 	return load.File(prog, "skills.belt", root, bases, reg)
 }
 
+// countTableFailures counts the per-table validate failures among the diagnostics.
+func countTableFailures(diags []diagnostic.Diagnostic) int {
+	n := 0
+	for _, d := range diags {
+		if d.Code == master.CodeTableValidationFailed {
+			n++
+		}
+	}
+	return n
+}
+
+// TestValidateAllRowCountCap exercises a per-table validate all check end to end:
+// the count of loaded rows is evaluated in the in-memory SQLite engine and
+// compared to the cap. Under the cap the table passes; at or over it the check
+// fails once, anchored at the assert.
+func TestValidateAllRowCountCap(t *testing.T) {
+	const belt = "master Item {\n" +
+		"  record { id: int, power: int }\n" +
+		"  primary id\n" +
+		"  validate {\n    all {\n      assert count < 3\n    }\n  }\n" +
+		"  source { csv \"items.csv\" }\n" +
+		"}\n"
+	bases := map[string]string{"csv": "data"}
+
+	// Two rows: count 2 < 3, the table passes.
+	if _, diags := run(t, belt, bases, map[string]string{
+		"data/items.csv": "id,power\n1,10\n2,20\n",
+	}); countTableFailures(diags) != 0 {
+		t.Errorf("2 rows: table_validation_failed = %d, want 0 (count 2 < 3)", countTableFailures(diags))
+	}
+
+	// Three rows: count 3 is not < 3, the table fails once.
+	if _, diags := run(t, belt, bases, map[string]string{
+		"data/items.csv": "id,power\n1,10\n2,20\n3,30\n",
+	}); countTableFailures(diags) != 1 {
+		t.Errorf("3 rows: table_validation_failed = %d, want 1 (count 3 not < 3)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllCountIgnoresCellValues pins that a whole-table count does not
+// depend on cell values: a row whose nint value is outside SQLite's int64 range is
+// still counted, so `count < 1` fails for it. Regression: counting by loading every
+// cell into SQLite let an out-of-range value fail the load and silently skip the
+// check, passing a file that should fail.
+func TestValidateAllCountIgnoresCellValues(t *testing.T) {
+	const belt = "master Big {\n" +
+		"  record { id: int, n: nint }\n" +
+		"  primary id\n" +
+		"  validate {\n    all {\n      assert count < 1\n    }\n  }\n" +
+		"  source { csv \"big.csv\" }\n" +
+		"}\n"
+	// One row with a value far past int64: it is counted (count 1), so count < 1 fails.
+	if _, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/big.csv": "id,n\n1,999999999999999999999999999\n",
+	}); countTableFailures(diags) != 1 {
+		t.Errorf("table_validation_failed = %d, want 1 (count 1 not < 1, despite the out-of-range cell)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllCountInClosure pins that count keeps its value inside a closure
+// in a validate all check: the relation count is carried through the applied
+// function the same way self is. Regression: graphApply built a fresh context
+// without the count, so count folded to nil and the check failed regardless of the
+// actual row count.
+func TestValidateAllCountInClosure(t *testing.T) {
+	const belt = "master Item {\n" +
+		"  record { id: int }\n" +
+		"  primary id\n" +
+		"  validate {\n    all {\n      assert (fn(): bool { return count < 3 })()\n    }\n  }\n" +
+		"  source { csv \"items.csv\" }\n" +
+		"}\n"
+	if _, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/items.csv": "id\n1\n2\n",
+	}); countTableFailures(diags) != 0 {
+		t.Errorf("table_validation_failed = %d, want 0 (count 2 < 3 inside a closure)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllCountThroughHelper pins that count keeps its value when a closure
+// that references it is invoked through a helper function. Regression: the helper
+// application built a fresh fold context without the relation count, so count
+// folded to nil through the helper and the check failed despite the row count.
+func TestValidateAllCountThroughHelper(t *testing.T) {
+	const belt = "fn apply(f: fn(): bool): bool {\n  return f()\n}\n\n" +
+		"master Item {\n" +
+		"  record { id: int }\n" +
+		"  primary id\n" +
+		"  validate {\n    all {\n      assert apply(fn(): bool { return count < 3 })\n    }\n  }\n" +
+		"  source { csv \"items.csv\" }\n" +
+		"}\n"
+	if _, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/items.csv": "id\n1\n2\n",
+	}); countTableFailures(diags) != 0 {
+		t.Errorf("table_validation_failed = %d, want 0 (count 2 < 3 through a helper)", countTableFailures(diags))
+	}
+}
+
 func TestLoadTypedRows(t *testing.T) {
 	loaded, diags := run(t, skillBelt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,name,power\n1,Fireball,30\n2,Heal,12\n",

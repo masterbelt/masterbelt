@@ -1,0 +1,50 @@
+File
+  Uses: ~
+  Decls: ~
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~
+  Masters:
+    MasterDecl
+      Doc: ~
+      Public: true
+      Name: "Skill"
+      Record: RecordType
+        Fields:
+          FieldDef
+            Name: "id"
+            Type: NamedType
+              Namespace: ""
+              Name: "int"
+              Args: ~
+              Projections: ~
+          FieldDef
+            Name: "power"
+            Type: NamedType
+              Namespace: ""
+              Name: "int"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+      Primary: "id"
+      Sources: ~
+      Validations:
+        ValidateClause
+          PerRow: false
+          Body:
+            AssertStmt
+              Cond: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "count"
+                  Member: Identifier
+                    Name: "lt"
+                Arguments:
+                  IntLit
+                    Text: "2000"
+                    Base: 0

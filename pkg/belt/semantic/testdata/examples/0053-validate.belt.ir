@@ -77,6 +77,7 @@ Module
               Subst: ~
               Type: Builtin
                 Name: "bool"
+        AllChecks: ~
       Where: ~
   Funcs: ~
   Asserts: ~

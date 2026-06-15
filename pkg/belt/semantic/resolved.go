@@ -115,6 +115,13 @@ func writeBackResolutions(module *ir.Module, res *callResolutions, fnShells map[
 		if def.Master != nil && len(def.Master.RowChecks) > 0 {
 			w.stmts(masterCheckStmts(def.Master.RowChecks), bindings{self: self})
 		}
+		// A master's per-table validate checks are statements over the relation (no
+		// self) — bound through the same walk so each condition's overload
+		// selections, adapted types, and literals are annotated from the checker
+		// facts, exactly as the row checks are; the data layer folds the result.
+		if def.Master != nil && len(def.Master.AllChecks) > 0 {
+			w.stmts(masterCheckStmts(def.Master.AllChecks), bindings{})
+		}
 	}
 }
 
@@ -293,6 +300,10 @@ func (w resolutionWriter) valueLeaf(v ir.Value, bd bindings) {
 		v.Type = &ir.Builtin{Name: builtin.NameDuration}
 	case *ir.NullValue:
 		v.Type = &ir.Builtin{Name: "null"}
+	case *ir.RelationCount:
+		// A relation count's type is the integer the count yields, fixed at
+		// lowering; there is no checker fact to settle (no overload, no adaptation).
+		v.Type = &ir.Builtin{Name: builtin.NameNint}
 	default:
 		// The composite forms have explicit arms in value; a form reaching
 		// here without a case above was never given a write-back rule — fail

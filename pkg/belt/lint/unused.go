@@ -198,6 +198,14 @@ func (mk *marker) reachType(t *ir.TypeDef) {
 				mk.walkValue(c.Cond)
 			}
 		}
+		// The per-table validate checks read the relation through value graphs the
+		// same way, so a declaration used only from a validate all check (a const a
+		// count is compared against) is reached too.
+		for _, c := range t.Master.AllChecks {
+			if c != nil {
+				mk.walkValue(c.Cond)
+			}
+		}
 	}
 	for _, meth := range t.Methods {
 		mk.reachMethod(meth)

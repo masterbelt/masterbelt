@@ -171,6 +171,36 @@ func TestUnusedConstKeptByMasterValidate(t *testing.T) {
 	}
 }
 
+// TestUnusedConstKeptByMasterValidateAll pins that a declaration read only from a
+// per-table validate all check is reached by the liveness walk, so it is not
+// reported unused (nor offered for deletion by the quick fix).
+func TestUnusedConstKeptByMasterValidateAll(t *testing.T) {
+	limit := &ir.Const{
+		Name:   "Limit",
+		Syntax: &ast.ConstDecl{},
+		Type:   &ir.Builtin{Name: "int"},
+		Value:  &ir.IntLiteral{Text: "100"},
+	}
+	master := &ir.TypeDef{
+		Name:         "M",
+		Public:       true,
+		MasterSyntax: &ast.MasterDecl{},
+		Master: &ir.MasterDef{
+			Row:       &ir.Record{Fields: []ir.Field{{Name: "id", Type: &ir.Builtin{Name: "int"}}}},
+			Primary:   []string{"id"},
+			AllChecks: []*ir.AssertStmt{{Cond: &ir.Reference{Target: limit}}},
+		},
+	}
+	m := &ir.Module{Consts: []*ir.Const{limit}, Types: []*ir.TypeDef{master}}
+	span := fakeSpan(map[ast.Node][2]int{limit.Syntax: {0, 10}, master.MasterSyntax: {11, 10}})
+
+	l := &linter{span: span}
+	l.unusedDeclarations(m)
+	if len(l.diags) != 0 {
+		t.Fatalf("Limit is read by the master's validate all check, so it is used; got %+v", l.diags)
+	}
+}
+
 func TestUnusedRowAliasKeptByMaster(t *testing.T) {
 	row := &ir.TypeDef{
 		Name:   "Row",

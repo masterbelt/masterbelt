@@ -252,9 +252,9 @@ module.exports = grammar({
       seq(op.LBrace, repeat(seq($.record_field, optional(op.Comma))), op.RBrace),
 
     // The validate member holds the master's data checks: a block of clauses,
-    // each a context keyword naming its scope (each is per-row; all, per-table,
-    // is a later concern) and a statement block of asserts. validate and each are
-    // context keywords aliased to master_keyword like record/primary/source.
+    // each a context keyword naming its scope (each is per-row; all is per-table)
+    // and a statement block of asserts. validate, each, and all are context
+    // keywords aliased to master_keyword like record/primary/source.
     master_validate: ($) =>
       seq(
         alias("validate", $.master_keyword),
@@ -263,7 +263,8 @@ module.exports = grammar({
         op.RBrace,
       ),
 
-    validate_clause: ($) => seq(alias("each", $.master_keyword), $.block),
+    validate_clause: ($) =>
+      seq(alias(choice("each", "all"), $.master_keyword), $.block),
 
     // --- impl blocks and methods --------------------------------------------
 

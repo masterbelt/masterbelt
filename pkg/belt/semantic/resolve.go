@@ -1331,13 +1331,21 @@ func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.Mas
 func resolveMasterValidations(r *infer.TypeResolver, reg *builtin.Registry, def *ir.TypeDef, md *ast.MasterDecl, fns bodyFuncs) {
 	self := ir.Type(&ir.Named{Def: def})
 	for _, clause := range md.Validations {
-		if !clause.PerRow {
-			continue // a per-table check (validate all) is a later concern
+		if clause.PerRow {
+			binder := bodyBinder{r: r, reg: reg, selfType: self, funcs: fns, self: true}
+			for _, s := range lower.Body(clause.Body, binder) {
+				if a, ok := s.(*ir.AssertStmt); ok {
+					def.Master.RowChecks = append(def.Master.RowChecks, a)
+				}
+			}
+			continue
 		}
-		binder := bodyBinder{r: r, reg: reg, selfType: self, funcs: fns, self: true}
+		// A per-table check (validate all) resolves over the relation, not a row: no
+		// self, the relation context instead, so a bare count reads the row count.
+		binder := bodyBinder{r: r, reg: reg, funcs: fns, relation: true}
 		for _, s := range lower.Body(clause.Body, binder) {
 			if a, ok := s.(*ir.AssertStmt); ok {
-				def.Master.RowChecks = append(def.Master.RowChecks, a)
+				def.Master.AllChecks = append(def.Master.AllChecks, a)
 			}
 		}
 	}

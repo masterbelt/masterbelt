@@ -15,6 +15,7 @@
 package load
 
 import (
+	"math/big"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -137,6 +138,7 @@ func readMaster(def *ir.TypeDef, doc *abstract.Document, env eval.GraphEnv, root
 		refineDiags, refined := checkRefinements(typed, fields, spec, env)
 		diags = append(diags, refineDiags...)
 		diags = append(diags, checkRowValidations(typed, fields, refined, def, doc, spec, env)...)
+		diags = append(diags, checkAllValidations(typed, def, doc, spec, env)...)
 		diags = append(diags, checkDuplicatePrimaryKeys(typed, def, spec)...)
 
 		loaded = append(loaded, Loaded{Master: def.Name, Display: spec.Display, Table: typed})
@@ -218,6 +220,33 @@ func checkRowValidations(typed master.Table, fields []ir.Field, refined map[int]
 				offset, width := assertSpan(doc, check.Syntax)
 				diags = append(diags, master.RowValidationFailed(offset, width, spec.Display, line))
 			}
+		}
+	}
+	return diags
+}
+
+// checkAllValidations folds each of the master's per-table validate checks over
+// the loaded rows. Unlike a per-row check (run once per row), an all check folds
+// once over the whole table: the relation's row count is substituted into the
+// check and the rest folded by the interpreter. An unfiltered count is the table's
+// row count — computed directly here, not by loading every cell into SQLite, since
+// a count reads no cell and a value outside SQLite's range must not silently skip
+// the check (a filtered count, where the engine runs the predicate, is a later
+// slice). A check that does not fold to a definite true fails, the fail-safe a
+// data check wants, anchored at its assert and naming the source as path.
+func checkAllValidations(typed master.Table, def *ir.TypeDef, doc *abstract.Document, spec master.SourceSpec, env eval.GraphEnv) []diagnostic.Diagnostic {
+	if len(def.Master.AllChecks) == 0 {
+		return nil
+	}
+	rows := ir.IntConstant(big.NewInt(int64(len(typed.Rows))))
+	var diags []diagnostic.Diagnostic
+	for _, check := range def.Master.AllChecks {
+		// A check passes only when it folds to a definite true with the count in
+		// hand; a definite false, or a check that does not fold to a bool, fails it.
+		v := eval.GraphTableCheck(check.Cond, rows, def, env)
+		if v == nil || v.Kind != ir.ConstBool || !v.Bool {
+			offset, width := assertSpan(doc, check.Syntax)
+			diags = append(diags, master.TableValidationFailed(offset, width, spec.Display))
 		}
 	}
 	return diags

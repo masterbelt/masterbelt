@@ -9,20 +9,21 @@ import (
 )
 
 const (
-	CodeCellRefinement       diagnostic.Code = "master.cell_refinement"
-	CodeCellTypeMismatch     diagnostic.Code = "master.cell_type_mismatch"
-	CodeDuplicateOption      diagnostic.Code = "master.duplicate_option"
-	CodeDuplicatePrimaryKey  diagnostic.Code = "master.duplicate_primary_key"
-	CodeDuplicateRowField    diagnostic.Code = "master.duplicate_row_field"
-	CodeLocatorEscapesRoot   diagnostic.Code = "master.locator_escapes_root"
-	CodeMissingColumn        diagnostic.Code = "master.missing_column"
-	CodeOptionTypeMismatch   diagnostic.Code = "master.option_type_mismatch"
-	CodeRowValidationFailed  diagnostic.Code = "master.row_validation_failed"
-	CodeSourceUnreadable     diagnostic.Code = "master.source_unreadable"
-	CodeUnknownFormat        diagnostic.Code = "master.unknown_format"
-	CodeUnknownOption        diagnostic.Code = "master.unknown_option"
-	CodeUnsupportedFieldType diagnostic.Code = "master.unsupported_field_type"
-	CodeUnsupportedRowType   diagnostic.Code = "master.unsupported_row_type"
+	CodeCellRefinement        diagnostic.Code = "master.cell_refinement"
+	CodeCellTypeMismatch      diagnostic.Code = "master.cell_type_mismatch"
+	CodeDuplicateOption       diagnostic.Code = "master.duplicate_option"
+	CodeDuplicatePrimaryKey   diagnostic.Code = "master.duplicate_primary_key"
+	CodeDuplicateRowField     diagnostic.Code = "master.duplicate_row_field"
+	CodeLocatorEscapesRoot    diagnostic.Code = "master.locator_escapes_root"
+	CodeMissingColumn         diagnostic.Code = "master.missing_column"
+	CodeOptionTypeMismatch    diagnostic.Code = "master.option_type_mismatch"
+	CodeRowValidationFailed   diagnostic.Code = "master.row_validation_failed"
+	CodeSourceUnreadable      diagnostic.Code = "master.source_unreadable"
+	CodeTableValidationFailed diagnostic.Code = "master.table_validation_failed"
+	CodeUnknownFormat         diagnostic.Code = "master.unknown_format"
+	CodeUnknownOption         diagnostic.Code = "master.unknown_option"
+	CodeUnsupportedFieldType  diagnostic.Code = "master.unsupported_field_type"
+	CodeUnsupportedRowType    diagnostic.Code = "master.unsupported_row_type"
 )
 
 func newCellRefinementDiagnostic(offset int, width int, path string, row int, col int, field string, value string, typ string) diagnostic.Diagnostic {
@@ -179,6 +180,20 @@ func newSourceUnreadableDiagnostic(offset int, width int, path string, detail st
 		Severity: diagnostic.Error,
 		Code:     CodeSourceUnreadable,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeSourceUnreadable, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newTableValidationFailedDiagnostic(offset int, width int, path string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"path": diagnostic.Str(path),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeTableValidationFailed,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeTableValidationFailed, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

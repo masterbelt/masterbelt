@@ -49,10 +49,11 @@ func graphApply(ctx graphCtx, fn *ir.Constant, args []*ir.Constant) *ir.Constant
 		}
 	}
 	return graphBody(fn.Fn.Body, graphCtx{
-		// A function literal inherits the enclosing receiver, so self in its body
-		// (a validate check's (fn(): bool { return self.id > 0 })()) folds to the
-		// same row the enclosing predicate runs against, not nil.
-		env: ctx.env, locals: locals, self: ctx.self, selfDef: ctx.selfDef, depth: ctx.depth + 1, budgetHit: ctx.budgetHit,
+		// A function literal inherits the enclosing receiver and relation count, so
+		// self ((fn(): bool { return self.id > 0 })()) and count
+		// ((fn(): bool { return count < 3 })()) in its body fold to the same row and
+		// table-row-count the enclosing predicate runs against, not nil.
+		env: ctx.env, locals: locals, self: ctx.self, selfDef: ctx.selfDef, relationCount: ctx.relationCount, depth: ctx.depth + 1, budgetHit: ctx.budgetHit,
 		resultColl: CollKindOf(resultType), resultType: resultType,
 		// A closure captures its defining environment's type parameters, so a
 		// match in its body folds under the same substitution as the routine the

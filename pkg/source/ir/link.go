@@ -245,6 +245,13 @@ func (l *linker) linkTypeDef(def *TypeDef) {
 				l.linkValue(&c.Cond)
 			}
 		}
+		// The per-table validate checks are value graphs over the relation, relinked
+		// the same way so they survive a round-trip.
+		for _, c := range def.Master.AllChecks {
+			if c != nil {
+				l.linkValue(&c.Cond)
+			}
+		}
 	}
 	l.linkValue(&def.Where)
 }
@@ -345,10 +352,11 @@ func (l *linker) linkIf(s *If) {
 //nolint:funlen // a flat exhaustive dispatch over the 25 sealed Value forms:
 func (l *linker) linkValue(p *Value) {
 	switch v := (*p).(type) {
-	case nil, *Unresolved:
+	case nil, *Unresolved, *RelationCount:
 		// nil: an empty graph slot. *Unresolved: a placeholder that carries only
-		// its name — no type or ref to link. A round-tripped graph that still
-		// holds one is a hole, as it was.
+		// its name. *RelationCount: its type is always the builtin integer the count
+		// yields, which carries no reference to relink. None of the three has a type
+		// or ref to link — a round-tripped graph that still holds one is a hole.
 	case *Adapt:
 		l.linkValue(&v.Value)
 		l.linkType(&v.To)

@@ -1,0 +1,18 @@
+// A validate all clause checks the master as a whole — the relation of every
+// row — rather than each row in turn. count is the relation's row count, read
+// with self omitted (like a column in an each clause, but a member of the
+// relation rather than of a row), so `assert count < 2000` caps the table's
+// size. Where an each assert reads a row, an all assert reads the relation.
+
+pub master Skill {
+  record {
+    id: int,
+    power: int,
+  }
+  primary id
+  validate {
+    all {
+      assert count < 2000
+    }
+  }
+}
