@@ -61,6 +61,7 @@ func ValueKinds() []Value {
 		&Ternary{},
 		&RangeLit{},
 		&NullValue{},
+		&RelationCount{},
 		&EnumMemberValue{},
 		&AssocConstValue{},
 		&TypeValue{},

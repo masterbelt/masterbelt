@@ -2168,12 +2168,27 @@ func writeMasterDef(w *treetext.Writer, n *MasterDef, depth int) error {
 			}
 		}
 	}
+	if len(n.AllChecks) == 0 {
+		w.Line(depth, "AllChecks: "+treetext.Nil)
+	} else {
+		w.Line(depth, "AllChecks:")
+		for _, item := range n.AllChecks {
+			if item == nil {
+				w.Line(depth+1, treetext.Nil)
+				continue
+			}
+			w.Line(depth+1, "AssertStmt")
+			if err := writeAssertStmt(w, item, depth+2); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
 // decodeMasterDef builds a MasterDef from its element.
 func decodeMasterDef(e *treetext.Element) (*MasterDef, error) {
-	if err := treetext.ExpectFields(e, "Row", "Primary", "RowChecks"); err != nil {
+	if err := treetext.ExpectFields(e, "Row", "Primary", "RowChecks", "AllChecks"); err != nil {
 		return nil, err
 	}
 	n := &MasterDef{}
@@ -2209,6 +2224,29 @@ func decodeMasterDef(e *treetext.Element) (*MasterDef, error) {
 			out = append(out, v)
 		}
 		n.RowChecks = out
+	}
+	switch f := e.Fields[3]; {
+	case f.Inline == treetext.Nil:
+	case f.Items == nil:
+		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
+	default:
+		out := make([]*AssertStmt, 0, len(f.Items))
+		for j := range f.Items {
+			item := &f.Items[j]
+			if item.Head == treetext.Nil {
+				out = append(out, nil)
+				continue
+			}
+			if item.Head != "AssertStmt" {
+				return nil, fmt.Errorf("treetext: line %d: %s is not a AssertStmt", item.Line, item.Head)
+			}
+			v, err := decodeAssertStmt(item)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, v)
+		}
+		n.AllChecks = out
 	}
 	return n, nil
 }
@@ -2968,6 +3006,38 @@ func (n *Reference) MarshalText() ([]byte, error) {
 	var w treetext.Writer
 	w.Line(0, "Reference")
 	if err := writeReference(&w, n, 1); err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
+}
+
+// writeRelationCount emits n's fields beneath an already-written heading line.
+func writeRelationCount(w *treetext.Writer, n *RelationCount, depth int) error {
+	if err := writeTypeField(w, depth, "Type", n.Type); err != nil {
+		return err
+	}
+	return nil
+}
+
+// decodeRelationCount builds a RelationCount from its element.
+func decodeRelationCount(e *treetext.Element) (*RelationCount, error) {
+	if err := treetext.ExpectFields(e, "Type"); err != nil {
+		return nil, err
+	}
+	n := &RelationCount{}
+	if v, err := decodeTypeField(e.Fields[0]); err != nil {
+		return nil, err
+	} else {
+		n.Type = v
+	}
+	return n, nil
+}
+
+// MarshalText renders the node and its subtree in the exact text form.
+func (n *RelationCount) MarshalText() ([]byte, error) {
+	var w treetext.Writer
+	w.Line(0, "RelationCount")
+	if err := writeRelationCount(&w, n, 1); err != nil {
 		return nil, err
 	}
 	return w.Bytes(), nil
@@ -4115,6 +4185,13 @@ func writeValueField(w *treetext.Writer, depth int, name string, v Value) error 
 		}
 		w.Line(depth, name+": Reference")
 		return writeReference(w, n, depth+1)
+	case *RelationCount:
+		if n == nil {
+			w.Line(depth, name+": "+treetext.Nil)
+			return nil
+		}
+		w.Line(depth, name+": RelationCount")
+		return writeRelationCount(w, n, depth+1)
 	case *SelfValue:
 		if n == nil {
 			w.Line(depth, name+": "+treetext.Nil)
@@ -4316,6 +4393,13 @@ func writeValueItem(w *treetext.Writer, depth int, v Value) error {
 		}
 		w.Line(depth, "Reference")
 		return writeReference(w, n, depth+1)
+	case *RelationCount:
+		if n == nil {
+			w.Line(depth, treetext.Nil)
+			return nil
+		}
+		w.Line(depth, "RelationCount")
+		return writeRelationCount(w, n, depth+1)
 	case *SelfValue:
 		if n == nil {
 			w.Line(depth, treetext.Nil)
@@ -4408,6 +4492,8 @@ func decodeValue(e *treetext.Element) (Value, error) {
 		return decodeRecordValue(e)
 	case "Reference":
 		return decodeReference(e)
+	case "RelationCount":
+		return decodeRelationCount(e)
 	case "SelfValue":
 		return decodeSelfValue(e)
 	case "StaticCall":
@@ -4484,6 +4570,7 @@ var treeStructs = []any{
 	(*RecordField)(nil),
 	(*RecordValue)(nil),
 	(*Reference)(nil),
+	(*RelationCount)(nil),
 	(*Return)(nil),
 	(*SelfValue)(nil),
 	(*StaticCall)(nil),
@@ -4636,6 +4723,9 @@ func writeTree(w *treetext.Writer, v any, depth int) (bool, error) {
 	case *Reference:
 		w.Line(depth, "Reference")
 		return true, writeReference(w, n, depth+1)
+	case *RelationCount:
+		w.Line(depth, "RelationCount")
+		return true, writeRelationCount(w, n, depth+1)
 	case *Return:
 		w.Line(depth, "Return")
 		return true, writeReturn(w, n, depth+1)
@@ -4712,6 +4802,7 @@ var treeExcluded = map[string][]string{
 	"RangeLit":          {"Syntax"},
 	"RecordValue":       {"Syntax"},
 	"Reference":         {"Syntax"},
+	"RelationCount":     {"Syntax"},
 	"Return":            {"Syntax"},
 	"SelfValue":         {"Syntax"},
 	"StaticCall":        {"Syntax"},

@@ -487,6 +487,20 @@ type NullValue struct {
 
 func (*NullValue) value() {}
 
+// RelationCount is the row count of a master's relation — the value a validate
+// all assert reads as the bare name count. It carries no relation of its own: the
+// master whose rows it counts is the one owning the check (a per-table check folds
+// over its own master's table), so the node is contextual. Its type is the integer
+// the count yields. The data layer evaluates it against the loaded rows — the belt
+// evaluator cannot, having no data — so a compile-time fold leaves it standing; a
+// filtered count (count of the rows a predicate holds for) is a later slice.
+type RelationCount struct {
+	Type   Type
+	Syntax ast.Expr `tree:"-"`
+}
+
+func (*RelationCount) value() {}
+
 // EnumMemberValue is a resolved reference to an enum member, whether written
 // qualified (Rarity.Common) or bare (Common, under an enum expectation). Def is
 // the enum definition and Index the member's position within it; the name and
@@ -565,6 +579,8 @@ func TypeOf(v Value) Type {
 		return v.Type
 	case *NullValue:
 		return v.Type
+	case *RelationCount:
+		return v.Type
 	case *EnumMemberValue:
 		return v.Type
 	case *AssocConstValue:
@@ -641,6 +657,8 @@ func SyntaxOf(v Value) ast.Expr {
 		return exprOrNil(v.Syntax)
 	case *NullValue:
 		return exprOrNil(v.Syntax)
+	case *RelationCount:
+		return v.Syntax // already the interface form; nil stays nil
 	case *EnumMemberValue:
 		return v.Syntax // already the interface form; nil stays nil
 	case *AssocConstValue:

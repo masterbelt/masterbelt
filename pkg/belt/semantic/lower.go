@@ -353,6 +353,10 @@ type bodyBinder struct {
 	tscope     infer.TypeScope
 	funcs      bodyFuncs
 	self       bool // whether self has a value here (a method body; never a function's)
+	// relation is set in a validate all clause, where the subject is the master's
+	// relation rather than a row: a bare count there reads the relation's row count
+	// (an aggregate over the table), the per-table counterpart of self omission.
+	relation bool
 	// locals maps each let-bound block-local in scope to its settled type. A
 	// reference to one lowers to an ir.LocalRef (shadowing a same-named parameter
 	// or type), and its type is read here when inferring a later let's value. It
@@ -605,6 +609,13 @@ func (b bodyBinder) leafIdentifier(e *ast.Identifier) ir.Value {
 	// member lowers to a member read in every walk.
 	if b.self && infer.IsReadableMember(b.reg, b.selfType, e.Name) {
 		return &ir.FieldAccess{Receiver: &ir.SelfValue{}, Field: e.Name, Syntax: e}
+	}
+	// In a validate all clause the subject is the relation, not a row: a bare count
+	// that resolves no other way reads the relation's row count. The same last-resort
+	// rule as self omission, so a local/parameter/type/constant named count shadows
+	// it; only count means the aggregate, and only here.
+	if b.relation && e.Name == infer.RelationCountName {
+		return &ir.RelationCount{Type: infer.RelationCountType(), Syntax: e}
 	}
 	return nil
 }

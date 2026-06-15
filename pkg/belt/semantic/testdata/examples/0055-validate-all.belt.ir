@@ -27,6 +27,21 @@ Module
                 Name: "int"
         Primary: "id"
         RowChecks: ~
+        AllChecks:
+          AssertStmt
+            Cond: Call
+              Receiver: RelationCount
+                Type: Builtin
+                  Name: "nint"
+              Method: "lt"
+              Args:
+                IntLiteral
+                  Text: "2000"
+                  Type: ~
+              Setter: false
+              Resolved: ~
+              Subst: ~
+              Type: ~
       Where: ~
   Funcs: ~
   Asserts: ~

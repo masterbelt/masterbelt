@@ -277,7 +277,24 @@ type BodyScope struct {
 	// sink-only func-literal settling pass, the effect and refinement walks),
 	// leaving the use to its prior silent reading.
 	ReportTypeParamValue func(node ast.Node, name string)
+	// Relation marks a validate all clause's scope, where the subject is the
+	// master's relation rather than a row: a bare count there types as the
+	// relation's row count, the per-table counterpart of self omission. It is false
+	// everywhere else, so count keeps its ordinary readings (a local, a parameter)
+	// outside an all clause.
+	Relation bool
 }
+
+// RelationCountName is the bare name a validate all clause reads as its relation's
+// row count — the per-table aggregate, resolved last-resort like a self member so a
+// local, parameter, type, or constant of the same name shadows it.
+const RelationCountName = "count"
+
+// RelationCountType is the type a relation count yields: an arbitrary-precision
+// integer, since a table's row count carries no fixed width. The lowering stamps
+// the RelationCount node with it and the checker types the bare count to it, so
+// the two agree.
+func RelationCountType() ir.Type { return &ir.Builtin{Name: "nint"} }
 
 // Body infers the type of a method-body expression: self, a parameter, a
 // literal, a record field access, a type conversion (T(x)), or a method call
@@ -449,6 +466,12 @@ func (s BodyScope) identifierLeaf(e *ast.Identifier) ir.Type {
 		if t := memberReadType(s.registry(), s.Self, e.Name); t != ir.Invalid {
 			return t
 		}
+	}
+	// In a validate all clause the subject is the relation, not a row: a bare count
+	// that resolves no other way types as the relation's row count, the same
+	// last-resort rule as self omission above.
+	if s.Relation && e.Name == RelationCountName {
+		return RelationCountType()
 	}
 	return ir.Invalid
 }

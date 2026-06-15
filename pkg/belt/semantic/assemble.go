@@ -620,26 +620,30 @@ func (a *assembler) reportMasterValidationRefs() {
 			row = &ir.Named{Def: def}
 		}
 		for _, clause := range md.Validations {
-			if !clause.PerRow {
-				continue
-			}
 			for _, stmt := range clause.Body {
-				if as, ok := stmt.(*ast.AssertStmt); ok && as.Cond != nil {
-					var rowMember func(*ast.Identifier) bool
-					if row != nil {
-						// The callee set is per-condition, so a self-method exemption
-						// reaches only a genuine implicit call (assert ok(x)), not a bare
-						// method name (assert ok), which is not a value.
-						callees := callCalleeIdents(as.Cond)
-						rowMember = func(id *ast.Identifier) bool { return selfReference(a.reg, row, id, callees) }
-					}
-					// reportRefIssues walks with ast.WalkExprs, which stops at a
-					// function literal's boundary — so a name a lambda binds (its own
-					// parameter) is not seen here and not misreported, and an undefined
-					// name inside a lambda body is left to the fold, which yields no
-					// value and fails the row under the data layer's fail-safe.
-					reportRefIssues(a.fileID, as.Cond, a.q, a.at, a.diags, nil, rowMember)
+				as, ok := stmt.(*ast.AssertStmt)
+				if !ok || as.Cond == nil {
+					continue
 				}
+				var member func(*ast.Identifier) bool
+				switch {
+				case clause.PerRow && row != nil:
+					// The callee set is per-condition, so a self-method exemption
+					// reaches only a genuine implicit call (assert ok(x)), not a bare
+					// method name (assert ok), which is not a value.
+					callees := callCalleeIdents(as.Cond)
+					member = func(id *ast.Identifier) bool { return selfReference(a.reg, row, id, callees) }
+				case !clause.PerRow:
+					// A per-table check reads relation operations (count) as bare names:
+					// resolved references, not undefined names.
+					member = func(id *ast.Identifier) bool { return id.Name == infer.RelationCountName }
+				}
+				// reportRefIssues walks with ast.WalkExprs, which stops at a function
+				// literal's boundary — so a name a lambda binds (its own parameter) is
+				// not seen here and not misreported, and an undefined name inside a
+				// lambda body is left to the fold, which yields no value and fails the
+				// check under the data layer's fail-safe.
+				reportRefIssues(a.fileID, as.Cond, a.q, a.at, a.diags, nil, member)
 			}
 		}
 	}

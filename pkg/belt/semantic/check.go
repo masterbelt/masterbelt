@@ -371,11 +371,16 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 // every row, so the block's meaning stays exactly the asserts it lists.
 func checkMasterValidations(def *ir.TypeDef, bs infer.BodyScope, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
 	for _, clause := range def.MasterSyntax.Validations {
+		clauseScope := bs
 		if !clause.PerRow {
-			continue // a per-table check (validate all) is a later concern
+			// A per-table check (validate all) is over the relation, not a row: no
+			// self, the relation context instead, so a bare count checks as the row
+			// count rather than as a self member.
+			clauseScope.Self = nil
+			clauseScope.Relation = true
 		}
-		checkStmts(clause.Body, ir.Invalid, bs, env, nil, sink, at, diags)
-		checkBareEnumArgs(clause.Body, bs, env, at, diags)
+		checkStmts(clause.Body, ir.Invalid, clauseScope, env, nil, sink, at, diags)
+		checkBareEnumArgs(clause.Body, clauseScope, env, at, diags)
 		if diags == nil {
 			continue
 		}

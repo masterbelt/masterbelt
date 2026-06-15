@@ -257,10 +257,13 @@ type MasterDef struct {
 	// RowChecks are the resolved per-row validate checks — the assert statements
 	// of the master's validate each clauses, in declaration order, each condition
 	// a value graph over self (the row). The data layer folds each against every
-	// loaded row. A per-table check (validate all) is a later concern and will
-	// carry its own field, since it folds once over the whole table rather than
-	// per row.
+	// loaded row.
 	RowChecks []*AssertStmt
+	// AllChecks are the resolved per-table validate checks — the assert statements
+	// of the master's validate all clauses, in declaration order. Each condition is
+	// a value graph over the relation (a RelationCount, not a row), folded once over
+	// the whole table rather than per row.
+	AllChecks []*AssertStmt
 }
 
 // WhereSyntax returns the surface form of the refinement predicate — the

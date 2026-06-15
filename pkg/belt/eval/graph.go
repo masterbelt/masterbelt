@@ -245,9 +245,11 @@ func graphValueRaw(v ir.Value, ctx graphCtx) *ir.Constant {
 		return graphFieldAccess(v, sub)
 	case *ir.Conversion:
 		return graphConvert(v, sub)
-	case *ir.Await:
-		// await marks the suspension point and adds nothing to the value; an
-		// awaited value is effectful by construction, so it does not fold.
+	case *ir.Await, *ir.RelationCount:
+		// Neither folds at compile time: await marks an effectful suspension point,
+		// and a relation's row count needs the loaded data the evaluator does not
+		// have — the data layer evaluates the count and substitutes it before folding
+		// the rest of the check.
 		return nil
 	case *ir.Apply:
 		return graphApplyCallee(v, sub)
