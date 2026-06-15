@@ -298,6 +298,45 @@ func TestViolationsConcurrent(t *testing.T) {
 	}
 }
 
+// TestCountAllAndFiltered pins the scalar count path: an unfiltered relation
+// counts every loaded row, and a filtered one counts the rows its predicate is
+// true for (a row the predicate is false or null for is not counted — the
+// matching-count semantics, distinct from a validation's fail-safe).
+func TestCountAllAndFiltered(t *testing.T) {
+	fields := []ir.Field{builtinField("id", "int"), builtinField("power", "int")}
+	table := master.Table{Columns: []string{"id", "power"}, Rows: []master.Row{
+		introw(2, 1, 5),
+		introw(3, 2, 0),
+		introw(4, 3, 30),
+		introw(5, 4, -7),
+	}}
+	eng, err := sqlite.Load(fields, table)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	defer closeEngine(t, eng)
+
+	all, err := eng.Count(mastersql.All())
+	if err != nil {
+		t.Fatalf("Count(all): %v", err)
+	}
+	if all != 4 {
+		t.Errorf("count(all) = %d, want 4", all)
+	}
+
+	pred, unsupported := mastersql.Lower(call("gt", selfField("power"), &ir.IntLiteral{Text: "0"}), fields)
+	if len(unsupported) != 0 {
+		t.Fatalf("predicate did not lower: %+v", unsupported)
+	}
+	positive, err := eng.Count(mastersql.All().Where(pred))
+	if err != nil {
+		t.Fatalf("Count(where): %v", err)
+	}
+	if positive != 2 {
+		t.Errorf("count(power > 0) = %d, want 2 (powers 5 and 30)", positive)
+	}
+}
+
 // --- end-to-end fixture: a real project loaded and validated -----------------
 
 // TestEngineOnProjectFixture is the canonical proof: a project of a .belt master
@@ -356,6 +395,15 @@ func TestEngineOnProjectFixture(t *testing.T) {
 	}
 	if vios[0].Origin.Row != 3 || vios[1].Origin.Row != 5 {
 		t.Errorf("violation origins on lines %d and %d, want 3 and 5", vios[0].Origin.Row, vios[1].Origin.Row)
+	}
+
+	// The same relation counts over the loaded data: 4 rows in all, and 2 satisfy
+	// power >= cost (the complement of the 2 violations the predicate flags).
+	if total, err := eng.Count(mastersql.All()); err != nil || total != 4 {
+		t.Errorf("Count(all) = %d (err %v), want 4", total, err)
+	}
+	if pass, err := eng.Count(mastersql.All().Where(pred)); err != nil || pass != 2 {
+		t.Errorf("Count(power >= cost) = %d (err %v), want 2", pass, err)
 	}
 
 	// The per-row evaluator, run by the loader, independently reports the same two

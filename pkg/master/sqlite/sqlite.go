@@ -128,6 +128,24 @@ func (e *Engine) Violations(pred mastersql.Predicate) ([]Violation, error) {
 	return out, rows.Err()
 }
 
+// Count runs the relation's row count against the loaded table and returns it.
+// An unfiltered relation counts every row; a filtered one counts the rows its
+// predicate is true for. It is the scalar path the validation aggregates and
+// scope read — the engine runs the relation's SQL the sql package renders, so the
+// one relation-to-SQL definition serves both the validation engine and codegen.
+func (e *Engine) Count(rel mastersql.Relation) (int64, error) {
+	query, binds := rel.CountSQL(tableName, dialect)
+	args, err := bindArgs(binds)
+	if err != nil {
+		return 0, err
+	}
+	var n int64
+	if err := e.db.QueryRow(query, args...).Scan(&n); err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
 // create builds the single table from the loaded columns. A master always
 // declares at least one field, so the column list is never empty.
 func (e *Engine) create() error {
