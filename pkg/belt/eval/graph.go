@@ -109,6 +109,15 @@ func GraphPredicate(pred ir.Value, self *ir.Constant, selfDef *ir.TypeDef, env G
 	return graphValue(pred, graphCtx{env: env, self: self, selfDef: selfDef})
 }
 
+// GraphTableCheck folds a per-table validate check, resolving the relation count
+// to count — the row count the data layer computed from the loaded rows. There is
+// no self (the subject is the table, not a row); selfDef carries the master for a
+// relation-method call's static channel. A check that does not fold to a definite
+// true fails, the same fail-safe a per-row check uses.
+func GraphTableCheck(pred ir.Value, count *ir.Constant, selfDef *ir.TypeDef, env GraphEnv) *ir.Constant {
+	return graphValue(pred, graphCtx{env: env, selfDef: selfDef, relationCount: count})
+}
+
 // graphCtx carries the interpretation context through the recursive fold: the
 // driver's environment, the local bindings of the enclosing applied routine or
 // function literals, the self value (and its owning definition, the static
@@ -147,6 +156,22 @@ type graphCtx struct {
 	// budgetHit is the failure-classification channel: a budget guard that
 	// refuses to fold sets it. See evalCtx.budgetHit.
 	budgetHit *bool
+	// relationCount is the value a RelationCount folds to — the row count the data
+	// layer computed from the loaded rows for a per-table validate check. It is nil
+	// outside that path (a refinement or per-row fold), where a relation count
+	// cannot be evaluated and stays unfoldable.
+	relationCount *ir.Constant
+}
+
+// unfoldable folds the two values the evaluator does not reduce on its own: an
+// await (an effectful suspension point, never foldable) and a relation count (the
+// row count, foldable only when the data layer supplied it for a per-table check
+// via relationCount; nil — unevaluable — otherwise).
+func (ctx graphCtx) unfoldable(v ir.Value) *ir.Constant {
+	if _, ok := v.(*ir.RelationCount); ok {
+		return ctx.relationCount
+	}
+	return nil
 }
 
 // noteBudget mirrors evalCtx.noteBudget for the graph context.
@@ -246,11 +271,7 @@ func graphValueRaw(v ir.Value, ctx graphCtx) *ir.Constant {
 	case *ir.Conversion:
 		return graphConvert(v, sub)
 	case *ir.Await, *ir.RelationCount:
-		// Neither folds at compile time: await marks an effectful suspension point,
-		// and a relation's row count needs the loaded data the evaluator does not
-		// have — the data layer evaluates the count and substitutes it before folding
-		// the rest of the check.
-		return nil
+		return ctx.unfoldable(v)
 	case *ir.Apply:
 		return graphApplyCallee(v, sub)
 	case *ir.Call:

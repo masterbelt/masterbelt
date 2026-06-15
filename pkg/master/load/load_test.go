@@ -45,6 +45,45 @@ func run(t *testing.T, beltSrc string, bases map[string]string, files map[string
 	return load.File(prog, "skills.belt", root, bases, reg)
 }
 
+// countTableFailures counts the per-table validate failures among the diagnostics.
+func countTableFailures(diags []diagnostic.Diagnostic) int {
+	n := 0
+	for _, d := range diags {
+		if d.Code == master.CodeTableValidationFailed {
+			n++
+		}
+	}
+	return n
+}
+
+// TestValidateAllRowCountCap exercises a per-table validate all check end to end:
+// the count of loaded rows is evaluated in the in-memory SQLite engine and
+// compared to the cap. Under the cap the table passes; at or over it the check
+// fails once, anchored at the assert.
+func TestValidateAllRowCountCap(t *testing.T) {
+	const belt = "master Item {\n" +
+		"  record { id: int, power: int }\n" +
+		"  primary id\n" +
+		"  validate {\n    all {\n      assert count < 3\n    }\n  }\n" +
+		"  source { csv \"items.csv\" }\n" +
+		"}\n"
+	bases := map[string]string{"csv": "data"}
+
+	// Two rows: count 2 < 3, the table passes.
+	if _, diags := run(t, belt, bases, map[string]string{
+		"data/items.csv": "id,power\n1,10\n2,20\n",
+	}); countTableFailures(diags) != 0 {
+		t.Errorf("2 rows: table_validation_failed = %d, want 0 (count 2 < 3)", countTableFailures(diags))
+	}
+
+	// Three rows: count 3 is not < 3, the table fails once.
+	if _, diags := run(t, belt, bases, map[string]string{
+		"data/items.csv": "id,power\n1,10\n2,20\n3,30\n",
+	}); countTableFailures(diags) != 1 {
+		t.Errorf("3 rows: table_validation_failed = %d, want 1 (count 3 not < 3)", countTableFailures(diags))
+	}
+}
+
 func TestLoadTypedRows(t *testing.T) {
 	loaded, diags := run(t, skillBelt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,name,power\n1,Fireball,30\n2,Heal,12\n",

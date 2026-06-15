@@ -98,6 +98,15 @@ func RowValidationFailed(offset, width int, path string, row int) diagnostic.Dia
 	return newRowValidationFailedDiagnostic(offset, width, path, row)
 }
 
+// TableValidationFailed reports that a master's loaded rows do not satisfy one of
+// its per-table validate all checks — an aggregate over the whole table, such as a
+// row-count cap. It anchors at the assert in the .belt declaration, the check that
+// failed; the table travels in the message as path, since the data lives in a
+// separate file the diagnostic model does not address.
+func TableValidationFailed(offset, width int, path string) diagnostic.Diagnostic {
+	return newTableValidationFailedDiagnostic(offset, width, path)
+}
+
 // DuplicatePrimaryKey reports that a row's primary key repeats one an earlier row
 // already carries — the master's rows are not uniquely identified. It anchors at
 // the source declaration like the other cell diagnostics, naming the duplicate

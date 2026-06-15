@@ -143,4 +143,5 @@ master.option_type_mismatch,オプション {key} は {typ} でなければな�
 master.duplicate_option,フォーマット {format} でオプション {key} が複数回指定されています
 master.duplicate_row_field,master {master} でフィールド {field} が複数回宣言されています
 master.row_validation_failed,"行 {path}:{row} は validate each の検査を満たしません"
+master.table_validation_failed,"テーブル {path} は validate all の検査を満たしません"
 master.duplicate_primary_key,"{path}:{row},{col}: 主キー {key} が重複しています(最初の出現は行 {first})"
