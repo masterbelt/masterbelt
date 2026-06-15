@@ -47,3 +47,18 @@ func TestValidateAllCheckWrittenBack(t *testing.T) {
 		t.Errorf("all-check condition type = %v, want bool (write-back must annotate AllChecks)", got)
 	}
 }
+
+// TestValidateAllCountNotCallable pins that count used as a call (count()) is
+// reported, not silently treated as a resolved reference and left to fail the
+// table at run time. count is the relation's row count, not a function.
+func TestValidateAllCountNotCallable(t *testing.T) {
+	src := "master M {\n" +
+		"  record { id: int }\n" +
+		"  primary id\n" +
+		"  validate {\n    all {\n      assert count() < 3\n    }\n  }\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if len(diags) == 0 {
+		t.Fatal("want a diagnostic for count() — count is not callable — got none")
+	}
+}

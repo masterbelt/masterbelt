@@ -635,8 +635,14 @@ func (a *assembler) reportMasterValidationRefs() {
 					member = func(id *ast.Identifier) bool { return selfReference(a.reg, row, id, callees) }
 				case !clause.PerRow:
 					// A per-table check reads relation operations (count) as bare names:
-					// resolved references, not undefined names.
-					member = func(id *ast.Identifier) bool { return id.Name == infer.RelationCountName }
+					// resolved references, not undefined names. The exemption is for a
+					// bare read only — count is the row count, not a function — so count
+					// used as a call callee (count(...)) is left to be reported as a
+					// misuse rather than silently treated as a resolved reference.
+					callees := callCalleeIdents(as.Cond)
+					member = func(id *ast.Identifier) bool {
+						return id.Name == infer.RelationCountName && !callees[id]
+					}
 				}
 				// reportRefIssues walks with ast.WalkExprs, which stops at a function
 				// literal's boundary — so a name a lambda binds (its own parameter) is

@@ -104,6 +104,25 @@ func TestValidateAllCountIgnoresCellValues(t *testing.T) {
 	}
 }
 
+// TestValidateAllCountInClosure pins that count keeps its value inside a closure
+// in a validate all check: the relation count is carried through the applied
+// function the same way self is. Regression: graphApply built a fresh context
+// without the count, so count folded to nil and the check failed regardless of the
+// actual row count.
+func TestValidateAllCountInClosure(t *testing.T) {
+	const belt = "master Item {\n" +
+		"  record { id: int }\n" +
+		"  primary id\n" +
+		"  validate {\n    all {\n      assert (fn(): bool { return count < 3 })()\n    }\n  }\n" +
+		"  source { csv \"items.csv\" }\n" +
+		"}\n"
+	if _, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/items.csv": "id\n1\n2\n",
+	}); countTableFailures(diags) != 0 {
+		t.Errorf("table_validation_failed = %d, want 0 (count 2 < 3 inside a closure)", countTableFailures(diags))
+	}
+}
+
 func TestLoadTypedRows(t *testing.T) {
 	loaded, diags := run(t, skillBelt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,name,power\n1,Fireball,30\n2,Heal,12\n",
