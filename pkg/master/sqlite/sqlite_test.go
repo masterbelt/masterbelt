@@ -335,6 +335,20 @@ func TestCountAllAndFiltered(t *testing.T) {
 	if positive != 2 {
 		t.Errorf("count(power > 0) = %d, want 2 (powers 5 and 30)", positive)
 	}
+
+	// Narrowing again intersects: power > 0 AND power < 10 keeps only the row with
+	// power 5, not every row matching the second filter alone.
+	small, lowered := mastersql.Lower(call("lt", selfField("power"), &ir.IntLiteral{Text: "10"}), fields)
+	if len(lowered) != 0 {
+		t.Fatalf("predicate did not lower: %+v", lowered)
+	}
+	both, err := eng.Count(mastersql.All().Where(pred).Where(small))
+	if err != nil {
+		t.Fatalf("Count(where.where): %v", err)
+	}
+	if both != 1 {
+		t.Errorf("count(power > 0 AND power < 10) = %d, want 1 (power 5)", both)
+	}
 }
 
 // --- end-to-end fixture: a real project loaded and validated -----------------

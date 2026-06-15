@@ -16,8 +16,11 @@ func All() Relation { return Relation{} }
 
 // Where returns the relation narrowed to the rows the predicate holds for. The
 // predicate is the same boolean fragment Lower produces, reused as the filter.
+// Narrowing a relation that already carries a filter intersects the two rather
+// than replacing the first — so a scoped relation further filtered keeps its scope
+// — by conjoining them with AND.
 func (r Relation) Where(p Predicate) Relation {
-	r.where = p
+	r.where = r.where.and(p)
 	return r
 }
 
