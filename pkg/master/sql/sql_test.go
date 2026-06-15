@@ -25,6 +25,12 @@ func lowerProbe(t *testing.T, preamble, fields, cond string) (sql.Predicate, []s
 	prog := semantic.NewProgram()
 	prog.SetFile("m.belt", abstract.NewDocument([]byte(src)), nil)
 	prog.Refresh()
+	// The condition must type-check before its lowering means anything: a probe
+	// that resolves with diagnostics is rejected query source, so lowering its graph
+	// would pin SQL for a predicate the analyzer never accepts.
+	if diags := prog.Diagnostics("m.belt"); len(diags) != 0 {
+		t.Fatalf("probe %q did not type-check: %v", cond, diags)
+	}
 	m := prog.Module("m.belt")
 	if m == nil {
 		t.Fatalf("no module for %q", cond)

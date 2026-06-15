@@ -214,6 +214,20 @@ func TestColumnEqualityRequiresComparable(t *testing.T) {
 	}
 }
 
+// TestNullableColumnComparisonResolves pins that a comparison on a nullable column
+// type-checks: c.opt == null / != null (the null checks) and c.opt < 5 (against the
+// non-null value) all resolve to predicate<M>. The comparison guard judges a
+// nullable column T | null by T, so a union element does not spuriously reject it.
+func TestNullableColumnComparisonResolves(t *testing.T) {
+	const m = "master M {\n  record { id: int, opt: int | null }\n  primary id\n}\n"
+	for _, cond := range []string{"c.opt == null", "c.opt != null", "c.opt < 5"} {
+		src := m + "fn probe(c: columns<M>): predicate<M> {\n  return " + cond + "\n}\n"
+		if _, diags := analyze(src); len(diags) != 0 {
+			t.Errorf("%q: unexpected diagnostics %v", cond, codes(diags))
+		}
+	}
+}
+
 // TestBareBoolIsNotPredicate pins the guarantee the typed algebra exists for: a
 // plain bool is not a predicate, so a where condition that is "just true" — or any
 // non-SQL-expressible bool — is a type error, caught at compile time rather than

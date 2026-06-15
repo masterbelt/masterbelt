@@ -271,8 +271,35 @@ func queryColumnComparisonValid(reg *builtin.Registry, recv ir.Type, method stri
 	if !ok {
 		return true
 	}
+	// A nullable column (T | null) is judged by T: a comparison against it, null
+	// included, stands where T's does — the lowering renders == null as IS NULL and
+	// a value comparison on the non-null T. Unwrap the null member before asking for
+	// the operator, since a union itself has no method table.
+	elem = nonNullType(elem)
 	_, _, hasOp := types.Candidates(reg, elem, method)
 	return hasOp
+}
+
+// nonNullType strips a null member from a union, yielding the single remaining
+// member — so a nullable type T | null is judged as T. A non-union, or a union with
+// more than one non-null member (no single operator set to check), is returned
+// unchanged.
+func nonNullType(t ir.Type) ir.Type {
+	u, ok := t.(*ir.Union)
+	if !ok {
+		return t
+	}
+	var nonNull []ir.Type
+	for _, m := range u.Members {
+		if b, ok := m.(*ir.Builtin); ok && b.Name == builtin.NameNull {
+			continue
+		}
+		nonNull = append(nonNull, m)
+	}
+	if len(nonNull) == 1 {
+		return nonNull[0]
+	}
+	return t
 }
 
 // bareEnumMemberArg resolves a bare identifier argument as a member of the enum the
