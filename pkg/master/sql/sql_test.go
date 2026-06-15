@@ -219,6 +219,16 @@ func TestLowerUnsupported(t *testing.T) {
 			t.Fatal("want an unsupported node for an overridden operator on a generic type")
 		}
 	})
+	t.Run("custom comparison on a nullable column", func(t *testing.T) {
+		// A nullable custom-comparison column (Weird | null) must still be rejected:
+		// the override check unwraps the null to find Weird's own eql, rather than
+		// seeing the non-nominal union and emitting plain SQL equality.
+		preamble := "type Weird = int impl {\n  pub eql(other: self): bool {\n    return false\n  }\n}\n"
+		_, u := lowerProbe(t, preamble, "id: int, w: Weird | null", "c.w == c.w")
+		if len(u) == 0 {
+			t.Fatal("want an unsupported node for a nullable custom-comparison column")
+		}
+	})
 	t.Run("custom comparison on an enum", func(t *testing.T) {
 		// An enum's synthesized comparisons lower (they compare the base value), but
 		// a comparison the enum's own impl defines is user logic SQL cannot stand in

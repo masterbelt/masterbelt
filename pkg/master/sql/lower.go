@@ -275,7 +275,32 @@ func (l *lowering) overrides(v ir.Value, method string) bool {
 	if !ok {
 		return false
 	}
-	return declaresMethod(elem, method)
+	// A nullable column (Weird | null) carries its custom comparison on the non-null
+	// member, so unwrap the null before the nominal check — otherwise the union is
+	// not nominal, declaresMethod returns false, and a custom-comparison column would
+	// lower to plain SQL equality.
+	return declaresMethod(nonNullType(elem), method)
+}
+
+// nonNullType strips a null member from a union, yielding the single remaining
+// member — so a nullable type T | null is examined as T. A non-union, or a union
+// with more than one non-null member, is returned unchanged.
+func nonNullType(t ir.Type) ir.Type {
+	u, ok := t.(*ir.Union)
+	if !ok {
+		return t
+	}
+	var nonNull []ir.Type
+	for _, m := range u.Members {
+		if b, ok := m.(*ir.Builtin); ok && b.Name == builtin.NameNull {
+			continue
+		}
+		nonNull = append(nonNull, m)
+	}
+	if len(nonNull) == 1 {
+		return nonNull[0]
+	}
+	return t
 }
 
 // declaresMethod reports whether a nominal type, or one in its underlying chain,
