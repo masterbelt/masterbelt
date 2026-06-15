@@ -484,7 +484,13 @@ func memberReadType(reg *builtin.Registry, recv ir.Type, name string) ir.Type {
 // its columns, so a column is reached only through the binding.
 func columnsFieldType(reg *builtin.Registry, recv ir.Type, name string) ir.Type {
 	app, ok := recv.(*ir.App)
-	if !ok || app.Def == nil || app.Def.Name != builtin.NameColumns || len(app.Args) != 1 {
+	if !ok || app.Def == nil || len(app.Args) != 1 {
+		return ir.Invalid
+	}
+	// Match the prelude's columns by identity, not by name: an ordinary file can
+	// shadow the name with its own generic type (type columns<T> = ...), and that
+	// type's field access must read the user's type, not the query binding.
+	if def, ok := reg.Lookup(builtin.NameColumns); !ok || app.Def != def {
 		return ir.Invalid
 	}
 	master := app.Args[0]
@@ -500,6 +506,21 @@ func columnsFieldType(reg *builtin.Registry, recv ir.Type, name string) ir.Type 
 		return ir.Invalid
 	}
 	return &ir.App{Def: colDef, Args: []ir.Type{master, ft}}
+}
+
+// queryColumnElem returns the value type T of a column<M, T> receiver — the type a
+// comparison against the column expects its operand to be — matching the prelude's
+// column by identity. It is how a bare member argument (c.rarity == legend) finds
+// its enum: the expectation is the column's element type, not the column wrapper.
+func queryColumnElem(reg *builtin.Registry, t ir.Type) (ir.Type, bool) {
+	app, ok := t.(*ir.App)
+	if !ok || app.Def == nil || len(app.Args) != 2 {
+		return nil, false
+	}
+	if def, ok := reg.Lookup(builtin.NameColumn); !ok || app.Def != def {
+		return nil, false
+	}
+	return app.Args[1], true
 }
 
 // IsReadableMember reports whether name reads one of recv's readable members — a

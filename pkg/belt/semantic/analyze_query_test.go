@@ -119,6 +119,41 @@ func TestColumnsFieldType(t *testing.T) {
 	}
 }
 
+// TestColumnsBareEnumMemberResolves pins that a bare enum member compares against
+// an enum column: c.rarity == legend resolves to predicate<Cards> through the
+// column's element type, the same way value-mode rarity == legend resolves through
+// the row field — not only the qualified Rarity.legend.
+func TestColumnsBareEnumMemberResolves(t *testing.T) {
+	src := "enum Rarity { common; rare; legend }\n" +
+		"master Cards {\n  record { id: int, rarity: Rarity }\n  primary id\n}\n" +
+		"fn probe(c: columns<Cards>): predicate<Cards> {\n" +
+		"  return c.rarity == legend\n" +
+		"}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	if got := probeReturnType(m); got == nil || got.String() != "predicate<Cards>" {
+		t.Errorf("return type = %v, want predicate<Cards>", got)
+	}
+}
+
+// TestColumnsTypeShadowedNotHijacked pins that a user type named columns shadows the
+// query binding: a field access off the user's columns<T> reads the user's type,
+// not master M's columns. The query-binding path matches the prelude type by
+// identity, not by name.
+func TestColumnsTypeShadowedNotHijacked(t *testing.T) {
+	src := "master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n" +
+		"type columns<T> = int\n" +
+		"fn probe(c: columns<Cards>): column<Cards, int> {\n" +
+		"  return c.cost\n" +
+		"}\n"
+	m, _ := analyze(src)
+	if got := probeReturnType(m); got != nil && got.String() == "column<Cards, int>" {
+		t.Errorf("a shadowed columns type must not resolve c.cost to a query column, got %v", got)
+	}
+}
+
 // TestColumnsUnknownFieldNotAColumn pins that a name the master's row does not have
 // does not resolve to a column: c.missing is not a column<Cards, _>, so it cannot
 // stand where a column is needed. (It resolves to no readable member, exactly as a
@@ -132,6 +167,36 @@ func TestColumnsUnknownFieldNotAColumn(t *testing.T) {
 	m, _ := analyze(src)
 	if got := probeReturnType(m); got != nil && got.String() == "column<Cards, int>" {
 		t.Errorf("c.missing must not resolve to a column, got %v", got)
+	}
+}
+
+// TestColumnOrderingRequiresOrderable pins that a column's ordering comparison is
+// available only for an orderable element type, mirroring value mode: a bool column
+// has no >, < (bool carries only equality), while an int, string, or enum column —
+// and equality on any comparable column — does. The query algebra must not be looser
+// than the value comparison it stands for.
+func TestColumnOrderingRequiresOrderable(t *testing.T) {
+	const m = "enum Rarity { common; rare; legend }\n" +
+		"master Cards {\n  record { id: int, cost: int, name: string, rarity: Rarity, active: bool }\n  primary id\n}\n"
+	cases := []struct {
+		name, cond string
+		wantErr    bool
+	}{
+		{"bool ordering rejected", "c.active > false", true},
+		{"bool equality allowed", "c.active == true", false},
+		{"int ordering allowed", "c.cost >= 0", false},
+		{"string ordering allowed", "c.name < \"z\"", false},
+		{"enum ordering allowed", "c.rarity <= legend", false},
+		{"column-to-column ordering allowed", "c.cost > c.id", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			src := m + "fn probe(c: columns<Cards>): predicate<Cards> {\n  return " + tc.cond + "\n}\n"
+			_, diags := analyze(src)
+			if gotErr := len(diags) != 0; gotErr != tc.wantErr {
+				t.Errorf("%q: gotErr=%v (diags %v), wantErr=%v", tc.cond, gotErr, codes(diags), tc.wantErr)
+			}
+		})
 	}
 }
 

@@ -104,19 +104,23 @@ func TestLowerCore(t *testing.T) {
 
 // TestLowerEnumColumn pins that a comparison against an enum member lowers to a
 // bound comparison on the member's underlying base value — the value stored for the
-// row — so a query over an enum column renders to SQL like any other.
+// row — so a query over an enum column renders to SQL like any other. Both the
+// qualified member (Rarity.legend) and the bare member (legend, resolved through
+// the column's element type) lower to the same bound.
 func TestLowerEnumColumn(t *testing.T) {
 	const preamble = "enum Rarity { common; rare; legend }\n"
-	got, u := lowerProbe(t, preamble, "id: int, rarity: Rarity", "c.rarity == Rarity.legend")
-	if len(u) != 0 {
-		t.Fatalf("unsupported: %+v", u)
-	}
-	if s := got.SQL(sql.SQLite); s != `("rarity" = ?)` {
-		t.Errorf("SQL = %q, want (\"rarity\" = ?)", s)
-	}
 	// common=0, rare=1, legend=2: the bound value is the member's base integer.
-	if b := bindsString(got.Binds()); b != "[int 2]" {
-		t.Errorf("binds = %s, want [int 2]", b)
+	for _, member := range []string{"Rarity.legend", "legend"} {
+		got, u := lowerProbe(t, preamble, "id: int, rarity: Rarity", "c.rarity == "+member)
+		if len(u) != 0 {
+			t.Fatalf("%s: unsupported: %+v", member, u)
+		}
+		if s := got.SQL(sql.SQLite); s != `("rarity" = ?)` {
+			t.Errorf("%s: SQL = %q, want (\"rarity\" = ?)", member, s)
+		}
+		if b := bindsString(got.Binds()); b != "[int 2]" {
+			t.Errorf("%s: binds = %s, want [int 2]", member, b)
+		}
 	}
 }
 
@@ -209,6 +213,16 @@ func TestLowerUnsupported(t *testing.T) {
 			t.Fatal("want an unsupported node for an overridden operator on a generic type")
 		}
 	})
+	t.Run("custom comparison on an enum", func(t *testing.T) {
+		// An enum's synthesized comparisons lower (they compare the base value), but
+		// a comparison the enum's own impl defines is user logic SQL cannot stand in
+		// for, so it is rejected like any other overridden operator.
+		preamble := "enum R { a; b } impl {\n  pub eql(other: self): bool {\n    return false\n  }\n}\n"
+		_, u := lowerProbe(t, preamble, "id: int, r: R", "c.r == c.r")
+		if len(u) == 0 {
+			t.Fatal("want an unsupported node for a custom comparison declared on an enum")
+		}
+	})
 }
 
 // TestLowerIntLiterals pins two literal forms whose value the lowering must get
@@ -235,17 +249,37 @@ func TestLowerIntLiterals(t *testing.T) {
 	}
 }
 
-// TestLowerNullEitherSide pins that the null literal is handled on either side of
-// the comparison — null == c.opt lowers the same as c.opt == null — so a valid
-// condition is not refused by operand order.
+// nullCol is a column<M, int> reference, built by hand for the lowering-level
+// null tests. Analyzed query source always places the column on the left (infix
+// desugars the left operand to the receiver, and null has no query method), so
+// the right-side form is exercised through a hand-built graph rather than source.
+var nullColDef = &ir.TypeDef{Name: "column", Builtin: true, Params: []*ir.TypeParam{{Name: "M"}, {Name: "T"}}}
+
+func nullCol(name string) *ir.FieldAccess {
+	return &ir.FieldAccess{
+		Receiver: &ir.ParamRef{Name: "c"},
+		Field:    name,
+		Type:     &ir.App{Def: nullColDef, Args: []ir.Type{&ir.Named{Def: &ir.TypeDef{Name: "M"}}, &ir.Builtin{Name: "nint"}}},
+	}
+}
+
+// TestLowerNullEitherSide pins that the lowering produces IS NULL whether the null
+// literal is the comparison's argument (the form analyzed source takes, c.opt ==
+// null) or its receiver (null == c.opt) — so the lowering stays robust to operand
+// order even though the checker only admits the column-on-left form. The graphs are
+// built by hand because the receiver form is rejected before lowering.
 func TestLowerNullEitherSide(t *testing.T) {
-	for _, cond := range []string{"c.opt == null", "null == c.opt"} {
-		got, u := lowerProbe(t, "", "id: int, opt: int | null", cond)
+	graphs := map[string]*ir.Call{
+		"null as argument": {Method: "eql", Receiver: nullCol("opt"), Args: []ir.Value{&ir.NullValue{}}},
+		"null as receiver": {Method: "eql", Receiver: &ir.NullValue{}, Args: []ir.Value{nullCol("opt")}},
+	}
+	for name, g := range graphs {
+		got, u := sql.Lower(g)
 		if len(u) != 0 {
-			t.Fatalf("%q: unsupported %+v", cond, u)
+			t.Fatalf("%s: unsupported %+v", name, u)
 		}
 		if s := got.SQL(sql.SQLite); s != `("opt" IS NULL)` {
-			t.Errorf("%q: SQL = %q, want (\"opt\" IS NULL)", cond, s)
+			t.Errorf("%s: SQL = %q, want (\"opt\" IS NULL)", name, s)
 		}
 	}
 }

@@ -139,6 +139,18 @@ func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method str
 	// the suppression style survives overloading.
 	known := synthMethodArgs(e, recv, args, &bad, s, sink)
 
+	// A query column's ordering comparison is valid only when its element type is
+	// orderable: column<M, T> offers lt/lteq/gt/gteq for every T, but the comparison
+	// stands only if T itself has the operator, mirroring value mode (a bool column
+	// has no >, just as a bool value has none). The type system cannot bound the
+	// column's methods by T, so the rule is checked here.
+	if !queryColumnOrderingValid(reg, recv, method) {
+		if !bad {
+			sink.invalidOp(e, method, typesList(recv, args))
+		}
+		return ir.Invalid
+	}
+
 	matches, _ := types.SelectOverload(reg, recv, method, known)
 	if len(matches) != 1 {
 		return reportMethodOverloadFailure(e, recv, method, args, matches, candidates, bad, s, sink)
@@ -221,18 +233,13 @@ func synthMethodArgs(e *ast.CallExpr, recv ir.Type, args []ir.Type, bad *bool, s
 		}
 		args[i] = check(a, s, sink)
 		if args[i] == ir.Invalid {
-			// A bare member of the receiver's enum (rarity == Legend, desugared
-			// to rarity.eql(Legend)) is that enum's value — the same channel the
-			// lowering's argument binder resolves it through, tried after
-			// ordinary resolution so a same-named binding still shadows the
-			// member. Streamed out so the typed value graph carries it.
-			if id, ok := a.(*ast.Identifier); ok {
-				if mt := enumMemberExpectation(recv, id.Name); mt != nil {
-					args[i] = mt
-					known[i] = mt
-					sink.typed(a, mt)
-					continue
-				}
+			// A bare member of the receiver's enum (rarity == Legend) resolves
+			// against the enum after ordinary resolution fails, so a same-named
+			// binding still shadows the member.
+			if mt := bareEnumMemberArg(recv, a, s, sink); mt != nil {
+				args[i] = mt
+				known[i] = mt
+				continue
 			}
 			*bad = true
 			continue
@@ -240,6 +247,57 @@ func synthMethodArgs(e *ast.CallExpr, recv ir.Type, args []ir.Type, bad *bool, s
 		known[i] = args[i]
 	}
 	return known
+}
+
+// queryOrderingMethods are the column ordering comparisons — the operators a query
+// column should offer only when its element type is orderable. Equality (eql/neq)
+// is not here: it is available on every comparable element and needs no guard.
+var queryOrderingMethods = map[string]bool{"lt": true, "lteq": true, "gt": true, "gteq": true}
+
+// queryColumnOrderingValid reports whether a method call is allowed under the
+// query-column ordering rule: true unless the receiver is a query column<M, T>, the
+// method is an ordering comparison, and the element type T has no such operator of
+// its own. It mirrors value mode — a column ordering stands exactly where the value
+// ordering would — closing the gap that column<M, T> offers the orderings for every
+// T regardless of whether T is orderable.
+func queryColumnOrderingValid(reg *builtin.Registry, recv ir.Type, method string) bool {
+	if !queryOrderingMethods[method] {
+		return true
+	}
+	elem, ok := queryColumnElem(reg, recv)
+	if !ok {
+		return true
+	}
+	_, _, hasOp := types.Candidates(reg, elem, method)
+	return hasOp
+}
+
+// bareEnumMemberArg resolves a bare identifier argument as a member of the enum the
+// receiver's comparison expects — the same channel the lowering's argument binder
+// uses, tried after ordinary resolution. The expectation is the enum directly
+// (value mode, rarity.eql(Legend)) or, for a query column (c.rarity.eql(Legend)),
+// the column's element type, so the column<M, T> wrapper is unwrapped first. It
+// returns the enum type and streams the resolved member so the write-back rebuilds
+// the identifier as an EnumMemberValue (the node the query lowering reads its base
+// value off), or nil when the argument is not such a member.
+func bareEnumMemberArg(recv ir.Type, a ast.Expr, s scope, sink *Sink) ir.Type {
+	id, ok := a.(*ast.Identifier)
+	if !ok {
+		return nil
+	}
+	want := recv
+	if elem, ok := queryColumnElem(s.registry(), recv); ok {
+		want = elem
+	}
+	mt := enumMemberExpectation(want, id.Name)
+	if mt == nil {
+		return nil
+	}
+	sink.typed(a, mt)
+	if def := types.EnumDef(mt); def != nil {
+		sink.resolvedEnumMember(a, def, enumMemberIndex(def, id.Name))
+	}
+	return mt
 }
 
 // reportMethodOverloadFailure handles the no-single-match arm of methodCallType:

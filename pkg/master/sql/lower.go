@@ -275,19 +275,17 @@ func (l *lowering) overrides(v ir.Value, method string) bool {
 	if !ok {
 		return false
 	}
-	// An enum compares by its base value (an integer or string), which SQL's own
-	// comparison reproduces — its standard comparison methods are not an override
-	// SQL cannot express, unlike a user nominal type that declares its own operator.
-	if n, ok := elem.(*ir.Named); ok && n.Def != nil && n.Def.Enum != nil {
-		return false
-	}
 	return declaresMethod(elem, method)
 }
 
 // declaresMethod reports whether a nominal type, or one in its underlying chain,
-// declares a method of the given name — the test for an overridden operator. A
-// generic application (Weird<string>) carries the same definition as the bare
-// nominal, so it is unwrapped the same way.
+// declares its own implementation of a method of the given name — the test for an
+// overridden operator. Only a method with a body counts: an extern method is a
+// builtin's or an enum's synthesized operator, which carries the SQL-standard
+// semantics (an enum compares by its base value, which SQL reproduces), whereas a
+// method with a body is user-defined logic SQL cannot stand in for. A generic
+// application (Weird<string>) carries the same definition as the bare nominal, so
+// it is unwrapped the same way.
 func declaresMethod(t ir.Type, method string) bool {
 	seen := map[*ir.TypeDef]bool{}
 	for {
@@ -305,7 +303,7 @@ func declaresMethod(t ir.Type, method string) bool {
 		}
 		seen[def] = true
 		for i := range def.Methods {
-			if def.Methods[i].Name == method {
+			if def.Methods[i].Name == method && !def.Methods[i].Extern {
 				return true
 			}
 		}
