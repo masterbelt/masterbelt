@@ -76,3 +76,82 @@ func TestBitwiseShiftBudget(t *testing.T) {
 		t.Errorf("byte(1).shl(2097153): classified as an evaluator gap, want a budget refusal: %q", msg)
 	}
 }
+
+// TestBitwiseBandOperandRangeChecked pins the soundness fix for a masking bitwise
+// operator: a bitwise AND clears bits, so an out-of-range operand masks to an
+// in-range result the result check accepts (byte(1).band(300) folds to 0), which
+// would leave the out-of-range operand unreported. The operand is now range-checked
+// at its own site, the way a free function's argument is — in a const and in a body
+// alike. Red→green: drop the band operand check and the masked result folds in
+// range with no overflow reported.
+func TestBitwiseBandOperandRangeChecked(t *testing.T) {
+	for _, src := range []string{
+		"const X: byte = byte(1).band(300)\n",
+		"const X: byte = byte(1).band(-1)\n",
+		"pub fn f(): byte { return byte(1).band(300) }\n",
+	} {
+		_, diags := analyze(src)
+		if !slices.Contains(codes(diags), CodeConstantOverflow) {
+			t.Errorf("%q: codes = %v, want a constant_overflow (the masked operand)", src, codes(diags))
+		}
+	}
+}
+
+// TestBitwiseBandReceiverRangeChecked pins the same for the receiver: 300.band(byte(1))
+// masks the out-of-range receiver to 0, which the result check accepts, so the
+// receiver is range-checked at its own site as the operand is.
+func TestBitwiseBandReceiverRangeChecked(t *testing.T) {
+	_, diags := analyze("const X: byte = 300.band(byte(1))\n")
+	if !slices.Contains(codes(diags), CodeConstantOverflow) {
+		t.Errorf("300.band(byte(1)): codes = %v, want a constant_overflow (the masked receiver)", codes(diags))
+	}
+}
+
+// TestBitwiseBandInRangeNoOverflow pins that the masking-operator range check does
+// not over-fire: in-range operands and receivers fold cleanly.
+func TestBitwiseBandInRangeNoOverflow(t *testing.T) {
+	for _, src := range []string{
+		"const X: byte = byte(7).band(byte(3))\n",
+		"const X: byte = byte(255).band(1)\n",
+	} {
+		if _, diags := analyze(src); len(diags) != 0 {
+			t.Errorf("%q: want no diagnostics, got %v", src, codes(diags))
+		}
+	}
+}
+
+// TestBitwiseOrXorCaughtByResult guards the band-only scope: OR and XOR set the
+// bits a too-wide input carries, and a left shift grows the magnitude, so the
+// result is out of range and the result check already reports it — no input-site
+// check is added for them. If a future evaluator change let one of these fold an
+// out-of-range input into range, this would go red and signal that the input check
+// must extend to it.
+func TestBitwiseOrXorCaughtByResult(t *testing.T) {
+	for _, src := range []string{
+		"const X: byte = byte(1).bor(300)\n",
+		"const X: byte = byte(1).bxor(300)\n",
+		"const X: byte = 300.bor(byte(1))\n",
+		"const X: byte = 256.bxor(byte(0))\n",
+		"const X: byte = 300.shl(1)\n",
+	} {
+		_, diags := analyze(src)
+		if !slices.Contains(codes(diags), CodeConstantOverflow) {
+			t.Errorf("%q: codes = %v, want a constant_overflow from the result check", src, codes(diags))
+		}
+	}
+}
+
+// TestOperandCheckLeavesArithmeticAndComparison pins behavior-invariance outside
+// the masking bitwise operator: arithmetic still reports only its overflowing
+// result (one constant_overflow, not a second at the operand), and a comparison
+// folds to a bool with no overflow. The input range check is scoped to band and
+// changes neither.
+func TestOperandCheckLeavesArithmeticAndComparison(t *testing.T) {
+	_, diags := analyze("const X: byte = byte(5) + 300\n")
+	if n := countCode(diags, CodeConstantOverflow); n != 1 {
+		t.Errorf("byte(5)+300: got %d constant_overflow, want exactly 1 (the result only): %v", n, codes(diags))
+	}
+	if _, d := analyze("const X: bool = byte(1) == 300\n"); len(d) != 0 {
+		t.Errorf("byte(1)==300: want no diagnostics (folds to a bool), got %v", codes(d))
+	}
+}

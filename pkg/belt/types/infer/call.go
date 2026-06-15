@@ -301,13 +301,23 @@ func adaptedOperands(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, m *ir.Met
 		pt := types.Substitute(m.Params[i].Type, subst)
 		if _, isSelf := pt.(*ir.SelfType); isSelf {
 			pt = operand
+			// A self-typed operand unifies with the receiver and is normally range-
+			// checked at the call's own result site. Bitwise AND (band) is the
+			// exception: it clears bits, so a too-wide operand masks to an in-range
+			// result the result check accepts (byte(1).band(300) folds to 0), leaving
+			// the out-of-range operand unreported. OR/XOR (bor/bxor) set the bits a
+			// too-wide operand carries, so their result is out of range and the result
+			// check already reports it; arithmetic likewise overflows its result. So
+			// the operand is range-checked here only for the masking operator,
+			// matching the free-function argument rule.
+			if masksOutOfRange(m.Name) {
+				sink.checked(a, pt)
+			}
 		} else if !hasTypeVar(pt) {
 			// A concrete (non-self) parameter range-checks its argument the way a
 			// free function's parameter does — a constant that cannot inhabit the
 			// type (a negative amount in a shift's nuint operand, say) is
-			// constant_overflow at the argument. A self-typed operand unifies with
-			// the receiver and is range-checked at the call's own result site, so it
-			// is not re-checked here.
+			// constant_overflow at the argument.
 			sink.checked(a, pt)
 		}
 		if !hasTypeVar(pt) && !types.Identical(args[i], pt) {
@@ -316,8 +326,26 @@ func adaptedOperands(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, m *ir.Met
 	}
 	if recvExpr != nil && !types.Identical(recv, operand) {
 		sink.adapted(recvExpr, operand)
+		// The receiver adapts to the unified sized type the same way a self operand
+		// does (the default-integer receiver unifying with a sized argument). For
+		// band it masks an out-of-range receiver to an in-range result the result
+		// check accepts (300.band(byte(1)) folds to 0), so the receiver is range-
+		// checked at its own site, as the operand is.
+		if masksOutOfRange(m.Name) {
+			sink.checked(recvExpr, operand)
+		}
 	}
 }
+
+// masksOutOfRange reports whether a bitwise operator can fold an out-of-range
+// operand or receiver to an in-range result, so the result check misses it and the
+// input must be range-checked at its own site. Only AND (band) masks: it clears
+// bits, so a too-wide input collapses into range. OR/XOR (bor/bxor) set the
+// over-wide bits, and arithmetic overflows, so the result check reports those; a
+// right shift (shr) can reduce an out-of-range receiver into range, but its
+// receiver adapts through the result expectation rather than operand unification,
+// so it is not reached here — a narrower, separate gap left for the result path.
+func masksOutOfRange(method string) bool { return method == "band" }
 
 // convCallType is the type rule for a conversion or constructor T(x): the
 // expression's type is the type the callee names, whatever its arguments. Two
