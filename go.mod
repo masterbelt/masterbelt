@@ -6,7 +6,7 @@ require (
 	github.com/owenrumney/go-lsp v0.2.3
 	github.com/pelletier/go-toml/v2 v2.3.1
 	github.com/spf13/cobra v1.10.2
-	golang.org/x/tools v0.45.0
+	golang.org/x/tools v0.46.0
 	mvdan.cc/editorconfig v0.3.0
 )
 
@@ -24,9 +24,9 @@ require (
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.3 // indirect
-	golang.org/x/mod v0.36.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/mod v0.37.0 // indirect
+	golang.org/x/sync v0.21.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
 )
 
 tool github.com/rhysd/actionlint/cmd/actionlint
