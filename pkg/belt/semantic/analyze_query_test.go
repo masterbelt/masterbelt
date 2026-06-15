@@ -91,6 +91,58 @@ func TestPredicateNegationYieldsPredicate(t *testing.T) {
 	}
 }
 
+// TestColumnsBindingFieldIsColumn pins that a field access off a query binding
+// (c.cost, where c : columns<Cards>) reads that field as a column<Cards, T> rather
+// than a value — so the comparison that follows produces a predicate<Cards>, and a
+// whole where condition written over the binding settles to predicate<Cards>. This
+// is how a query names a column: through the binding, never self.
+func TestColumnsBindingFieldIsColumn(t *testing.T) {
+	src := queryCardsMaster +
+		"fn probe(c: columns<Cards>): predicate<Cards> {\n" +
+		"  return c.cost > 100 && c.name == \"fire\"\n" +
+		"}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	if got := returnedType(funcNamed(m, "probe")); got == nil || got.String() != "predicate<Cards>" {
+		t.Errorf("return type = %v, want predicate<Cards>", got)
+	}
+}
+
+// TestColumnsFieldType pins the field-access resolution itself: c.cost reads the
+// int column of Cards as column<Cards, int> — the row field's value type lifted
+// into query mode.
+func TestColumnsFieldType(t *testing.T) {
+	src := queryCardsMaster +
+		"fn probe(c: columns<Cards>): column<Cards, int> {\n" +
+		"  return c.cost\n" +
+		"}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	if got := returnedType(funcNamed(m, "probe")); got == nil || got.String() != "column<Cards, int>" {
+		t.Errorf("return type = %v, want column<Cards, int>", got)
+	}
+}
+
+// TestColumnsUnknownFieldNotAColumn pins that a name the master's row does not have
+// does not resolve to a column: c.missing is not a column<Cards, _>, so it cannot
+// stand where a column is needed. (It resolves to no readable member, exactly as a
+// record's unknown field does — the value-position read is left to the type that
+// consumes it; the query lowering rejects a non-column field access.)
+func TestColumnsUnknownFieldNotAColumn(t *testing.T) {
+	src := queryCardsMaster +
+		"fn probe(c: columns<Cards>): column<Cards, int> {\n" +
+		"  return c.missing\n" +
+		"}\n"
+	m, _ := analyze(src)
+	if got := returnedType(funcNamed(m, "probe")); got != nil && got.String() == "column<Cards, int>" {
+		t.Errorf("c.missing must not resolve to a column, got %v", got)
+	}
+}
+
 // TestBareBoolIsNotPredicate pins the guarantee the typed algebra exists for: a
 // plain bool is not a predicate, so a where condition that is "just true" — or any
 // non-SQL-expressible bool — is a type error, caught at compile time rather than
