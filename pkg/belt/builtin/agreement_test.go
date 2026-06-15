@@ -100,9 +100,18 @@ func TestEveryEffectfulNativeIsDeclared(t *testing.T) {
 // explicit, closed set: growing it is a deliberate act, not drift.
 func TestEveryPureExternIsBacked(t *testing.T) {
 	reg, defs := preludeDefs(t)
-	// The eval-implemented builtins: declared `= builtin`, no NativeType, the
-	// folder supplies their method semantics (collection/range intrinsics).
-	evalImplemented := map[string]bool{"list": true, "map": true, "range": true}
+	// The builtins the registry does not natively model. The collections and range
+	// are folder-implemented — declared `= builtin`, no NativeType, the folder
+	// supplies their method semantics (collection/range intrinsics). The query
+	// algebra (column/predicate/columns) is the other kind: its operators never
+	// fold to a value at all — a column comparison is a predicate the query
+	// lowering renders to SQL, not a constant the folder reduces — so it has no
+	// NativeType and no intrinsic, and the query lowering, not the folder, gives it
+	// meaning. Growing this set is a deliberate act, not drift.
+	evalImplemented := map[string]bool{
+		"list": true, "map": true, "range": true,
+		"column": true, "predicate": true, "columns": true,
+	}
 	for _, d := range defs {
 		if !d.Builtin {
 			continue

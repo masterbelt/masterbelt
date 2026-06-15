@@ -1,0 +1,65 @@
+// The typed query algebra: the types a master's query (column) mode is built
+// from. They sit apart from the value-mode primitives because their operators do
+// not fold to a value — a comparison over a column yields a predicate the query
+// lowers to SQL, not a bool the evaluator computes. The type is the guarantee:
+// a where condition is a predicate<M>, so it is SQL-expressible by construction,
+// and a plain bool (true, a row method's result) is a type error there.
+//
+// They are `= builtin` with no native descriptor and no intrinsic: a column or a
+// predicate is never a comptime constant the folder reduces. The query lowering
+// (pkg/master/sql) walks the typed construction tree instead, so these carry no
+// evaluation semantics here — only the type signatures the checker resolves a
+// query condition against.
+
+/// A column of master M's table, carrying the field's value type T, in query
+/// (column) mode — a reference to the column rather than a read of a value. It
+/// arises from a query binding's field access (c.cost), never from self, which in
+/// query position exposes the relation's methods, not its columns. Each comparison
+/// returns a predicate<M> the query lowers to SQL: against a literal value of the
+/// column's type, or against another column of the same master.
+pub type column<M, T> = builtin<M, T> impl {
+  /// The == operator: the column equals the value (IS NULL against null).
+  pub extern fn eql(value: T): predicate<M>
+  /// The != operator.
+  pub extern fn neq(value: T): predicate<M>
+  /// The < operator.
+  pub extern fn lt(value: T): predicate<M>
+  /// The <= operator.
+  pub extern fn lteq(value: T): predicate<M>
+  /// The > operator.
+  pub extern fn gt(value: T): predicate<M>
+  /// The >= operator.
+  pub extern fn gteq(value: T): predicate<M>
+
+  /// The == operator against another column of the same master.
+  pub extern fn eql(other: column<M, T>): predicate<M>
+  /// The != operator against another column.
+  pub extern fn neq(other: column<M, T>): predicate<M>
+  /// The < operator against another column.
+  pub extern fn lt(other: column<M, T>): predicate<M>
+  /// The <= operator against another column.
+  pub extern fn lteq(other: column<M, T>): predicate<M>
+  /// The > operator against another column.
+  pub extern fn gt(other: column<M, T>): predicate<M>
+  /// The >= operator against another column.
+  pub extern fn gteq(other: column<M, T>): predicate<M>
+}
+
+/// A query condition over master M: the SQL-expressible predicate a comparison of
+/// M's columns produces. The logical operators compose predicates into predicates
+/// — never a bool — so a whole where condition stays a predicate<M> the query
+/// lowers to a single SQL expression.
+pub type predicate<M> = builtin<M> impl {
+  /// The && operator: both predicates hold (SQL AND).
+  pub extern fn anan(other: predicate<M>): predicate<M>
+  /// The || operator: either predicate holds (SQL OR).
+  pub extern fn oror(other: predicate<M>): predicate<M>
+  /// The ! operator: the predicate does not hold (SQL NOT).
+  pub extern fn not(): predicate<M>
+}
+
+/// The columns of master M, the type of a query binding (the c in
+/// where(fn(c) -> ...)). A field access off it reads that column as a
+/// column<M, fieldType> — the field's value type lifted into query mode — so a
+/// query names a column only through the binding, never through self.
+pub type columns<M> = builtin<M>
