@@ -269,12 +269,21 @@ func graphValueRaw(v ir.Value, ctx graphCtx) *ir.Constant {
 // graphIntLiteral folds an integer literal to its arbitrary-precision value,
 // honouring a 0b/0o/0x radix prefix.
 func graphIntLiteral(v *ir.IntLiteral) *ir.Constant {
-	digits, base := intRadix(v.Text)
-	n, ok := new(big.Int).SetString(digits, base)
+	n, ok := ParseIntLiteral(v.Text)
 	if !ok {
 		return nil
 	}
 	return ir.IntConstant(n)
+}
+
+// ParseIntLiteral parses an integer literal's text to its arbitrary-precision
+// value, honouring the language's radix rules (a 0b/0o/0x prefix; a bare leading
+// zero stays decimal). It is the one place that reading happens, so a consumer
+// outside the evaluator — the SQL lowering binding a literal — agrees with the
+// evaluator rather than re-deriving the radix with different rules.
+func ParseIntLiteral(text string) (*big.Int, bool) {
+	digits, base := intRadix(text)
+	return new(big.Int).SetString(digits, base)
 }
 
 // intRadix splits an integer literal's text into the digits to parse and the

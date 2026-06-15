@@ -211,6 +211,50 @@ func TestLowerUnsupported(t *testing.T) {
 			t.Fatal("want an unsupported node for an overridden operator")
 		}
 	})
+	t.Run("overridden operator on a generic type", func(t *testing.T) {
+		// The override check must see through a generic application (Weird<string>
+		// is an applied nominal, not a bare one), or the custom operator slips past.
+		src := "type Weird<T> = int impl {\n  pub eql(other: self): bool {\n    return false\n  }\n}\n" +
+			"master M {\n  record { w: Weird<string> }\n  primary w\n  validate {\n    each {\n      assert self.w == self.w\n    }\n  }\n}\n"
+		_, u := lowerSrc(t, src)
+		if len(u) == 0 {
+			t.Fatal("want an unsupported node for an overridden operator on a generic type")
+		}
+	})
+	t.Run("overridden logical operator", func(t *testing.T) {
+		// A bool-like column type that overrides not/&&/|| does not carry the
+		// builtin's semantics either, so the logical operator is rejected too.
+		src := "type Weird = bool impl {\n  pub not(): bool {\n    return true\n  }\n}\n" +
+			"master M {\n  record { w: Weird }\n  primary w\n  validate {\n    each {\n      assert !self.w\n    }\n  }\n}\n"
+		_, u := lowerSrc(t, src)
+		if len(u) == 0 {
+			t.Fatal("want an unsupported node for an overridden logical operator")
+		}
+	})
+}
+
+// TestLowerIntLiterals pins two literal forms whose value the lowering must get
+// right: a negative threshold (-1, represented as a unary neg over the literal)
+// binds the signed value, and a leading-zero decimal (010) binds decimal 10, not
+// octal 8 — the language reads a radix only from a 0b/0o/0x prefix.
+func TestLowerIntLiterals(t *testing.T) {
+	cases := []struct{ cond, sql, binds string }{
+		{"self.id >= -1", `("id" >= ?)`, "[int -1]"},
+		{"self.id == 010", `("id" = ?)`, "[int 10]"},
+		{"self.id < -128", `("id" < ?)`, "[int -128]"},
+	}
+	for _, tc := range cases {
+		got, u := lowerValidate(t, "id: int", tc.cond)
+		if len(u) != 0 {
+			t.Fatalf("%q: unsupported %+v", tc.cond, u)
+		}
+		if s := got.SQL(sql.SQLite); s != tc.sql {
+			t.Errorf("%q: SQL = %q, want %q", tc.cond, s, tc.sql)
+		}
+		if b := bindsString(got.Binds()); b != tc.binds {
+			t.Errorf("%q: binds = %s, want %s", tc.cond, b, tc.binds)
+		}
+	}
 }
 
 // TestLowerNullEitherSide pins that the null literal is handled on either side of

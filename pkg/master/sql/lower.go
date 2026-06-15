@@ -3,6 +3,7 @@ package sql
 import (
 	"math/big"
 
+	"github.com/masterbelt/masterbelt/pkg/belt/eval"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
@@ -74,9 +75,21 @@ var comparisonOps = map[string]string{
 }
 
 // call lowers a method call — the desugared form of every operator. The
-// comparison, logical, and negation operators map to SQL; anything else (an
-// arithmetic operator, a column or row method) is outside the core.
+// comparison, logical, and negation operators map to SQL, and a unary sign over
+// an integer literal folds to a signed bind; anything else (an arithmetic
+// operator over columns, a column or row method) is outside the core.
 func (l *lowering) call(c *ir.Call) sqlExpr {
+	// A unary sign over a literal is the literal's value, signed — the form a
+	// negative threshold (self.id >= -1) takes, where -1 is neg over the literal 1.
+	if c.Method == "neg" || c.Method == "pos" {
+		return l.signedLiteral(c)
+	}
+	// The operator forms below must be the builtin operator, not one a column's
+	// type overrides — SQL's builtin =/AND/NOT would otherwise apply different
+	// semantics than the column's own. Reject an overridden operator on any operand.
+	if l.overridden(c) {
+		return l.reject(c, "overridden operator "+c.Method)
+	}
 	switch c.Method {
 	case "anan", "oror":
 		return l.logical(c)
@@ -90,6 +103,39 @@ func (l *lowering) call(c *ir.Call) sqlExpr {
 		return l.compare(c)
 	}
 	return l.reject(c, "operator "+c.Method)
+}
+
+// signedLiteral folds a unary sign over an integer literal to a signed bind. A
+// sign over anything else (a column, an expression) is arithmetic, outside the
+// core, and rejected.
+func (l *lowering) signedLiteral(c *ir.Call) sqlExpr {
+	lit, ok := intLiteralOf(c.Receiver)
+	if !ok {
+		return l.reject(c, "operator "+c.Method)
+	}
+	v, ok := eval.ParseIntLiteral(lit.Text)
+	if !ok {
+		return l.reject(lit, "integer literal")
+	}
+	if c.Method == "neg" {
+		v = new(big.Int).Neg(v)
+	}
+	l.binds = append(l.binds, Bind{Kind: BindInt, Int: v})
+	return placeholder{}
+}
+
+// overridden reports whether any operand of an operator call is a column whose
+// type overrides the operator method — so the call is not the builtin operator.
+func (l *lowering) overridden(c *ir.Call) bool {
+	if l.overrides(c.Receiver, c.Method) {
+		return true
+	}
+	for _, a := range c.Args {
+		if l.overrides(a, c.Method) {
+			return true
+		}
+	}
+	return false
 }
 
 // logical lowers && / || to AND / OR over its two operands.
@@ -109,17 +155,13 @@ func (l *lowering) logical(c *ir.Call) sqlExpr {
 	return binary{op: op, l: left, r: right}
 }
 
-// compare lowers a comparison. A column whose nominal type overrides the operator
-// is not the builtin comparison and is rejected, so SQL never silently ignores
-// custom semantics. Equality and inequality against null — on either side, since
-// SQL's = NULL is never true — become IS NULL / IS NOT NULL over the other
-// operand; every other comparison is the plain operator over its two operands.
+// compare lowers a comparison (its operator already confirmed not overridden by
+// call). Equality and inequality against null — on either side, since SQL's
+// = NULL is never true — become IS NULL / IS NOT NULL over the other operand;
+// every other comparison is the plain operator over its two operands.
 func (l *lowering) compare(c *ir.Call) sqlExpr {
 	if len(c.Args) != 1 {
 		return l.reject(c, "operator "+c.Method)
-	}
-	if l.overrides(c.Receiver, c.Method) || l.overrides(c.Args[0], c.Method) {
-		return l.reject(c, "overridden operator "+c.Method)
 	}
 	switch {
 	case isNull(c.Args[0]):
@@ -165,12 +207,22 @@ func (l *lowering) column(f *ir.FieldAccess) sqlExpr {
 }
 
 func (l *lowering) intLiteral(n *ir.IntLiteral) sqlExpr {
-	v, ok := new(big.Int).SetString(n.Text, 0)
+	v, ok := eval.ParseIntLiteral(n.Text)
 	if !ok {
 		return l.reject(n, "integer literal")
 	}
 	l.binds = append(l.binds, Bind{Kind: BindInt, Int: v})
 	return placeholder{}
+}
+
+// intLiteralOf returns the integer literal beneath a value, seen through the
+// Adapt a typed literal is wrapped in, or false for anything else.
+func intLiteralOf(v ir.Value) (*ir.IntLiteral, bool) {
+	if a, ok := v.(*ir.Adapt); ok {
+		v = a.Value
+	}
+	lit, ok := v.(*ir.IntLiteral)
+	return lit, ok
 }
 
 // overrides reports whether a value is a column whose nominal type declares the
@@ -186,21 +238,31 @@ func (l *lowering) overrides(v ir.Value, method string) bool {
 }
 
 // declaresMethod reports whether a nominal type, or one in its underlying chain,
-// declares a method of the given name — the test for an overridden operator.
+// declares a method of the given name — the test for an overridden operator. A
+// generic application (Weird<string>) carries the same definition as the bare
+// nominal, so it is unwrapped the same way.
 func declaresMethod(t ir.Type, method string) bool {
 	seen := map[*ir.TypeDef]bool{}
 	for {
-		n, ok := t.(*ir.Named)
-		if !ok || n.Def == nil || seen[n.Def] {
+		var def *ir.TypeDef
+		switch x := t.(type) {
+		case *ir.Named:
+			def = x.Def
+		case *ir.App:
+			def = x.Def
+		default:
 			return false
 		}
-		seen[n.Def] = true
-		for i := range n.Def.Methods {
-			if n.Def.Methods[i].Name == method {
+		if def == nil || seen[def] {
+			return false
+		}
+		seen[def] = true
+		for i := range def.Methods {
+			if def.Methods[i].Name == method {
 				return true
 			}
 		}
-		t = n.Def.Body
+		t = def.Body
 	}
 }
 
