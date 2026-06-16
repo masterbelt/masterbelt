@@ -283,19 +283,65 @@ func (l *lowering) overrides(v ir.Value, method string) bool {
 }
 
 // sqlSummable reports whether a column of element type T can be summed by the
-// engine's plain SQL sum(): a fixed-width numeric whose addition SQL reproduces and
-// whose total the scalar result represents. It is false for an arbitrary-precision
-// integer (nint/nuint), whose sum can exceed the int64 the engine reads it into, and
-// for a type that declares its own add — a user-defined numeric whose arithmetic SQL
-// would not carry, the same exclusion the comparison lowering makes for a custom
-// operator. A column the sum cannot honor is rejected rather than silently summed
-// with the wrong arithmetic or a truncated total.
+// engine's plain SQL sum() and read back as the column's type. It is true only for a
+// fixed-width signed-or-small integer the engine reads into an int64 faithfully, with
+// no refinement and no custom arithmetic. The exclusions:
+//
+//   - a type that declares its own add — a user-defined numeric whose arithmetic SQL
+//     would not carry, the same exclusion the comparison lowering makes for a custom
+//     operator;
+//   - an arbitrary-precision (nint/nuint) or 64-bit unsigned (ulong) underlying
+//     builtin, whose sum (or even a single cell, for ulong) can exceed the int64 the
+//     engine reads the scalar into — reached through an alias too (type Big = nint),
+//     so the underlying builtin is unwrapped before the check;
+//   - a refinement anywhere in the chain (type Positive = int where self > 0), since
+//     an empty relation sums to zero, and that manufactured zero need not satisfy the
+//     refinement.
+//
+// A column the sum cannot honor is rejected rather than summed with the wrong
+// arithmetic, a truncated total, or a value that violates its type.
 func sqlSummable(elem ir.Type) bool {
 	t := nonNullType(elem)
-	if b, ok := t.(*ir.Builtin); ok && (b.Name == builtin.NameNint || b.Name == builtin.NameNuint) {
+	if declaresMethod(t, "add") {
 		return false
 	}
-	return !declaresMethod(t, "add")
+	seen := map[*ir.TypeDef]bool{}
+	for {
+		switch x := t.(type) {
+		case *ir.Builtin:
+			return summableBuiltin(x.Name)
+		case *ir.Named:
+			def := x.Def
+			if def == nil || seen[def] {
+				return false
+			}
+			seen[def] = true
+			if def.Where != nil {
+				return false
+			}
+			if def.Builtin {
+				return summableBuiltin(def.Name)
+			}
+			t = def.Body
+		default:
+			return false
+		}
+		if t == nil {
+			return false
+		}
+	}
+}
+
+// summableBuiltin reports whether a builtin numeric's plain SQL sum fits the int64
+// the engine reads it into: every integer but the arbitrary-precision ones and the
+// 64-bit unsigned, whose totals overflow a signed 64-bit result.
+func summableBuiltin(name string) bool {
+	switch name {
+	case builtin.NameNint, builtin.NameNuint, builtin.NameUlong:
+		return false
+	default:
+		return true
+	}
 }
 
 // nonNullType strips a null member from a union, yielding the single remaining

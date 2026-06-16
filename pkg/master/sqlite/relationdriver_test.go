@@ -164,18 +164,32 @@ func TestRelationDriverSum(t *testing.T) {
 	}
 }
 
-// TestRelationDriverRejectsArbitraryPrecisionSum pins that a sum over an
-// arbitrary-precision column is not silently run: a nint column passes the selector's
-// numeric bound but its total can exceed the int64 the engine reads, so the driver
-// reports it unsupported (the caller treats any Unsupported as a rejection) rather
-// than returning a truncated sum.
-func TestRelationDriverRejectsArbitraryPrecisionSum(t *testing.T) {
-	const src = "master Cards {\n  record { id: int, big: nint }\n  primary id\n}\n" +
-		"fn probe(): nint {\n  return Cards.sum(fn(c) -> c.big)\n}\n"
-	chain, env := chainOf(t, src)
-	_, _, _, unsupported, ok := mastersql.SumRelation(chain, env)
-	if ok && len(unsupported) == 0 {
-		t.Fatal("a sum over an arbitrary-precision (nint) column must be unsupported, not summed into int64")
+// TestRelationDriverRejectsUnsummableColumn pins that a sum the SQL aggregate cannot
+// faithfully run is reported unsupported (the caller treats any Unsupported as a
+// rejection) rather than summed into int64 with a wrong, truncated, or type-violating
+// result. Each column passes the selector's numeric bound at the checker but is
+// caught here: an arbitrary-precision column and its alias (the sum can exceed
+// int64), a 64-bit unsigned column (likewise), and a refinement (whose empty-relation
+// zero need not satisfy the where).
+func TestRelationDriverRejectsUnsummableColumn(t *testing.T) {
+	cases := map[string]string{
+		"arbitrary precision": "master Cards {\n  record { id: int, v: nint }\n  primary id\n}\n" +
+			"fn probe(): nint {\n  return Cards.sum(fn(c) -> c.v)\n}\n",
+		"alias of arbitrary precision": "pub type Big = nint\nmaster Cards {\n  record { id: int, v: Big }\n  primary id\n}\n" +
+			"fn probe(): Big {\n  return Cards.sum(fn(c) -> c.v)\n}\n",
+		"64-bit unsigned": "master Cards {\n  record { id: int, v: ulong }\n  primary id\n}\n" +
+			"fn probe(): ulong {\n  return Cards.sum(fn(c) -> c.v)\n}\n",
+		"refinement": "pub type Positive = int where self > 0\nmaster Cards {\n  record { id: int, v: Positive }\n  primary id\n}\n" +
+			"fn probe(): Positive {\n  return Cards.sum(fn(c) -> c.v)\n}\n",
+	}
+	for name, src := range cases {
+		t.Run(name, func(t *testing.T) {
+			chain, env := chainOf(t, src)
+			_, _, _, unsupported, ok := mastersql.SumRelation(chain, env)
+			if ok && len(unsupported) == 0 {
+				t.Fatalf("a sum over a %s column must be unsupported, not summed into int64", name)
+			}
+		})
 	}
 }
 

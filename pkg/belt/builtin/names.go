@@ -9,6 +9,7 @@ package builtin
 const (
 	NameNint     = "nint"
 	NameNuint    = "nuint"
+	NameUlong    = "ulong"
 	NameBool     = "bool"
 	NameString   = "string"
 	NameList     = "list"
