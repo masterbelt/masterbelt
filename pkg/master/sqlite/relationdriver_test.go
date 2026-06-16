@@ -164,6 +164,21 @@ func TestRelationDriverSum(t *testing.T) {
 	}
 }
 
+// TestRelationDriverRejectsArbitraryPrecisionSum pins that a sum over an
+// arbitrary-precision column is not silently run: a nint column passes the selector's
+// numeric bound but its total can exceed the int64 the engine reads, so the driver
+// reports it unsupported (the caller treats any Unsupported as a rejection) rather
+// than returning a truncated sum.
+func TestRelationDriverRejectsArbitraryPrecisionSum(t *testing.T) {
+	const src = "master Cards {\n  record { id: int, big: nint }\n  primary id\n}\n" +
+		"fn probe(): nint {\n  return Cards.sum(fn(c) -> c.big)\n}\n"
+	chain, env := chainOf(t, src)
+	_, _, _, unsupported, ok := mastersql.SumRelation(chain, env)
+	if ok && len(unsupported) == 0 {
+		t.Fatal("a sum over an arbitrary-precision (nint) column must be unsupported, not summed into int64")
+	}
+}
+
 // TestRelationDriverSeesThroughNestedAdapt pins that the driver recognizes a count
 // chain wrapped in more than one Adapt — the shape write-back produces when the
 // query's result is coerced through nested adaptations, e.g. returning it from a

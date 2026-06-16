@@ -282,6 +282,22 @@ func (l *lowering) overrides(v ir.Value, method string) bool {
 	return declaresMethod(nonNullType(elem), method)
 }
 
+// sqlSummable reports whether a column of element type T can be summed by the
+// engine's plain SQL sum(): a fixed-width numeric whose addition SQL reproduces and
+// whose total the scalar result represents. It is false for an arbitrary-precision
+// integer (nint/nuint), whose sum can exceed the int64 the engine reads it into, and
+// for a type that declares its own add — a user-defined numeric whose arithmetic SQL
+// would not carry, the same exclusion the comparison lowering makes for a custom
+// operator. A column the sum cannot honor is rejected rather than silently summed
+// with the wrong arithmetic or a truncated total.
+func sqlSummable(elem ir.Type) bool {
+	t := nonNullType(elem)
+	if b, ok := t.(*ir.Builtin); ok && (b.Name == builtin.NameNint || b.Name == builtin.NameNuint) {
+		return false
+	}
+	return !declaresMethod(t, "add")
+}
+
 // nonNullType strips a null member from a union, yielding the single remaining
 // member — so a nullable type T | null is examined as T. A non-union, or a union
 // with more than one non-null member, is returned unchanged.

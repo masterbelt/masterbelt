@@ -40,12 +40,24 @@ func SumRelation(chain ir.Value, env eval.GraphEnv) (rel Relation, column string
 	if !ok || len(sum.Args) != 1 {
 		return Relation{}, "", nil, nil, false
 	}
-	column, ok = selectorColumn(sum.Args[0])
+	col, ok := selectorColumn(sum.Args[0])
 	if !ok {
 		return Relation{}, "", nil, nil, false
 	}
 	rel, master, unsupported, ok = relationChain(sum.Receiver, env)
-	return rel, column, master, unsupported, ok
+	if !ok {
+		return Relation{}, "", nil, nil, false
+	}
+	// The column's numeric-ness is the checker's bound; its summability by plain SQL
+	// is not. An arbitrary-precision column (the sum may exceed int64) or one whose
+	// type carries a custom add is rejected here, the aggregate twin of the
+	// comparison lowering's custom-operator guard, so the engine never sums it with
+	// the wrong arithmetic or a truncated total.
+	elem, _ := columnElem(col)
+	if !sqlSummable(elem) {
+		unsupported = append(unsupported, Unsupported{Node: col, Reason: "sum of this column type"})
+	}
+	return rel, col.Field, master, unsupported, ok
 }
 
 // relationChain walks the where-narrowing chain over a master relation that an
@@ -76,23 +88,24 @@ func relationChain(recv ir.Value, env eval.GraphEnv) (rel Relation, master *ir.T
 	}
 }
 
-// selectorColumn returns the column a sum selector names: the field of the single
-// column reference its lambda yields (fn(c) -> c.cost). It requires the arrow-lambda
-// shape whereBody requires and a body that is a column<M, T> field access, so a
-// selector that computes a value rather than naming a column is not recognized.
-func selectorColumn(v ir.Value) (string, bool) {
+// selectorColumn returns the single column reference a sum selector names (the c.cost
+// of fn(c) -> c.cost). It requires the arrow-lambda shape whereBody requires and a
+// body that is a column<M, T> field access, so a selector that computes a value
+// rather than naming a column is not recognized. The field access carries the
+// column's name and its element type, both of which the caller reads.
+func selectorColumn(v ir.Value) (*ir.FieldAccess, bool) {
 	body, ok := whereBody(v)
 	if !ok {
-		return "", false
+		return nil, false
 	}
 	fa, ok := unwrap(body).(*ir.FieldAccess)
 	if !ok {
-		return "", false
+		return nil, false
 	}
 	if _, ok := columnElem(fa); !ok {
-		return "", false
+		return nil, false
 	}
-	return fa.Field, true
+	return fa, true
 }
 
 // foldOperands replaces every data-independent subexpression of a predicate with
