@@ -2251,6 +2251,44 @@ func decodeMasterDef(e *treetext.Element) (*MasterDef, error) {
 	return n, nil
 }
 
+// writeMasterRelation emits n's fields beneath an already-written heading line.
+func writeMasterRelation(w *treetext.Writer, n *MasterRelation, depth int) error {
+	w.Line(depth, "Master: "+refText(n.Master))
+	if err := writeTypeField(w, depth, "Type", n.Type); err != nil {
+		return err
+	}
+	return nil
+}
+
+// decodeMasterRelation builds a MasterRelation from its element.
+func decodeMasterRelation(e *treetext.Element) (*MasterRelation, error) {
+	if err := treetext.ExpectFields(e, "Master", "Type"); err != nil {
+		return nil, err
+	}
+	n := &MasterRelation{}
+	if v, err := unrefTypeDef(e.Fields[0]); err != nil {
+		return nil, err
+	} else {
+		n.Master = v
+	}
+	if v, err := decodeTypeField(e.Fields[1]); err != nil {
+		return nil, err
+	} else {
+		n.Type = v
+	}
+	return n, nil
+}
+
+// MarshalText renders the node and its subtree in the exact text form.
+func (n *MasterRelation) MarshalText() ([]byte, error) {
+	var w treetext.Writer
+	w.Line(0, "MasterRelation")
+	if err := writeMasterRelation(&w, n, 1); err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
+}
+
 // writeMatch emits n's fields beneath an already-written heading line.
 func writeMatch(w *treetext.Writer, n *Match, depth int) error {
 	if err := writeValueField(w, depth, "Scrutinee", n.Scrutinee); err != nil {
@@ -4150,6 +4188,13 @@ func writeValueField(w *treetext.Writer, depth int, name string, v Value) error 
 		}
 		w.Line(depth, name+": LocalRef")
 		return writeLocalRef(w, n, depth+1)
+	case *MasterRelation:
+		if n == nil {
+			w.Line(depth, name+": "+treetext.Nil)
+			return nil
+		}
+		w.Line(depth, name+": MasterRelation")
+		return writeMasterRelation(w, n, depth+1)
 	case *NullValue:
 		if n == nil {
 			w.Line(depth, name+": "+treetext.Nil)
@@ -4358,6 +4403,13 @@ func writeValueItem(w *treetext.Writer, depth int, v Value) error {
 		}
 		w.Line(depth, "LocalRef")
 		return writeLocalRef(w, n, depth+1)
+	case *MasterRelation:
+		if n == nil {
+			w.Line(depth, treetext.Nil)
+			return nil
+		}
+		w.Line(depth, "MasterRelation")
+		return writeMasterRelation(w, n, depth+1)
 	case *NullValue:
 		if n == nil {
 			w.Line(depth, treetext.Nil)
@@ -4482,6 +4534,8 @@ func decodeValue(e *treetext.Element) (Value, error) {
 		return decodeIntLiteral(e)
 	case "LocalRef":
 		return decodeLocalRef(e)
+	case "MasterRelation":
+		return decodeMasterRelation(e)
 	case "NullValue":
 		return decodeNullValue(e)
 	case "ParamRef":
@@ -4559,6 +4613,7 @@ var treeStructs = []any{
 	(*Let)(nil),
 	(*LocalRef)(nil),
 	(*MasterDef)(nil),
+	(*MasterRelation)(nil),
 	(*Match)(nil),
 	(*MatchArm)(nil),
 	(*Method)(nil),
@@ -4690,6 +4745,9 @@ func writeTree(w *treetext.Writer, v any, depth int) (bool, error) {
 	case *MasterDef:
 		w.Line(depth, "MasterDef")
 		return true, writeMasterDef(w, n, depth+1)
+	case *MasterRelation:
+		w.Line(depth, "MasterRelation")
+		return true, writeMasterRelation(w, n, depth+1)
 	case *Match:
 		w.Line(depth, "Match")
 		return true, writeMatch(w, n, depth+1)
@@ -4795,6 +4853,7 @@ var treeExcluded = map[string][]string{
 	"IntLiteral":        {"Syntax"},
 	"Let":               {"Syntax"},
 	"LocalRef":          {"Syntax"},
+	"MasterRelation":    {"Syntax"},
 	"Match":             {"Syntax"},
 	"Method":            {"Syntax"},
 	"NullValue":         {"Syntax"},

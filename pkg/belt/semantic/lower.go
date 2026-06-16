@@ -596,10 +596,14 @@ func (b bodyBinder) leafIdentifier(e *ast.Identifier) ir.Value {
 			return &ir.Reference{Target: c, Syntax: e}
 		}
 	}
-	// A bare type name reifies to a type value (long == long, the receiver of a
-	// metatype method call) — the same reading the constant binder gives it, so a
-	// body and a const agree, and the metatype comparison folds.
+	// A bare master name is its relation — the value the query operations are
+	// methods on; every other bare type name reifies to a type value (long == long,
+	// the receiver of a metatype method call), the same reading the constant binder
+	// gives it, so a body and a const agree and the metatype comparison folds.
 	if def, ok := b.r.Defs[e.Name]; ok {
+		if def.Master != nil {
+			return &ir.MasterRelation{Master: def, Syntax: e}
+		}
 		return &ir.TypeValue{Reified: reifyType(def), Syntax: e}
 	}
 	// Last resort: a bare name that resolves no other way reads a readable member
@@ -662,9 +666,13 @@ func (b bodyBinder) leafNamespaceOrTypeMember(e *ast.MemberExpr) ir.Value {
 	if v := typeMemberValue(b.reg, infer.MemberReceiverDef(b.r.Defs, b.r.Qualified, shadowed, e.Receiver), e); v != nil {
 		return v
 	}
-	// A bare namespace-qualified type name used as a value (geo.Item, no trailing
-	// projection) reifies to a type value, the qualified twin of a bare local type
-	// name, so a body folds geo.Item == geo.Item exactly as a const does.
+	// A namespace-qualified master name used as a value (geo.Cards) is its relation,
+	// the qualified twin of the bare master name leafIdentifier lowers — the value
+	// the query operations are methods on. Every other qualified type name reifies
+	// to a type value, so a body folds geo.Item == geo.Item exactly as a const does.
+	if def := infer.QualifiedTypeDef(b.r.Qualified, shadowed, e); def != nil && def.Master != nil {
+		return &ir.MasterRelation{Master: def, Syntax: e}
+	}
 	return qualifiedTypeValue(b.r.Qualified, shadowed, e)
 }
 

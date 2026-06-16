@@ -172,7 +172,9 @@ func (s constScope) leaf(e ast.Expr) ir.Type {
 		}
 		// A bare type name in value position is a compile-time type value, of type
 		// `type` (the metatype): const x = int8. A value of that name (a constant)
-		// wins above, so only a name resolving to a type alone reaches here.
+		// wins above, so only a name resolving to a type alone reaches here. (A
+		// master is its relation only in a body, where the query driver can run it
+		// against data; a const cannot evaluate a relation, so it stays a type value.)
 		if _, ok := s.universe()[e.Name]; ok {
 			return metatype()
 		}
@@ -295,6 +297,31 @@ const RelationCountName = "count"
 // the RelationCount node with it and the checker types the bare count to it, so
 // the two agree.
 func RelationCountType() ir.Type { return &ir.Builtin{Name: "nint"} }
+
+// RelationType builds relation<master> — the relation algebra's relation of a
+// master's rows, the type a master in value position has (the value a bare master
+// name denotes, on which the query operations are methods). It is ir.Invalid when
+// the registry has no relation type (a degraded prelude).
+func RelationType(reg *builtin.Registry, master *ir.TypeDef) ir.Type {
+	def, ok := reg.Lookup(builtin.NameRelation)
+	if !ok {
+		return ir.Invalid
+	}
+	return &ir.App{Def: def, Args: []ir.Type{&ir.Named{Def: master}}}
+}
+
+// isRelationType reports whether t is a relation<M> — an application of the
+// relation builtin. It is the value-reading test the static-call path uses to tell
+// an unshadowed master name (which reads as its relation) from a master shadowed by
+// a constant (which reads as the constant, not the relation).
+func isRelationType(reg *builtin.Registry, t ir.Type) bool {
+	app, ok := t.(*ir.App)
+	if !ok {
+		return false
+	}
+	def, ok := reg.Lookup(builtin.NameRelation)
+	return ok && app.Def == def
+}
 
 // Body infers the type of a method-body expression: self, a parameter, a
 // literal, a record field access, a type conversion (T(x)), or a method call
@@ -444,11 +471,19 @@ func (s BodyScope) identifierLeaf(e *ast.Identifier) ir.Type {
 		}
 		return ir.Invalid
 	}
-	// A bare type name in value position is a compile-time type value, of the
-	// metatype `type` — the same reading the constant scope gives it, so a body
-	// (let t = sbyte, long == long) types it identically.
-	if _, ok := s.Universe[e.Name]; ok {
-		return metatype()
+	// A bare master name in value position is its relation — the set of all its
+	// rows, on which the query operations (where, count) are methods. Every other
+	// bare type name in value position is a compile-time type value of the metatype
+	// `type` — the same reading the constant scope gives it. A top-level constant of
+	// the same name shadows the master (the lowering resolves the constant first), so
+	// the relation reading applies only when no constant shadows the name.
+	if def, ok := s.Universe[e.Name]; ok {
+		if def.Master != nil && (s.ConstShadows == nil || !s.ConstShadows(e)) {
+			return RelationType(s.Reg, def)
+		}
+		if def.Master == nil {
+			return metatype()
+		}
 	}
 	// A top-level constant of the same name resolves through the constant scope —
 	// the lowering reads it through constRef, before the implicit-self fallback —
@@ -487,6 +522,12 @@ func (s BodyScope) typeMemberValue(e *ast.MemberExpr) (ir.Type, bool) {
 	// namespace-qualified one (geo.Item).
 	if recv, ok := e.Receiver.(*ast.Identifier); ok && s.shadows(recv.Name) {
 		return ir.Invalid, false
+	}
+	// A namespace-qualified master name in value position is its relation — the
+	// qualified twin of the bare master name, on which where and count are methods.
+	// The bare reading is identifierLeaf's; this is the imported one.
+	if def := QualifiedTypeDef(s.Qualified, s.valueShadows, e); def != nil && def.Master != nil {
+		return RelationType(s.Reg, def), true
 	}
 	if t := typeMemberType(s.Reg, s.Universe, s.Qualified, s.valueShadows, e); t != ir.Invalid {
 		return t, true

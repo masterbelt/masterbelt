@@ -22,6 +22,7 @@ func TestRefEdgeCoverage(t *testing.T) {
 		"StaticCall":      true,
 		"EnumMemberValue": true,
 		"AssocConstValue": true,
+		"MasterRelation":  true,
 	}
 	for _, v := range ir.ValueKinds() {
 		ty := reflect.TypeOf(v).Elem()

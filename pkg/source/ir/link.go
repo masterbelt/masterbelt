@@ -349,7 +349,7 @@ func (l *linker) linkIf(s *If) {
 // every case is the form's edge list, so the length is the case count, not
 // control complexity (the Lexer.Next class of exception).
 //
-//nolint:funlen // a flat exhaustive dispatch over the 25 sealed Value forms:
+//nolint:funlen,gocyclo // a flat exhaustive dispatch over the 26 sealed Value forms:
 func (l *linker) linkValue(p *Value) {
 	switch v := (*p).(type) {
 	case nil, *Unresolved, *RelationCount:
@@ -434,6 +434,9 @@ func (l *linker) linkValue(p *Value) {
 		l.linkValue(&v.Upper)
 		l.linkType(&v.Type)
 	case *NullValue:
+		l.linkType(&v.Type)
+	case *MasterRelation:
+		l.resolveTypeDef(&v.Master)
 		l.linkType(&v.Type)
 	case *EnumMemberValue:
 		l.resolveTypeDef(&v.Def)

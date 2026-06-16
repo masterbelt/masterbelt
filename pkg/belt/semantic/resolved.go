@@ -14,6 +14,7 @@ import (
 
 	"github.com/masterbelt/masterbelt/pkg/belt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/belt/types"
+	"github.com/masterbelt/masterbelt/pkg/belt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
@@ -304,6 +305,10 @@ func (w resolutionWriter) valueLeaf(v ir.Value, bd bindings) {
 		// A relation count's type is the integer the count yields, fixed at
 		// lowering; there is no checker fact to settle (no overload, no adaptation).
 		v.Type = &ir.Builtin{Name: builtin.NameNint}
+	case *ir.MasterRelation:
+		// A master relation's type is relation<its master>, derived from the master
+		// it denotes — there is no checker fact to settle.
+		v.Type = infer.RelationType(w.reg, v.Master)
 	default:
 		// The composite forms have explicit arms in value; a form reaching
 		// here without a case above was never given a write-back rule — fail

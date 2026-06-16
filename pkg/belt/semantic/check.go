@@ -396,6 +396,35 @@ func checkMasterValidations(def *ir.TypeDef, bs infer.BodyScope, noSelf func(ast
 			}
 		}
 	}
+	if diags != nil {
+		reportValidateAllRelationQueries(def, at, diags)
+	}
+}
+
+// reportValidateAllRelationQueries rejects a relation query (a where/count chain
+// over a master, which lowers a MasterRelation into the check) in a validate all
+// check: the per-table data fold evaluates an all check with the table's row count,
+// not by running a relation query against the loaded rows, so a filtered count
+// there would silently miscount. Until the data layer drives such a query, the
+// check is reported rather than accepted — the data is only loaded against a clean
+// schema, so this error keeps the loader from folding the unevaluable chain to a
+// spurious failure. A bare count (the relation's row count, no MasterRelation) is
+// the supported form and is left untouched.
+func reportValidateAllRelationQueries(def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
+	for _, check := range def.Master.AllChecks {
+		relational := false
+		ir.WalkValues(check.Cond, func(v ir.Value) bool {
+			if _, ok := v.(*ir.MasterRelation); ok {
+				relational = true
+				return false
+			}
+			return true
+		})
+		if relational && check.Syntax != nil {
+			s := at(check.Syntax)
+			diags.Add(newMasterValidateAllRelationUnsupportedDiagnostic(s.offset, s.width, def.Name))
+		}
+	}
 }
 
 // checkFuncBodies type-checks each function body's returned value against the

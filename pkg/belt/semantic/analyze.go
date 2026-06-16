@@ -281,15 +281,30 @@ func classifyRefCallee(fileID FileID, e *ast.CallExpr, q queries, funcCallee map
 				staticCallee[callee] = true
 			case types.IsMetatypeMethod(q.universe(fileID)[builtin.NameType], callee.Member.Name):
 				staticCallee[callee] = true
+			case isMasterDef(q.universe(fileID)[recv.Name]):
+				// A master in value position is its relation, so a call of a name that
+				// is not one of its static fns is a relation method (Cards.where(...),
+				// Cards.count()): it calls a method of the relation value, not a member
+				// of the master type, so it is exempt from the type-member check the
+				// same way a static or metatype call is.
+				staticCallee[callee] = true
 			}
-		} else if isQualifiedTypeReceiver(fileID, callee.Receiver, q) &&
-			types.IsMetatypeMethod(q.universe(fileID)[builtin.NameType], callee.Member.Name) {
-			// A metatype method call on a bare qualified type value (geo.Item ==
-			// geo.Item, desugared to geo.Item.eql(geo.Item)) calls the reified type
-			// value's equality, not a member of the qualified type itself, so it is
-			// exempt from the type-member reference check exactly as the local
-			// Level.eql(long) form above is.
-			staticCallee[callee] = true
+		} else if def := qualifiedTypeReceiverDef(fileID, callee.Receiver, q); def != nil {
+			switch {
+			case types.IsMetatypeMethod(q.universe(fileID)[builtin.NameType], callee.Member.Name):
+				// A metatype method call on a bare qualified type value (geo.Item ==
+				// geo.Item, desugared to geo.Item.eql(geo.Item)) calls the reified type
+				// value's equality, not a member of the qualified type itself, so it is
+				// exempt from the type-member reference check exactly as the local
+				// Level.eql(long) form above is.
+				staticCallee[callee] = true
+			case isMasterDef(def):
+				// A qualified master in value position is its relation (geo.Cards), so a
+				// call of a name that is not one of its static fns is a relation method
+				// (geo.Cards.where(...), geo.Cards.count()): the qualified twin of the
+				// bare-name relation method above, exempt the same way.
+				staticCallee[callee] = true
+			}
 		}
 	}
 }
@@ -333,20 +348,26 @@ func walkRefsMember(fileID FileID, e *ast.MemberExpr, q queries, onMember, onTyp
 // member is one of its exported types — so a further member off it (geo.Item.id)
 // is a qualified type-member reference rather than an ordinary expression.
 func isQualifiedTypeReceiver(fileID FileID, recv ast.Expr, q queries) bool {
+	return qualifiedTypeReceiverDef(fileID, recv, q) != nil
+}
+
+// qualifiedTypeReceiverDef resolves a namespace-qualified type-name receiver
+// (geo.Item) to the type definition it names, or nil when recv is not one — not a
+// member access, the namespace name shadowed by a value (geo a local or const, so
+// geo.Item is a value field read), or the member not an exported type.
+func qualifiedTypeReceiverDef(fileID FileID, recv ast.Expr, q queries) *ir.TypeDef {
 	m, ok := recv.(*ast.MemberExpr)
 	if !ok {
-		return false
+		return nil
 	}
 	ns, ok := m.Receiver.(*ast.Identifier)
 	if !ok {
-		return false
+		return nil
 	}
-	// A value of the namespace's name shadows the import (geo a local or const), so
-	// geo.Item is then a value field read, not a qualified type.
 	if q.resolve(fileID, ns) != nil {
-		return false
+		return nil
 	}
-	return qualifiedFrom(q, q.importsOf(fileID))(ns.Name, m.Member.Name) != nil
+	return qualifiedFrom(q, q.importsOf(fileID))(ns.Name, m.Member.Name)
 }
 
 // isTypeName reports whether an identifier names a type in its file — and no
@@ -359,6 +380,13 @@ func isTypeName(fileID FileID, id *ast.Identifier, q queries) bool {
 	}
 	_, ok := q.universe(fileID)[id.Name]
 	return ok
+}
+
+// isMasterDef reports whether a definition is a master — the kind whose value-
+// position form is its relation, so a non-static member call on it is a relation
+// method rather than a member of the type.
+func isMasterDef(def *ir.TypeDef) bool {
+	return def != nil && def.Master != nil
 }
 
 // isNamespace reports whether an identifier names a namespace import in its
