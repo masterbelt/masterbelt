@@ -3,6 +3,7 @@ package sqlite_test
 import (
 	"testing"
 
+	"github.com/masterbelt/masterbelt/pkg/belt/eval"
 	"github.com/masterbelt/masterbelt/pkg/belt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/belt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/master"
@@ -11,30 +12,34 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
-// chainOf resolves a probe whose body is a relation query and returns the resolved
-// chain value — the count()/where() method-call chain over the master relation that
-// the driver evaluates.
-func chainOf(t *testing.T, src, fileID, fnName string) ir.Value {
+// chainOf resolves the probe function of a single-file source and returns the
+// resolved chain value of its return — the count()/where() method-call chain over
+// the master relation that the driver evaluates — together with the file's fold
+// environment, which resolves the named constants a where predicate compares
+// against.
+func chainOf(t *testing.T, src string) (ir.Value, eval.GraphEnv) {
 	t.Helper()
+	const fileID = semantic.FileID("cards.belt")
 	prog := semantic.NewProgram()
-	prog.SetFile(semantic.FileID(fileID), abstract.NewDocument([]byte(src)), nil)
+	prog.SetFile(fileID, abstract.NewDocument([]byte(src)), nil)
 	prog.Refresh()
-	if diags := prog.Diagnostics(semantic.FileID(fileID)); len(diags) != 0 {
+	if diags := prog.Diagnostics(fileID); len(diags) != 0 {
 		t.Fatalf("query did not type-check: %v", diags)
 	}
-	m := prog.Module(semantic.FileID(fileID))
+	env := prog.EvalEnv(fileID)
+	m := prog.Module(fileID)
 	for _, f := range m.Funcs {
-		if f.Name != fnName {
+		if f.Name != "probe" {
 			continue
 		}
 		for _, s := range f.Body {
 			if r, ok := s.(*ir.Return); ok && r.Value != nil {
-				return r.Value
+				return r.Value, env
 			}
 		}
 	}
-	t.Fatalf("no chain resolved for %q", fnName)
-	return nil
+	t.Fatal("no chain resolved for probe")
+	return nil, nil
 }
 
 // TestRelationDriverRejectsBlockLambda pins that a where lambda with block control
@@ -44,9 +49,63 @@ func chainOf(t *testing.T, src, fileID, fnName string) ir.Value {
 func TestRelationDriverRejectsBlockLambda(t *testing.T) {
 	const src = "master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n" +
 		"fn probe(): nint {\n  return Cards.where(fn(c) {\n    if c.id > 0 {\n      return c.cost < 30\n    }\n    return c.cost > 10\n  }).count()\n}\n"
-	chain := chainOf(t, src, "cards.belt", "probe")
-	if _, _, _, ok := mastersql.CountRelation(chain); ok {
+	chain, env := chainOf(t, src)
+	if _, _, _, ok := mastersql.CountRelation(chain, env); ok {
 		t.Fatal("a block-control-flow where lambda must not be recognized as a simple count chain")
+	}
+}
+
+// TestRelationDriverFoldsConstOperands pins that a where predicate compared against
+// a data-independent operand — a named constant or an arithmetic expression — runs:
+// the driver folds the operand to a constant via the fold environment before
+// lowering, since Lower binds only literals. The column comparison and the count
+// stay; only the value side collapses. Each query runs against the loaded rows.
+func TestRelationDriverFoldsConstOperands(t *testing.T) {
+	const masterSrc = "master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n" +
+		"const MIN_COST = 30\n"
+	fields := []ir.Field{builtinField("id", "int"), builtinField("cost", "int")}
+	table := master.Table{Columns: []string{"id", "cost"}, Rows: []master.Row{
+		introw(2, 1, 10),
+		introw(3, 2, 20),
+		introw(4, 3, 40),
+		introw(5, 4, 99),
+	}}
+	eng, err := sqlite.Load(fields, table)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	defer closeEngine(t, eng)
+
+	cases := []struct {
+		name, body string
+		want       int64
+	}{
+		{"named constant", "Cards.where(fn(c) -> c.cost < MIN_COST).count()", 2},               // 10, 20
+		{"arithmetic", "Cards.where(fn(c) -> c.cost < 50 + 49).count()", 3},                    // 10, 20, 40 (< 99)
+		{"constant and arithmetic", "Cards.where(fn(c) -> c.cost < MIN_COST + 70).count()", 4}, // < 100
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			src := masterSrc + "fn probe(): nint {\n  return " + tc.body + "\n}\n"
+			chain, env := chainOf(t, src)
+			rel, m, unsupported, ok := mastersql.CountRelation(chain, env)
+			if !ok {
+				t.Fatalf("driver did not recognize the count chain")
+			}
+			if len(unsupported) != 0 {
+				t.Fatalf("operand did not fold to a literal: %+v", unsupported)
+			}
+			if m == nil || m.Name != "Cards" {
+				t.Fatalf("chain master = %v, want Cards", m)
+			}
+			got, err := eng.Count(rel)
+			if err != nil {
+				t.Fatalf("Count: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("count = %d, want %d", got, tc.want)
+			}
+		})
 	}
 }
 
@@ -60,8 +119,8 @@ func TestRelationDriverRejectsBlockLambda(t *testing.T) {
 func TestRelationDriverSeesThroughNestedAdapt(t *testing.T) {
 	const src = "master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n" +
 		"fn probe(): short | error {\n  return Cards.where(fn(c) -> c.cost < 30).count()\n}\n"
-	chain := chainOf(t, src, "cards.belt", "probe")
-	rel, m, unsupported, ok := mastersql.CountRelation(chain)
+	chain, env := chainOf(t, src)
+	rel, m, unsupported, ok := mastersql.CountRelation(chain, env)
 	if !ok {
 		t.Fatal("the driver must see a count chain through nested Adapt wrappers")
 	}
@@ -122,8 +181,8 @@ func TestRelationDriverCount(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			src := masterSrc + "fn probe(): nint {\n  return " + tc.body + "\n}\n"
-			chain := chainOf(t, src, "cards.belt", "probe")
-			rel, m, unsupported, ok := mastersql.CountRelation(chain)
+			chain, env := chainOf(t, src)
+			rel, m, unsupported, ok := mastersql.CountRelation(chain, env)
 			if !ok {
 				t.Fatalf("driver did not recognize the count chain")
 			}
