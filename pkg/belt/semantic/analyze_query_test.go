@@ -158,21 +158,22 @@ func TestMasterNameResolvesToRelation(t *testing.T) {
 }
 
 // TestRelationSumResolves pins the sum aggregate's type: sum selects a numeric
-// column and yields that column's element type, so Cards.sum(fn(c) -> c.cost) and a
-// filtered sum settle to the column's type; a non-numeric column is rejected by the
-// selector's T: numeric bound rather than type-checking and failing the lowering.
+// column and yields the arbitrary-precision nint (a sum can exceed the column's own
+// range, so the result widens to hold it), so Cards.sum(fn(c) -> c.cost) and a
+// filtered sum settle to nint; a non-numeric column is rejected by the selector's
+// T: numeric bound rather than type-checking and failing the lowering.
 func TestRelationSumResolves(t *testing.T) {
 	for _, body := range []string{
 		"Cards.sum(fn(c) -> c.cost)",
 		"Cards.where(fn(c) -> c.cost > 0).sum(fn(c) -> c.cost)",
 	} {
-		src := queryCardsMaster + "fn probe(): int {\n  return " + body + "\n}\n"
+		src := queryCardsMaster + "fn probe(): nint {\n  return " + body + "\n}\n"
 		m, diags := analyze(src)
 		if len(diags) != 0 {
 			t.Fatalf("%q: unexpected diagnostics: %v", body, codes(diags))
 		}
-		if got := probeReturnType(m); got == nil || got.String() != "int" {
-			t.Errorf("%q: return type = %v, want int", body, got)
+		if got := probeReturnType(m); got == nil || got.String() != "nint" {
+			t.Errorf("%q: return type = %v, want nint", body, got)
 		}
 	}
 	// A non-numeric column violates the sum selector's numeric bound.

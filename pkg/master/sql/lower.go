@@ -283,23 +283,22 @@ func (l *lowering) overrides(v ir.Value, method string) bool {
 }
 
 // sqlSummable reports whether a column of element type T can be summed by the
-// engine's plain SQL sum() and read back as the column's type. It is true only for a
-// fixed-width signed-or-small integer the engine reads into an int64 faithfully, with
-// no refinement and no custom arithmetic. The exclusions:
+// engine's plain SQL sum() and read back through the int64 the engine scans. The
+// result type is the arbitrary-precision nint, so a sum that exceeds the column's own
+// range is well-typed; what this guards is the engine's int64 read, not the result
+// type. It is true for a fixed-width integer the engine scans faithfully. The
+// exclusions:
 //
 //   - a type that declares its own add — a user-defined numeric whose arithmetic SQL
 //     would not carry, the same exclusion the comparison lowering makes for a custom
 //     operator;
 //   - an arbitrary-precision (nint/nuint) or 64-bit unsigned (ulong) underlying
-//     builtin, whose sum (or even a single cell, for ulong) can exceed the int64 the
-//     engine reads the scalar into — reached through an alias too (type Big = nint),
-//     so the underlying builtin is unwrapped before the check;
-//   - a refinement anywhere in the chain (type Positive = int where self > 0), since
-//     an empty relation sums to zero, and that manufactured zero need not satisfy the
-//     refinement.
+//     builtin, whose values or sum can exceed the int64 the engine scans — reached
+//     through an alias too (type Big = nint), so the underlying builtin is unwrapped
+//     before the check.
 //
 // A column the sum cannot honor is rejected rather than summed with the wrong
-// arithmetic, a truncated total, or a value that violates its type.
+// arithmetic or a truncated total.
 func sqlSummable(elem ir.Type) bool {
 	t := nonNullType(elem)
 	if declaresMethod(t, "add") {
@@ -316,9 +315,6 @@ func sqlSummable(elem ir.Type) bool {
 				return false
 			}
 			seen[def] = true
-			if def.Where != nil {
-				return false
-			}
 			if def.Builtin {
 				return summableBuiltin(def.Name)
 			}

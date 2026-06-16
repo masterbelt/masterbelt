@@ -138,7 +138,7 @@ func TestRelationDriverSum(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			src := masterSrc + "fn probe(): int {\n  return " + tc.body + "\n}\n"
+			src := masterSrc + "fn probe(): nint {\n  return " + tc.body + "\n}\n"
 			chain, env := chainOf(t, src)
 			rel, col, m, unsupported, ok := mastersql.SumRelation(chain, env)
 			if !ok {
@@ -164,23 +164,21 @@ func TestRelationDriverSum(t *testing.T) {
 	}
 }
 
-// TestRelationDriverRejectsUnsummableColumn pins that a sum the SQL aggregate cannot
-// faithfully run is reported unsupported (the caller treats any Unsupported as a
-// rejection) rather than summed into int64 with a wrong, truncated, or type-violating
-// result. Each column passes the selector's numeric bound at the checker but is
-// caught here: an arbitrary-precision column and its alias (the sum can exceed
-// int64), a 64-bit unsigned column (likewise), and a refinement (whose empty-relation
-// zero need not satisfy the where).
+// TestRelationDriverRejectsUnsummableColumn pins that a sum the engine's int64-scanned
+// SQL sum cannot hold is reported unsupported (the caller treats any Unsupported as a
+// rejection) rather than summed with a wrong or truncated total. Each column passes
+// the selector's numeric bound at the checker but is caught here: an arbitrary-
+// precision column and its alias (values or sum exceed int64) and a 64-bit unsigned
+// column (likewise). A fixed-width column — including a refinement of one — is
+// summable, since the nint result holds the total.
 func TestRelationDriverRejectsUnsummableColumn(t *testing.T) {
 	cases := map[string]string{
 		"arbitrary precision": "master Cards {\n  record { id: int, v: nint }\n  primary id\n}\n" +
 			"fn probe(): nint {\n  return Cards.sum(fn(c) -> c.v)\n}\n",
 		"alias of arbitrary precision": "pub type Big = nint\nmaster Cards {\n  record { id: int, v: Big }\n  primary id\n}\n" +
-			"fn probe(): Big {\n  return Cards.sum(fn(c) -> c.v)\n}\n",
+			"fn probe(): nint {\n  return Cards.sum(fn(c) -> c.v)\n}\n",
 		"64-bit unsigned": "master Cards {\n  record { id: int, v: ulong }\n  primary id\n}\n" +
-			"fn probe(): ulong {\n  return Cards.sum(fn(c) -> c.v)\n}\n",
-		"refinement": "pub type Positive = int where self > 0\nmaster Cards {\n  record { id: int, v: Positive }\n  primary id\n}\n" +
-			"fn probe(): Positive {\n  return Cards.sum(fn(c) -> c.v)\n}\n",
+			"fn probe(): nint {\n  return Cards.sum(fn(c) -> c.v)\n}\n",
 	}
 	for name, src := range cases {
 		t.Run(name, func(t *testing.T) {
