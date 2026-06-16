@@ -52,10 +52,44 @@ func MethodResult(reg *builtin.Registry, recv ir.Type, method string, args []ir.
 		return ir.Invalid
 	}
 	sel := matches[0]
+	if _, bound := MethodBoundViolation(reg, sel.Method, sel.Subst, recv); bound != nil {
+		return ir.Invalid
+	}
 	if _, isSelf := sel.Method.Result.(*ir.SelfType); isSelf {
 		return sel.Operand
 	}
 	return Substitute(sel.Method.Result, sel.Subst)
+}
+
+// MethodBoundViolation returns the first type-parameter bound the selected method
+// overload's solution violates — with the bound resolved by the solution — or a nil
+// bound when every bound holds. A method does not list its type parameters the way a
+// function signature does; their bounds live on the TypeVars in its parameter types,
+// so they are gathered from there and each solved substitution checked against its
+// bound. It is the one rule both the type-level MethodResult and the AST-driven
+// checker run, so a bounded method cannot be type-checked one way and not the other.
+//
+// The bound is resolved by the solution before the check: a bound that names
+// another solved variable — accept<T: Box<U>> on Host<int> — is verified as Box<int>
+// rather than the unresolved Box<U>, and a bound that names self — f<T: Box<self>> —
+// is verified against the receiver type recv rather than the unresolved self. A
+// solution that is itself a type variable is checked through its own bound
+// (Satisfies maps a TypeVar to its bound), so a generic call h.take(u) with an
+// unbounded u is rejected rather than silently accepted.
+func MethodBoundViolation(reg *builtin.Registry, m *ir.Method, subst map[string]ir.Type, recv ir.Type) (solved, bound ir.Type) {
+	for _, p := range m.Params {
+		for _, tv := range BoundedTypeVars(p.Type) {
+			t, ok := subst[tv.Name]
+			if !ok {
+				continue
+			}
+			b := SubstituteSelf(Substitute(tv.Bound, subst), recv)
+			if !Satisfies(reg, t, b) {
+				return t, b
+			}
+		}
+	}
+	return nil, nil
 }
 
 // BindReceiver finds a method on the receiver's type and starts the

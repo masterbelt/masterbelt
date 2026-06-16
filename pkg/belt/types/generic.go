@@ -376,6 +376,48 @@ func interfaceParamSubst(iface ir.Type, def *ir.TypeDef) map[string]ir.Type {
 	return subst
 }
 
+// BoundedTypeVars collects, in first-seen order, each distinct constrained type
+// variable in t's structure — a TypeVar carrying a Bound. It is how a generic
+// method's type-parameter bounds are recovered for the bound check: a method does
+// not list its type parameters (unlike a function signature), so their bounds live
+// on the TypeVars embedded in its parameter and result types, and this walk gathers
+// them. The walk mirrors HasTypeVar so the two cannot drift as composite type forms
+// are added.
+func BoundedTypeVars(t ir.Type) []*ir.TypeVar {
+	var out []*ir.TypeVar
+	seen := map[string]bool{}
+	var walk func(ir.Type)
+	walk = func(t ir.Type) {
+		switch t := t.(type) {
+		case *ir.TypeVar:
+			if t.Bound != nil && !seen[t.Name] {
+				seen[t.Name] = true
+				out = append(out, t)
+			}
+			walk(t.Bound)
+		case *ir.App:
+			for _, a := range t.Args {
+				walk(a)
+			}
+		case *ir.Func:
+			for _, p := range t.Params {
+				walk(p)
+			}
+			walk(t.Result)
+		case *ir.Union:
+			for _, m := range t.Members {
+				walk(m)
+			}
+		case *ir.Record:
+			for _, f := range t.Fields {
+				walk(f.Type)
+			}
+		}
+	}
+	walk(t)
+	return out
+}
+
 // HasTypeVar reports whether t still contains a type variable anywhere in its
 // structure — a generic part no context has pinned to a concrete type. It is
 // the one walk the checker's inference holes and the interpreter's

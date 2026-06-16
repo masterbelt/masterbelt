@@ -172,6 +172,15 @@ func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method str
 	if bad {
 		return ir.Invalid
 	}
+	// A generic method's type-parameter bound is checked here — the method twin of
+	// resolveFuncResult's check, which only the function-call path runs. The rule is
+	// shared with the type-level MethodResult, so a numeric sum selector's column
+	// must be numeric (not a string column the SQL sum cannot add) whichever path
+	// types the call.
+	if solved, bound := types.MethodBoundViolation(reg, m, subst, recv); bound != nil {
+		sink.boundNotSatisfied(e, solved, bound)
+		return ir.Invalid
+	}
 	if _, isSelf := m.Result.(*ir.SelfType); isSelf {
 		// The settled type-variable solution — the receiver's bindings plus what
 		// the argument matching solved — streamed out for the IR write-back
