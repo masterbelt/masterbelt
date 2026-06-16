@@ -68,10 +68,16 @@ func whereBody(v ir.Value) (ir.Value, bool) {
 	return r.Value, true
 }
 
-// unwrap sees a value through the Adapt an accepted conversion wraps it in.
+// unwrap sees a value through the Adapt wrappers an accepted conversion adds. It
+// peels every layer: a value adapted to a type that needs nested coercions — a
+// count widened to short and then tagged into short | error — carries more than one
+// Adapt, and a single strip would leave an inner Adapt that hides the call chain.
 func unwrap(v ir.Value) ir.Value {
-	if a, ok := v.(*ir.Adapt); ok {
-		return a.Value
+	for {
+		a, ok := v.(*ir.Adapt)
+		if !ok {
+			return v
+		}
+		v = a.Value
 	}
-	return v
 }

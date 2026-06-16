@@ -50,6 +50,47 @@ func TestRelationDriverRejectsBlockLambda(t *testing.T) {
 	}
 }
 
+// TestRelationDriverSeesThroughNestedAdapt pins that the driver recognizes a count
+// chain wrapped in more than one Adapt — the shape write-back produces when the
+// query's result is coerced through nested adaptations, e.g. returning it from a
+// function declared with a union type (short | error): the count widens to short
+// and then tags into the union, so the chain is Adapt(Adapt(count(...))). The
+// recognizer must peel every Adapt; a single strip would leave an inner Adapt that
+// hides the call and reject a valid type-checked query.
+func TestRelationDriverSeesThroughNestedAdapt(t *testing.T) {
+	const src = "master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n" +
+		"fn probe(): short | error {\n  return Cards.where(fn(c) -> c.cost < 30).count()\n}\n"
+	chain := chainOf(t, src, "cards.belt", "probe")
+	rel, m, unsupported, ok := mastersql.CountRelation(chain)
+	if !ok {
+		t.Fatal("the driver must see a count chain through nested Adapt wrappers")
+	}
+	if len(unsupported) != 0 {
+		t.Fatalf("predicate did not lower: %+v", unsupported)
+	}
+	if m == nil || m.Name != "Cards" {
+		t.Fatalf("chain master = %v, want Cards", m)
+	}
+	fields := []ir.Field{builtinField("id", "int"), builtinField("cost", "int")}
+	table := master.Table{Columns: []string{"id", "cost"}, Rows: []master.Row{
+		introw(2, 1, 10),
+		introw(3, 2, 20),
+		introw(4, 3, 40),
+	}}
+	eng, err := sqlite.Load(fields, table)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	defer closeEngine(t, eng)
+	got, err := eng.Count(rel)
+	if err != nil {
+		t.Fatalf("Count: %v", err)
+	}
+	if got != 2 { // cost 10, 20
+		t.Errorf("count = %d, want 2", got)
+	}
+}
+
 // TestRelationDriverCount is the query driver's end-to-end proof: a relation query
 // written in source (Cards.where(...).count(), and the unfiltered Cards.count()) is
 // resolved to a chain, the driver recognizes it and lowers the where predicate to a
