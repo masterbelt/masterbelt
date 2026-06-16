@@ -1284,12 +1284,13 @@ func (p *parser) finishMethodDecl(children []cst.Green) *cst.Node {
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // an effect keyword
 	}
-	if nameLike(p.peekSignificant()) {
+	if methodName(p.peekSignificant()) {
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // the method name (a keyword is a
 		// usable method name here, the same way it is a member name after "." — the
 		// position after fn is unambiguous, so `fn where(...)` declares the method a
-		// `r.where(...)` call reaches).
+		// `r.where(...)` call reaches). A declaration marker (pub/extern/fn/effect) is
+		// not a name, so `fn pub()` is rejected rather than read as an unnamed method.
 	} else {
 		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
 	}
@@ -1383,13 +1384,24 @@ func (p *parser) parseParam(requireType bool) *cst.Node {
 	return cst.NewNode(cst.Param, children)
 }
 
+// methodName reports whether kind can be a method's name: an identifier or a
+// reserved word that is not a declaration marker (pub/extern/fn/an effect). A
+// keyword names a method the same way it names a member after "." or a parameter —
+// `fn where(): nint` — while a marker stays structural, so `fn pub()` is rejected.
+func methodName(kind token.Kind) bool {
+	return kind == token.Ident || (kind.Keyword() && !kind.MethodMarker())
+}
+
 // startsMethod reports whether kind can begin a method declaration inside an
-// impl block.
+// impl block — a marker (pub/extern/fn/an effect) or the name itself, which may be
+// an identifier or a non-marker keyword (the fn-less instance method `where(): T`).
+// An associated constant is dispatched before this, so a leading const is not seen
+// here as a method named const.
 func startsMethod(kind token.Kind) bool {
 	switch kind {
-	case token.Pub, token.Extern, token.Fn, token.Ident:
+	case token.Pub, token.Extern, token.Fn:
 		return true
 	default:
-		return kind.Effect() // a method may begin with its effect list
+		return kind.Effect() || methodName(kind)
 	}
 }

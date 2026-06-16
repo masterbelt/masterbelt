@@ -84,6 +84,7 @@
 (field name: ["assert" "async" "await" "builtin" "const" "else" "enum" "extern" "false" "fn" "for" "from" "if" "impl" "in" "interface" "io" "let" "match" "nondet" "null" "of" "pub" "return" "self" "switch" "true" "type" "use" "where"] @property)
 (record_field name: ["assert" "async" "await" "builtin" "const" "else" "enum" "extern" "false" "fn" "for" "from" "if" "impl" "in" "interface" "io" "let" "match" "nondet" "null" "of" "pub" "return" "self" "switch" "true" "type" "use" "where"] @property)
 (param name: ["assert" "async" "await" "builtin" "const" "else" "enum" "extern" "false" "fn" "for" "from" "if" "impl" "in" "interface" "io" "let" "match" "nondet" "null" "of" "pub" "return" "self" "switch" "true" "type" "use" "where"] @variable.parameter)
+(method_decl name: ["assert" "async" "await" "builtin" "const" "else" "enum" "extern" "false" "fn" "for" "from" "if" "impl" "in" "interface" "io" "let" "match" "nondet" "null" "of" "pub" "return" "self" "switch" "true" "type" "use" "where"] @function.method)
 
 (call_expr callee: (value_ref (identifier) @function))
 (call_expr callee: (member_expr member: (identifier) @function.method))

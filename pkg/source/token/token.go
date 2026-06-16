@@ -313,6 +313,20 @@ func (k Kind) Effect() bool {
 	return k == Io || k == Async || k == Nondet
 }
 
+// MethodMarker reports whether the keyword is a declaration marker that precedes a
+// method's name — pub, extern, fn, or an effect — rather than a name itself. A
+// method name may be any other reserved word (fn where(...)), but not one of these:
+// the grammar consumes them structurally before the name, so admitting one there
+// would shadow the marker and leave the method unnamed.
+func (k Kind) MethodMarker() bool {
+	switch k {
+	case Pub, Extern, Fn, Io, Async, Nondet:
+		return true
+	default:
+		return false
+	}
+}
+
 // Keyword reports whether the kind is one of the reserved-word keyword kinds
 // (the contiguous Const..In run). It is the predicate that lets a keyword be
 // read as a plain identifier where the grammar makes one unambiguous — a member

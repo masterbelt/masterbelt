@@ -171,11 +171,11 @@ func keywordAlternation() string {
 
 // nameKeywordRules colour a reserved word used as a name as that name's role
 // rather than as the keyword: a member after "." is a property, a type-position
-// projection a type, a record field or record-literal field a property, and a
-// parameter a parameter — the _name positions of the grammar. They are emitted
-// after the keyword block so the role colour wins (later patterns win in
-// tree-sitter), the query twin of semantic.go classifying a keyword in a name
-// position by its parent.
+// projection a type, a record field or record-literal field a property, a
+// parameter a parameter, and a method declaration's name a method — the _name
+// positions of the grammar. They are emitted after the keyword block so the role
+// colour wins (later patterns win in tree-sitter), the query twin of semantic.go
+// classifying a keyword in a name position by its parent.
 func nameKeywordRules(kw string) []highlightRule {
 	return []highlightRule{
 		{pattern: "(member_expr member: " + kw + " %s)\n", category: catProperty},
@@ -183,6 +183,7 @@ func nameKeywordRules(kw string) []highlightRule {
 		{pattern: "(field name: " + kw + " %s)\n", category: catProperty},
 		{pattern: "(record_field name: " + kw + " %s)\n", category: catProperty},
 		{pattern: "(param name: " + kw + " %s)\n", category: catParameter},
+		{pattern: "(method_decl name: " + kw + " %s)\n", category: catMethod},
 	}
 }
 

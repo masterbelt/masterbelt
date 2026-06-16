@@ -687,10 +687,10 @@ func lowerMethod(t cst.Tree, buf source.Buffer) *ast.MethodDecl {
 			default:
 				// A keyword in the name position — `fn where(...)` — is a usable
 				// method name, read the same as an Ident (the parser accepts it
-				// there). The fn keyword itself, and the punctuation, set no name;
-				// pub/extern/the effects have their own cases above, so the only
-				// keyword that reaches here before the name is fn, excluded here.
-				if name == "" && tok.Kind() != token.Fn && tok.Kind().Keyword() {
+				// there). A declaration marker (fn, and the effects below in their own
+				// cases) is structural, not a name; pub/extern have their own cases
+				// above. So only a non-marker keyword in the name slot sets the name.
+				if name == "" && tok.Kind().Keyword() && !tok.Kind().MethodMarker() {
 					name = child.Text(buf)
 				}
 			}
