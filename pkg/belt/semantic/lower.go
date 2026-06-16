@@ -596,10 +596,14 @@ func (b bodyBinder) leafIdentifier(e *ast.Identifier) ir.Value {
 			return &ir.Reference{Target: c, Syntax: e}
 		}
 	}
-	// A bare type name reifies to a type value (long == long, the receiver of a
-	// metatype method call) — the same reading the constant binder gives it, so a
-	// body and a const agree, and the metatype comparison folds.
+	// A bare master name is its relation — the value the query operations are
+	// methods on; every other bare type name reifies to a type value (long == long,
+	// the receiver of a metatype method call), the same reading the constant binder
+	// gives it, so a body and a const agree and the metatype comparison folds.
 	if def, ok := b.r.Defs[e.Name]; ok {
+		if def.Master != nil {
+			return &ir.MasterRelation{Master: def, Syntax: e}
+		}
 		return &ir.TypeValue{Reified: reifyType(def), Syntax: e}
 	}
 	// Last resort: a bare name that resolves no other way reads a readable member

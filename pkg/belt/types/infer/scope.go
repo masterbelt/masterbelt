@@ -170,10 +170,13 @@ func (s constScope) leaf(e ast.Expr) ir.Type {
 		if target := s.env.Resolve(e); target != nil {
 			return s.env.TypeOf(target)
 		}
-		// A bare type name in value position is a compile-time type value, of type
-		// `type` (the metatype): const x = int8. A value of that name (a constant)
-		// wins above, so only a name resolving to a type alone reaches here.
-		if _, ok := s.universe()[e.Name]; ok {
+		// A bare master name in value position is its relation; every other bare
+		// type name is a compile-time type value of type `type` (the metatype):
+		// const x = int8. A value of that name (a constant) wins above.
+		if def, ok := s.universe()[e.Name]; ok {
+			if def.Master != nil {
+				return RelationType(s.registry(), def)
+			}
 			return metatype()
 		}
 	case *ast.MemberExpr:
@@ -295,6 +298,18 @@ const RelationCountName = "count"
 // the RelationCount node with it and the checker types the bare count to it, so
 // the two agree.
 func RelationCountType() ir.Type { return &ir.Builtin{Name: "nint"} }
+
+// RelationType builds relation<master> — the relation algebra's relation of a
+// master's rows, the type a master in value position has (the value a bare master
+// name denotes, on which the query operations are methods). It is ir.Invalid when
+// the registry has no relation type (a degraded prelude).
+func RelationType(reg *builtin.Registry, master *ir.TypeDef) ir.Type {
+	def, ok := reg.Lookup(builtin.NameRelation)
+	if !ok {
+		return ir.Invalid
+	}
+	return &ir.App{Def: def, Args: []ir.Type{&ir.Named{Def: master}}}
+}
 
 // Body infers the type of a method-body expression: self, a parameter, a
 // literal, a record field access, a type conversion (T(x)), or a method call
@@ -444,10 +459,14 @@ func (s BodyScope) identifierLeaf(e *ast.Identifier) ir.Type {
 		}
 		return ir.Invalid
 	}
-	// A bare type name in value position is a compile-time type value, of the
-	// metatype `type` — the same reading the constant scope gives it, so a body
-	// (let t = sbyte, long == long) types it identically.
-	if _, ok := s.Universe[e.Name]; ok {
+	// A bare master name in value position is its relation — the set of all its
+	// rows, on which the query operations (where, count) are methods. Every other
+	// bare type name in value position is a compile-time type value of the metatype
+	// `type` — the same reading the constant scope gives it.
+	if def, ok := s.Universe[e.Name]; ok {
+		if def.Master != nil {
+			return RelationType(s.Reg, def)
+		}
 		return metatype()
 	}
 	// A top-level constant of the same name resolves through the constant scope —

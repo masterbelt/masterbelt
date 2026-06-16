@@ -163,10 +163,11 @@ type graphCtx struct {
 	relationCount *ir.Constant
 }
 
-// unfoldable folds the two values the evaluator does not reduce on its own: an
-// await (an effectful suspension point, never foldable) and a relation count (the
-// row count, foldable only when the data layer supplied it for a per-table check
-// via relationCount; nil — unevaluable — otherwise).
+// unfoldable folds the values the evaluator does not reduce on its own: an await
+// (an effectful suspension point, never foldable), a relation count (the row count,
+// foldable only when the data layer supplied it for a per-table check via
+// relationCount), and a master relation (a query base the query driver evaluates
+// against the loaded data, never the belt evaluator) — nil, unevaluable, otherwise.
 func (ctx graphCtx) unfoldable(v ir.Value) *ir.Constant {
 	if _, ok := v.(*ir.RelationCount); ok {
 		return ctx.relationCount
@@ -270,7 +271,7 @@ func graphValueRaw(v ir.Value, ctx graphCtx) *ir.Constant {
 		return graphFieldAccess(v, sub)
 	case *ir.Conversion:
 		return graphConvert(v, sub)
-	case *ir.Await, *ir.RelationCount:
+	case *ir.Await, *ir.RelationCount, *ir.MasterRelation:
 		return ctx.unfoldable(v)
 	case *ir.Apply:
 		return graphApplyCallee(v, sub)

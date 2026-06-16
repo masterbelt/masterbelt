@@ -24,11 +24,11 @@ func WalkValues(v Value, fn func(Value) bool) {
 	case *Adapt:
 		WalkValues(v.Value, fn)
 	case *IntLiteral, *StringLiteral, *BoolLiteral, *DatetimeLiteral,
-		*DurationLiteral, *NullValue, *RelationCount, *SelfValue, *ParamRef, *LocalRef,
+		*DurationLiteral, *NullValue, *RelationCount, *MasterRelation, *SelfValue, *ParamRef, *LocalRef,
 		*Reference, *EnumMemberValue, *AssocConstValue, *TypeValue, *Unresolved:
 		// Leaves: nothing beneath (a type value's Reified is a type, not a value;
 		// an unresolved placeholder carries only its name; a relation count's master
-		// is contextual, not a child value).
+		// is contextual, not a child value; a master relation's master is a type ref).
 	case *CollectionLiteral:
 		for _, e := range v.Entries {
 			walkAll(fn, e.Key, e.Value)

@@ -31,6 +31,33 @@ func probeReturnType(m *ir.Module) ir.Type {
 	return nil
 }
 
+// TestMasterNameResolvesToRelation pins that a master in value position is its
+// relation: Cards.where(fn(c) -> ...).count() and Cards.count() resolve to nint,
+// the query operations resolving as methods on relation<Cards>. A name that is one
+// of the master's static fns still resolves as a static call (it is not shadowed by
+// the relation methods).
+func TestMasterNameResolvesToRelation(t *testing.T) {
+	const m = "master Cards {\n  record { id: int, cost: int } impl {\n    pub static fn zero(): nint {\n      return 0\n    }\n  }\n  primary id\n}\n"
+	cases := []struct{ name, body string }{
+		{"filtered count", "Cards.where(fn(c) -> c.cost < 0).count()"},
+		{"unfiltered count", "Cards.count()"},
+		{"chained where", "Cards.where(fn(c) -> c.cost < 0).where(fn(c) -> c.id > 0).count()"},
+		{"static fn still resolves", "Cards.zero()"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			src := m + "fn probe(): nint {\n  return " + tc.body + "\n}\n"
+			out, diags := analyze(src)
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", codes(diags))
+			}
+			if got := probeReturnType(out); got == nil || got.String() != "nint" {
+				t.Errorf("return type = %v, want nint", got)
+			}
+		})
+	}
+}
+
 // TestRelationWhereCountResolves pins the relation type algebra: where narrows a
 // relation<M> by a predicate (its lambda binds the columns of M and returns a
 // predicate<M> — a column comparison, not a bool) and itself returns a relation<M>,

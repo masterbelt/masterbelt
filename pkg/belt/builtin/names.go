@@ -31,6 +31,7 @@ const (
 	NameColumn    = "column"
 	NamePredicate = "predicate"
 	NameColumns   = "columns"
+	NameRelation  = "relation"
 )
 
 // The canonical operator-method names every operand type shares: the

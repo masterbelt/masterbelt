@@ -62,6 +62,7 @@ func ValueKinds() []Value {
 		&RangeLit{},
 		&NullValue{},
 		&RelationCount{},
+		&MasterRelation{},
 		&EnumMemberValue{},
 		&AssocConstValue{},
 		&TypeValue{},

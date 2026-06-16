@@ -561,6 +561,14 @@ func staticCallType(e *ast.CallExpr, member *ast.MemberExpr, s scope, sink *Sink
 	}
 	sigs := staticSigs(def, member.Member.Name)
 	if len(sigs) == 0 {
+		// A master in value position is its relation, so a call of a name that is
+		// not one of its static fns is a relation method (Cards.where(...),
+		// Cards.count()): defer to the method-call path, which types the receiver as
+		// relation<M> and resolves the method there, rather than reporting a missing
+		// static fn.
+		if def.Master != nil {
+			return ir.Invalid, false
+		}
 		// The receiver names a type but it has no static fn of that name. This is
 		// the static call's own unknown — an enum member or associated constant of
 		// the same name is a value (handled by the leaf), so reaching here means a

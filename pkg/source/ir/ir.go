@@ -501,6 +501,20 @@ type RelationCount struct {
 
 func (*RelationCount) value() {}
 
+// MasterRelation is a master used in query position: the relation of all its rows,
+// the value a bare master name (Cards) denotes where a value is expected. Master is
+// the master definition whose rows it is; Type is relation<Master>. The query
+// operations (where, count) are method calls on it, and the query driver evaluates
+// the chain against the master's loaded data — the belt evaluator cannot, having no
+// data — so a compile-time fold leaves it standing.
+type MasterRelation struct {
+	Master *TypeDef `tree:"ref"`
+	Type   Type
+	Syntax ast.Expr `tree:"-"`
+}
+
+func (*MasterRelation) value() {}
+
 // EnumMemberValue is a resolved reference to an enum member, whether written
 // qualified (Rarity.Common) or bare (Common, under an enum expectation). Def is
 // the enum definition and Index the member's position within it; the name and
@@ -527,7 +541,7 @@ func (*EnumMemberValue) value() {}
 // one case = one field read, so the length is the case count, not control
 // complexity (the Lexer.Next class of exception).
 //
-//nolint:funlen // a flat exhaustive dispatch over the 26 sealed Value forms:
+//nolint:funlen,gocyclo // a flat exhaustive dispatch over the 27 sealed Value forms:
 func TypeOf(v Value) Type {
 	switch v := v.(type) {
 	case nil:
@@ -581,6 +595,8 @@ func TypeOf(v Value) Type {
 		return v.Type
 	case *RelationCount:
 		return v.Type
+	case *MasterRelation:
+		return v.Type
 	case *EnumMemberValue:
 		return v.Type
 	case *AssocConstValue:
@@ -606,7 +622,7 @@ func TypeOf(v Value) Type {
 // silently anchoring nowhere.
 // one case = one anchor read (the Lexer.Next class of exception).
 //
-//nolint:funlen // a flat exhaustive dispatch over the 26 sealed Value forms:
+//nolint:funlen,gocyclo // a flat exhaustive dispatch over the 27 sealed Value forms:
 func SyntaxOf(v Value) ast.Expr {
 	switch v := v.(type) {
 	case nil:
@@ -658,6 +674,8 @@ func SyntaxOf(v Value) ast.Expr {
 	case *NullValue:
 		return exprOrNil(v.Syntax)
 	case *RelationCount:
+		return v.Syntax // already the interface form; nil stays nil
+	case *MasterRelation:
 		return v.Syntax // already the interface form; nil stays nil
 	case *EnumMemberValue:
 		return v.Syntax // already the interface form; nil stays nil

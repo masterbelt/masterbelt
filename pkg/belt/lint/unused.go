@@ -123,6 +123,8 @@ func (mk *marker) visit(n ir.Value) bool {
 		mk.reachType(n.Def)
 	case *ir.AssocConstValue:
 		mk.reachType(n.Def)
+	case *ir.MasterRelation:
+		mk.reachType(n.Master)
 	}
 	mk.reachTypeRef(ir.TypeOf(n))
 	return true
