@@ -1,6 +1,8 @@
 package sqlite_test
 
 import (
+	"math"
+	"math/big"
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/belt/eval"
@@ -157,10 +159,42 @@ func TestRelationDriverSum(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Sum: %v", err)
 			}
-			if got != tc.want {
-				t.Errorf("sum = %d, want %d", got, tc.want)
+			if got.Cmp(big.NewInt(tc.want)) != 0 {
+				t.Errorf("sum = %s, want %d", got, tc.want)
 			}
 		})
+	}
+}
+
+// TestRelationDriverSumWidensBeyondInt64 pins that a sum is accumulated in arbitrary
+// precision, not scanned from SQLite's int64 sum(): a long column whose total exceeds
+// int64 (long.Max + 1) is summed to the exact wider value the nint result type
+// promises, where SQLite's own sum() would raise an integer-overflow error.
+func TestRelationDriverSumWidensBeyondInt64(t *testing.T) {
+	const src = "master Cards {\n  record { id: int, big: long }\n  primary id\n}\n" +
+		"fn probe(): nint {\n  return Cards.sum(fn(c) -> c.big)\n}\n"
+	chain, env := chainOf(t, src)
+	rel, col, _, unsupported, ok := mastersql.SumRelation(chain, env)
+	if !ok || len(unsupported) != 0 {
+		t.Fatalf("a long column must be summable: ok=%v unsupported=%+v", ok, unsupported)
+	}
+	fields := []ir.Field{builtinField("id", "int"), builtinField("big", "long")}
+	table := master.Table{Columns: []string{"id", "big"}, Rows: []master.Row{
+		introw(2, 1, math.MaxInt64),
+		introw(3, 2, 1),
+	}}
+	eng, err := sqlite.Load(fields, table)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	defer closeEngine(t, eng)
+	got, err := eng.Sum(rel, col)
+	if err != nil {
+		t.Fatalf("Sum: %v", err)
+	}
+	want := new(big.Int).Add(big.NewInt(math.MaxInt64), big.NewInt(1)) // 2^63, beyond int64
+	if got.Cmp(want) != 0 {
+		t.Errorf("sum = %s, want %s (the total widened beyond int64)", got, want)
 	}
 }
 

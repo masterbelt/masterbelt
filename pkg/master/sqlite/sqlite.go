@@ -146,20 +146,34 @@ func (e *Engine) Count(rel mastersql.Relation) (int64, error) {
 	return n, nil
 }
 
-// Sum runs the relation's sum of a column against the loaded rows and returns the
-// scalar — the aggregate twin of Count, over the same relation-to-SQL the sql
-// package renders. An empty relation sums to zero (the SQL COALESCEs NULL away).
-func (e *Engine) Sum(rel mastersql.Relation, column string) (int64, error) {
-	query, binds := rel.SumSQL(column, tableName, dialect)
+// Sum reads the relation's rows for a column and accumulates their total in
+// arbitrary precision — the aggregate twin of Count, over the same relation-to-SQL.
+// SQLite's own sum() overflows the int64 it returns (long.Max + 1 is a runtime
+// error), while the relation's sum widens to nint, so the engine sums the cell
+// values itself rather than asking SQL for the total. A NULL cell is skipped, as
+// SQL's sum does; an empty relation sums to zero.
+func (e *Engine) Sum(rel mastersql.Relation, column string) (*big.Int, error) {
+	query, binds := rel.ColumnSQL(column, tableName, dialect)
 	args, err := bindArgs(binds)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	var n int64
-	if err := e.db.QueryRow(query, args...).Scan(&n); err != nil {
-		return 0, err
+	rows, err := e.db.Query(query, args...)
+	if err != nil {
+		return nil, err
 	}
-	return n, nil
+	defer func() { _ = rows.Close() }()
+	total := new(big.Int)
+	for rows.Next() {
+		var v sql.NullInt64
+		if err := rows.Scan(&v); err != nil {
+			return nil, err
+		}
+		if v.Valid {
+			total.Add(total, big.NewInt(v.Int64))
+		}
+	}
+	return total, rows.Err()
 }
 
 // create builds the single table from the loaded columns. A master always

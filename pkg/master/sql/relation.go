@@ -39,13 +39,14 @@ func (r Relation) CountSQL(table string, d Dialect) (string, []Bind) {
 	return sel + " WHERE " + frag, r.where.Binds()
 }
 
-// SumSQL renders the sum of a column over the relation's rows for a dialect, with
-// the filter as a WHERE clause when the relation has one. An empty relation — no
-// matching rows — sums to zero rather than SQL's NULL (COALESCE wraps the sum), so
-// the result is the column's numeric zero; the column's numeric-ness is the
-// checker's guarantee. The binds are the filter's, positional and dialect-neutral.
-func (r Relation) SumSQL(column, table string, d Dialect) (string, []Bind) {
-	sel := "SELECT COALESCE(sum(" + d.QuoteIdent(column) + "), 0) FROM " + d.QuoteIdent(table)
+// ColumnSQL renders a projection of one column over the relation's rows for a
+// dialect, with the filter as a WHERE clause when the relation has one. The engine
+// reads the column's values to accumulate an aggregate (a sum) in arbitrary
+// precision itself rather than asking SQL for the total: SQL's integer sum overflows
+// the fixed-width scalar it returns, while the relation's sum widens to nint. The
+// binds are the filter's, positional and dialect-neutral.
+func (r Relation) ColumnSQL(column, table string, d Dialect) (string, []Bind) {
+	sel := "SELECT " + d.QuoteIdent(column) + " FROM " + d.QuoteIdent(table)
 	frag := r.where.SQL(d)
 	if frag == "" {
 		return sel, nil
