@@ -281,6 +281,13 @@ func classifyRefCallee(fileID FileID, e *ast.CallExpr, q queries, funcCallee map
 				staticCallee[callee] = true
 			case types.IsMetatypeMethod(q.universe(fileID)[builtin.NameType], callee.Member.Name):
 				staticCallee[callee] = true
+			case isMasterDef(q.universe(fileID)[recv.Name]):
+				// A master in value position is its relation, so a call of a name that
+				// is not one of its static fns is a relation method (Cards.where(...),
+				// Cards.count()): it calls a method of the relation value, not a member
+				// of the master type, so it is exempt from the type-member check the
+				// same way a static or metatype call is.
+				staticCallee[callee] = true
 			}
 		} else if isQualifiedTypeReceiver(fileID, callee.Receiver, q) &&
 			types.IsMetatypeMethod(q.universe(fileID)[builtin.NameType], callee.Member.Name) {
@@ -359,6 +366,13 @@ func isTypeName(fileID FileID, id *ast.Identifier, q queries) bool {
 	}
 	_, ok := q.universe(fileID)[id.Name]
 	return ok
+}
+
+// isMasterDef reports whether a definition is a master — the kind whose value-
+// position form is its relation, so a non-static member call on it is a relation
+// method rather than a member of the type.
+func isMasterDef(def *ir.TypeDef) bool {
+	return def != nil && def.Master != nil
 }
 
 // isNamespace reports whether an identifier names a namespace import in its

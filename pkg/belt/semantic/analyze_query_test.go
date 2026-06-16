@@ -12,9 +12,8 @@ const queryCardsMaster = "master Cards {\n" +
 	"  primary id\n" +
 	"}\n"
 
-// probeReturnType is the resolved type of the value the probe function's single
-// return yields — the type the query algebra settled the body expression to.
-func probeReturnType(m *ir.Module) ir.Type {
+// probeReturn is the resolved value the probe function's single return yields.
+func probeReturn(m *ir.Module) ir.Value {
 	if m == nil {
 		return nil
 	}
@@ -24,11 +23,59 @@ func probeReturnType(m *ir.Module) ir.Type {
 		}
 		for _, s := range f.Body {
 			if r, ok := s.(*ir.Return); ok && r.Value != nil {
-				return ir.TypeOf(r.Value)
+				return r.Value
 			}
 		}
 	}
 	return nil
+}
+
+// probeReturnType is the resolved type of the value the probe function's single
+// return yields — the type the query algebra settled the body expression to.
+func probeReturnType(m *ir.Module) ir.Type {
+	if v := probeReturn(m); v != nil {
+		return ir.TypeOf(v)
+	}
+	return nil
+}
+
+// TestRelationCountInValidateAll pins that a relation count over a master name is
+// not mistaken for a type-member access in a validate all assertion: the reference
+// walk treats Item.where/Item.count as relation methods, so no unknown_associated_const
+// is reported for a checker-accepted relation query. (The data-layer evaluation of
+// such a check is a following slice; this pins the reference/type agreement.)
+func TestRelationCountInValidateAll(t *testing.T) {
+	src := "master Item {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Item.where(fn(c) -> c.power > 10).count() < 50\n    }\n  }\n}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, "belt.semantic.unknown_associated_const") {
+		t.Fatalf("a relation method must not be reported as a type member: %v", codes(diags))
+	}
+}
+
+// TestConstShadowsMaster pins that a top-level constant of a master's name shadows
+// the master in value position — matching the lowering, which resolves the constant
+// reference, not the relation. The checker must agree: were it to type the name as
+// relation<Cards>, that would mismatch the declared nint and report a diagnostic the
+// lowering's constant reference contradicts.
+func TestConstShadowsMaster(t *testing.T) {
+	src := "master Cards {\n  record { id: int }\n  primary id\n}\n" +
+		"const Cards = 5\n" +
+		"fn probe(): nint {\n  return Cards\n}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics (the constant should shadow the master): %v", codes(diags))
+	}
+	r := probeReturn(m)
+	if r == nil {
+		t.Fatal("probe has no resolved return value")
+	}
+	if _, ok := r.(*ir.MasterRelation); ok {
+		t.Fatalf("Cards resolved to the relation; the shadowing constant must win")
+	}
+	if _, ok := r.(*ir.Reference); !ok {
+		t.Errorf("Cards resolved to %T, want the constant *ir.Reference", r)
+	}
 }
 
 // TestMasterNameResolvesToRelation pins that a master in value position is its

@@ -461,12 +461,16 @@ func (s BodyScope) identifierLeaf(e *ast.Identifier) ir.Type {
 	// A bare master name in value position is its relation — the set of all its
 	// rows, on which the query operations (where, count) are methods. Every other
 	// bare type name in value position is a compile-time type value of the metatype
-	// `type` — the same reading the constant scope gives it.
+	// `type` — the same reading the constant scope gives it. A top-level constant of
+	// the same name shadows the master (the lowering resolves the constant first), so
+	// the relation reading applies only when no constant shadows the name.
 	if def, ok := s.Universe[e.Name]; ok {
-		if def.Master != nil {
+		if def.Master != nil && (s.ConstShadows == nil || !s.ConstShadows(e)) {
 			return RelationType(s.Reg, def)
 		}
-		return metatype()
+		if def.Master == nil {
+			return metatype()
+		}
 	}
 	// A top-level constant of the same name resolves through the constant scope —
 	// the lowering reads it through constRef, before the implicit-self fallback —
