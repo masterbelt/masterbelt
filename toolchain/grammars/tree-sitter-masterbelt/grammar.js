@@ -290,7 +290,10 @@ module.exports = grammar({
         optional($.modifier),
         optional(kw.fn),
         repeat($.effect),
-        field("name", $.identifier),
+        // The name position after fn admits a reserved word as an ordinary
+        // identifier (fn where(...)), mirroring the real parser's nameLike — the
+        // method a `r.where(...)` call reaches.
+        field("name", $._name),
         optional($.generic_params),
         $.param_list,
         op.Colon,
@@ -307,7 +310,8 @@ module.exports = grammar({
     effect: ($) => choice(kw.io, kw.async, kw.nondet),
 
     // A name position the grammar reads a reserved word as an ordinary
-    // identifier: a member after ".", a record field name, a parameter name.
+    // identifier: a member after ".", a record field name, a parameter name, a
+    // method name.
     // It mirrors the real parser's nameLike — every keyword is admissible there
     // because the position begins no keyword construct (item.type, { type: ... },
     // fn(for: int)). The tree-sitter lexer extracts keywords eagerly, so each

@@ -1284,9 +1284,12 @@ func (p *parser) finishMethodDecl(children []cst.Green) *cst.Node {
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // an effect keyword
 	}
-	if p.peekSignificant() == token.Ident {
+	if nameLike(p.peekSignificant()) {
 		p.skipTrivia(&children)
-		children = append(children, p.bump()) // the method name
+		children = append(children, p.bump()) // the method name (a keyword is a
+		// usable method name here, the same way it is a member name after "." — the
+		// position after fn is unambiguous, so `fn where(...)` declares the method a
+		// `r.where(...)` call reaches).
 	} else {
 		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
 	}
