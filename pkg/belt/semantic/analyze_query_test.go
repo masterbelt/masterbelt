@@ -157,6 +157,42 @@ func TestMasterNameResolvesToRelation(t *testing.T) {
 	}
 }
 
+// TestRelationSumResolves pins the sum aggregate's type: sum selects a numeric
+// column and yields that column's element type, so Cards.sum(fn(c) -> c.cost) and a
+// filtered sum settle to the column's type. The selector binds the columns of M and
+// names the column to add, the same column-mode binding where uses.
+func TestRelationSumResolves(t *testing.T) {
+	for _, body := range []string{
+		"Cards.sum(fn(c) -> c.cost)",
+		"Cards.where(fn(c) -> c.cost > 0).sum(fn(c) -> c.cost)",
+	} {
+		src := queryCardsMaster + "fn probe(): int {\n  return " + body + "\n}\n"
+		m, diags := analyze(src)
+		if len(diags) != 0 {
+			t.Fatalf("%q: unexpected diagnostics: %v", body, codes(diags))
+		}
+		if got := probeReturnType(m); got == nil || got.String() != "int" {
+			t.Errorf("%q: return type = %v, want int", body, got)
+		}
+	}
+}
+
+// TestRelationSumRejectsNonNumericColumn pins that the sum selector's numeric bound
+// is enforced: summing a non-numeric column (a string, a bool) reports
+// bound_not_satisfied rather than type-checking and then failing the SQL lowering.
+// sum is the first bounded generic method, so this also pins that a method's
+// type-parameter bound is checked at the call — the method twin of the function
+// call's bound check, which the method path did not run before.
+func TestRelationSumRejectsNonNumericColumn(t *testing.T) {
+	for _, sel := range []string{"c.name"} {
+		src := queryCardsMaster + "fn probe(): string {\n  return Cards.sum(fn(c) -> " + sel + ")\n}\n"
+		_, diags := analyze(src)
+		if !hasCode(diags, "belt.semantic.bound_not_satisfied") {
+			t.Errorf("sum(%s): want bound_not_satisfied, got %v", sel, codes(diags))
+		}
+	}
+}
+
 // TestQualifiedMasterResolvesToRelation pins that a master reached through a
 // namespace import is its relation the same way a local master name is: an imported
 // deck.Cards.where(...).count() (and the unfiltered deck.Cards.count()) type-checks,

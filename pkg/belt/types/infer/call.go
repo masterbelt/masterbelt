@@ -172,6 +172,15 @@ func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method str
 	if bad {
 		return ir.Invalid
 	}
+	// A generic method's type-parameter bound is checked here — the method twin of
+	// resolveFuncResult's check, which only the function-call path runs. A method
+	// does not list its type parameters, so their bounds live on the TypeVars in its
+	// signature; the solved substitution must satisfy each (a numeric sum selector's
+	// column must be numeric, not a string column the SQL sum cannot add).
+	if solved, bound := methodBoundViolation(reg, m, subst); bound != nil {
+		sink.boundNotSatisfied(e, solved, bound)
+		return ir.Invalid
+	}
 	if _, isSelf := m.Result.(*ir.SelfType); isSelf {
 		// The settled type-variable solution — the receiver's bindings plus what
 		// the argument matching solved — streamed out for the IR write-back
@@ -196,6 +205,29 @@ func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method str
 	}
 	adaptedOperands(reg, e, recvExpr, recv, m, subst, operand, args, sink)
 	return result
+}
+
+// methodBoundViolation returns the first method type-parameter bound the selected
+// overload's solution violates, or nil bound when every bound holds. A method's
+// type parameters are not listed on ir.Method; their bounds live on the TypeVars in
+// its signature, so they are collected from the parameter and result types and each
+// solved substitution checked against its bound — the method twin of
+// resolveFuncResult's check. A variable no argument solved (or one still generic) is
+// left to the result's own uninferable handling rather than reported here.
+func methodBoundViolation(reg *builtin.Registry, m *ir.Method, subst map[string]ir.Type) (solved, bound ir.Type) {
+	for _, p := range m.Params {
+		for _, tv := range types.BoundedTypeVars(p.Type) {
+			t, ok := subst[tv.Name]
+			if !ok || hasTypeVar(t) {
+				// Unsolved or still generic — left to the result's uninferable handling.
+				continue
+			}
+			if !types.Satisfies(reg, t, tv.Bound) {
+				return t, tv.Bound
+			}
+		}
+	}
+	return nil, nil
 }
 
 // reportNoMethod handles the no-such-method arm of methodCallType: synthesize
