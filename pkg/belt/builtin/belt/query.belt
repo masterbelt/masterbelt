@@ -63,3 +63,20 @@ pub type predicate<M> = builtin<M> impl {
 /// column<M, fieldType> — the field's value type lifted into query mode — so a
 /// query names a column only through the binding, never through self.
 pub type columns<M> = builtin<M>
+
+/// A relation over master M's table: a set of its rows, the whole table or a
+/// subset. A master in query position is the relation of all its rows; where
+/// narrows it (the rows a predicate holds for) and an aggregate consumes it. The
+/// operations compose — where returns a relation, so they chain — and produce a
+/// value: count is the number of rows. Like the rest of the query algebra it is a
+/// `= builtin` with no native: a relation is not folded to a constant by the
+/// evaluator; the query driver evaluates it against the master's loaded data.
+pub type relation<M> = builtin<M> impl {
+  /// Narrow the relation to the rows the predicate holds for. The bound c is the
+  /// columns of M, and the result is a predicate<M> (a column condition), so the
+  /// narrowing is SQL-expressible by construction.
+  pub extern fn where(cond: fn(c: columns<M>): predicate<M>): relation<M>
+
+  /// The number of rows in the relation.
+  pub extern fn count(): nint
+}

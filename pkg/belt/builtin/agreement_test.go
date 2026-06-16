@@ -110,7 +110,7 @@ func TestEveryPureExternIsBacked(t *testing.T) {
 	// meaning. Growing this set is a deliberate act, not drift.
 	evalImplemented := map[string]bool{
 		"list": true, "map": true, "range": true,
-		"column": true, "predicate": true, "columns": true,
+		"column": true, "predicate": true, "columns": true, "relation": true,
 	}
 	for _, d := range defs {
 		if !d.Builtin {
