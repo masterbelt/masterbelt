@@ -141,7 +141,7 @@ module.exports = grammar({
         // static name(): T); get/set are spelled as readable members (X: T), so the
         // modifier is restricted here while reusing the shared Modifier node.
         optional(alias("static", $.modifier)),
-        field("name", $.identifier),
+        field("name", $._method_name),
         optional($.generic_params),
         optional($.param_list),
         op.Colon,
@@ -290,7 +290,10 @@ module.exports = grammar({
         optional($.modifier),
         optional(kw.fn),
         repeat($.effect),
-        field("name", $.identifier),
+        // The name position after fn admits a reserved word as an ordinary
+        // identifier (fn where(...)), mirroring the real parser's nameLike — the
+        // method a `r.where(...)` call reaches.
+        field("name", $._method_name),
         optional($.generic_params),
         $.param_list,
         op.Colon,
@@ -313,6 +316,18 @@ module.exports = grammar({
     // fn(for: int)). The tree-sitter lexer extracts keywords eagerly, so each
     // must be listed explicitly to be accepted here.
     _name: ($) => choice($.identifier, ...Object.values(lex.kw)),
+
+    // A method or interface-member name: like _name, but not a declaration marker
+    // (pub/extern/fn/an effect), which the grammar consumes structurally before the
+    // name — so `fn where(...)` names a method while `fn pub()` does not, following
+    // the real parser's methodName (which rejects the markers).
+    _method_name: ($) =>
+      choice(
+        $.identifier,
+        ...Object.entries(lex.kw)
+          .filter(([k]) => !["pub", "extern", "fn", "io", "async", "nondet"].includes(k))
+          .map(([, v]) => v),
+      ),
 
     param_list: ($) => seq(op.LParen, commaSep($.param), op.RParen),
 

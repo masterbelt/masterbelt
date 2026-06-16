@@ -379,6 +379,38 @@ func TestLowerMethodDoc(t *testing.T) {
 	}
 }
 
+// TestLowerKeywordMethodName checks that a reserved word names a method the same
+// way an identifier does — `fn where(...)` and the fn-less `where(...)` both lower
+// to a method named "where" (the name a r.where(...) call reaches) — while a
+// declaration marker is not a name: `fn pub(...)` is rejected rather than read as
+// an unnamed public method.
+func TestLowerKeywordMethodName(t *testing.T) {
+	t.Run("fn keyword name", func(t *testing.T) {
+		file, diags := Lower([]byte("type T = nint impl {\n  fn where(): nint {\n    return 0\n  }\n}\n"))
+		if len(diags) != 0 {
+			t.Fatalf("unexpected diagnostics: %v", diags)
+		}
+		if m := file.Types[0].Methods; len(m) != 1 || m[0].Name != "where" {
+			t.Fatalf("methods = %+v, want one method named where", m)
+		}
+	})
+	t.Run("fn-less keyword name", func(t *testing.T) {
+		file, diags := Lower([]byte("type T = nint impl {\n  where(): nint {\n    return 0\n  }\n}\n"))
+		if len(diags) != 0 {
+			t.Fatalf("unexpected diagnostics: %v", diags)
+		}
+		if m := file.Types[0].Methods; len(m) != 1 || m[0].Name != "where" {
+			t.Fatalf("methods = %+v, want one method named where", m)
+		}
+	})
+	t.Run("marker keyword is not a name", func(t *testing.T) {
+		_, diags := Lower([]byte("type T = nint impl {\n  fn pub(): nint {\n    return 0\n  }\n}\n"))
+		if len(diags) == 0 {
+			t.Fatal("want a diagnostic: a marker keyword (pub) is not a method name")
+		}
+	})
+}
+
 // TestLowerMethodKind checks the accessor/static modifier lowers to the
 // method's Kind, the name picks up the property name (not the modifier), and an
 // ordinary method stays MethodNormal.
@@ -462,6 +494,19 @@ func TestLowerInterfaceDecl(t *testing.T) {
 	count := iface.Members[1]
 	if count.Name != "count" || !count.Provided() || !count.Public {
 		t.Errorf("count = %+v, want a public provided member named count", count)
+	}
+}
+
+// TestLowerInterfaceKeywordMember pins that an interface method requirement may be
+// named with a reserved word, the same as a concrete method — so an interface can
+// require a keyword-named method that an impl declares (interface { where(): nint }).
+func TestLowerInterfaceKeywordMember(t *testing.T) {
+	file, diags := Lower([]byte("interface I {\n  where(): nint\n}\n"))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if m := file.Interfaces[0].Members; len(m) != 1 || m[0].Name != "where" {
+		t.Fatalf("members = %+v, want one required member named where", m)
 	}
 }
 

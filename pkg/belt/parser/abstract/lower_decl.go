@@ -685,8 +685,14 @@ func lowerMethod(t cst.Tree, buf source.Buffer) *ast.MethodDecl {
 					name = child.Text(buf)
 				}
 			default:
-				// Any other token (the "fn" keyword, parens, the "->" arrow)
-				// sets no field of the method: it is skipped.
+				// A keyword in the name position — `fn where(...)` — is a usable
+				// method name, read the same as an Ident (the parser accepts it
+				// there). A declaration marker (fn, and the effects below in their own
+				// cases) is structural, not a name; pub/extern have their own cases
+				// above. So only a non-marker keyword in the name slot sets the name.
+				if name == "" && tok.Kind().Keyword() && !tok.Kind().MethodMarker() {
+					name = child.Text(buf)
+				}
 			}
 			continue
 		}
@@ -821,8 +827,12 @@ func lowerInterfaceMember(t cst.Tree, buf source.Buffer) *ast.InterfaceMember {
 					name = child.Text(buf)
 				}
 			default:
-				// Any other token (the "fn" keyword, parens, the "->" arrow)
-				// sets no field of the interface member: it is skipped.
+				// A keyword in the name position names the member the same as an
+				// Ident (where(): nint); a declaration marker is structural, not a
+				// name. The fn keyword and the punctuation set no field either.
+				if name == "" && tok.Kind().Keyword() && !tok.Kind().MethodMarker() {
+					name = child.Text(buf)
+				}
 			}
 			continue
 		}

@@ -31,6 +31,71 @@ func probeReturnType(m *ir.Module) ir.Type {
 	return nil
 }
 
+// TestRelationWhereCountResolves pins the relation type algebra: where narrows a
+// relation<M> by a predicate (its lambda binds the columns of M and returns a
+// predicate<M> — a column comparison, not a bool) and itself returns a relation<M>,
+// so the operations chain; count consumes a relation to nint. A whole query
+// expression therefore settles to nint at the type level.
+func TestRelationWhereCountResolves(t *testing.T) {
+	src := queryCardsMaster +
+		"fn probe(r: relation<Cards>): nint {\n" +
+		"  return r.where(fn(c) -> c.cost < 0).count()\n" +
+		"}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	if got := probeReturnType(m); got == nil || got.String() != "nint" {
+		t.Errorf("return type = %v, want nint", got)
+	}
+}
+
+// TestRelationWhereChains pins that where returns a relation<M>, so the narrowings
+// compose: two where calls in a row each apply, and count consumes the result.
+func TestRelationWhereChains(t *testing.T) {
+	src := queryCardsMaster +
+		"fn probe(r: relation<Cards>): nint {\n" +
+		"  return r.where(fn(c) -> c.cost < 0).where(fn(c) -> c.name == \"x\").count()\n" +
+		"}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	if got := probeReturnType(m); got == nil || got.String() != "nint" {
+		t.Errorf("return type = %v, want nint", got)
+	}
+}
+
+// TestRelationCountResolves pins the unfiltered aggregate: count on a relation<M>
+// directly (no where) is nint.
+func TestRelationCountResolves(t *testing.T) {
+	src := queryCardsMaster +
+		"fn probe(r: relation<Cards>): nint {\n" +
+		"  return r.count()\n" +
+		"}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	if got := probeReturnType(m); got == nil || got.String() != "nint" {
+		t.Errorf("return type = %v, want nint", got)
+	}
+}
+
+// TestRelationWhereRejectsBoolLambda pins that where's lambda must return a
+// predicate<M>, not a bool — the same guarantee the column algebra gives, now at
+// the relation boundary: a plain bool condition is a type error.
+func TestRelationWhereRejectsBoolLambda(t *testing.T) {
+	src := queryCardsMaster +
+		"fn probe(r: relation<Cards>): nint {\n" +
+		"  return r.where(fn(c) -> true).count()\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if len(diags) == 0 {
+		t.Fatal("want a type error: where's lambda must return predicate<Cards>, not bool")
+	}
+}
+
 // TestColumnComparisonYieldsPredicate pins the core of the query algebra: a
 // comparison of a column<M,T> against a value or another column yields a
 // predicate<M>, and the logical operators compose predicates into a predicate —

@@ -290,7 +290,7 @@ func (p *parser) parseInterfaceDecl(lead []cst.Green) *cst.Node {
 			return cst.NewNode(cst.InterfaceDecl, children)
 		case p.peekSignificant() == token.EOF:
 			return cst.NewNode(cst.InterfaceDecl, children)
-		case p.peekSignificant() == token.Pub || p.peekSignificant() == token.Ident:
+		case p.peekSignificant() == token.Pub || methodName(p.peekSignificant()):
 			var lead []cst.Green
 			p.skipTrivia(&lead)
 			children = append(children, p.parseInterfaceMember(lead))
@@ -324,9 +324,10 @@ func (p *parser) parseInterfaceMember(lead []cst.Green) *cst.Node {
 		children = append(children, p.bump())
 	}
 	p.interfaceModifier(&children)
-	if p.peekSignificant() == token.Ident {
+	if methodName(p.peekSignificant()) {
 		p.skipTrivia(&children)
-		children = append(children, p.bump()) // the member name
+		children = append(children, p.bump()) // the member name (a reserved word
+		// names an interface member the same way it names a concrete method)
 	} else {
 		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
 	}
@@ -1284,9 +1285,13 @@ func (p *parser) finishMethodDecl(children []cst.Green) *cst.Node {
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // an effect keyword
 	}
-	if p.peekSignificant() == token.Ident {
+	if methodName(p.peekSignificant()) {
 		p.skipTrivia(&children)
-		children = append(children, p.bump()) // the method name
+		children = append(children, p.bump()) // the method name (a keyword is a
+		// usable method name here, the same way it is a member name after "." — the
+		// position after fn is unambiguous, so `fn where(...)` declares the method a
+		// `r.where(...)` call reaches). A declaration marker (pub/extern/fn/effect) is
+		// not a name, so `fn pub()` is rejected rather than read as an unnamed method.
 	} else {
 		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
 	}
@@ -1380,13 +1385,24 @@ func (p *parser) parseParam(requireType bool) *cst.Node {
 	return cst.NewNode(cst.Param, children)
 }
 
+// methodName reports whether kind can be a method's name: an identifier or a
+// reserved word that is not a declaration marker (pub/extern/fn/an effect). A
+// keyword names a method the same way it names a member after "." or a parameter —
+// `fn where(): nint` — while a marker stays structural, so `fn pub()` is rejected.
+func methodName(kind token.Kind) bool {
+	return kind == token.Ident || (kind.Keyword() && !kind.MethodMarker())
+}
+
 // startsMethod reports whether kind can begin a method declaration inside an
-// impl block.
+// impl block — a marker (pub/extern/fn/an effect) or the name itself, which may be
+// an identifier or a non-marker keyword (the fn-less instance method `where(): T`).
+// An associated constant is dispatched before this, so a leading const is not seen
+// here as a method named const.
 func startsMethod(kind token.Kind) bool {
 	switch kind {
-	case token.Pub, token.Extern, token.Fn, token.Ident:
+	case token.Pub, token.Extern, token.Fn:
 		return true
 	default:
-		return kind.Effect() // a method may begin with its effect list
+		return kind.Effect() || methodName(kind)
 	}
 }

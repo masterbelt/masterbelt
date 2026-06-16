@@ -190,14 +190,23 @@ func semanticTokensWith(doc *abstract.Document, isReadonlyConst, isFuncCallee, i
 		callee := calleeMemberGreen(node, t)
 		// In a dotted type name the head is the first name token; every name
 		// token after it is a projection segment (Order.customer.id), which a
-		// keyword segment colours by its role rather than as a keyword.
-		headSeen := false
+		// keyword segment colours by its role rather than as a keyword. A method
+		// declaration's name is the first name token that is not a marker
+		// (pub/extern/fn/effect) — `fn where(...)` — coloured the same way.
+		headSeen, methodNameSeen := false, false
 		for _, child := range t.Children() {
 			seg := false
-			if node.Kind() == cst.TypeName {
-				if tok, isTok := child.Token(); isTok && isNameToken(tok.Kind()) {
+			if tok, isTok := child.Token(); isTok && isNameToken(tok.Kind()) {
+				switch node.Kind() {
+				case cst.TypeName:
 					seg = headSeen
 					headSeen = true
+				case cst.MethodDecl:
+					if !methodNameSeen && !tok.Kind().MethodMarker() {
+						seg, methodNameSeen = true, true
+					}
+				default:
+					// Other nodes carry no name-token disambiguation here.
 				}
 			}
 			walk(child, node.Kind(), node, selfIsCallee, callee != nil && child.Green() == callee, seg)
@@ -320,7 +329,7 @@ func classifyToken(kind token.Kind, parent cst.Kind, calleeMember, typeNameSeg b
 		// same classification its identifier sibling would take. A bare type keyword
 		// (null/self/type as a TypeName head, not a projection segment) and every
 		// keyword elsewhere stay keyword.control, matching the cold-start grammar.
-		if isNamePosition(parent) || (parent == cst.TypeName && typeNameSeg) {
+		if isNamePosition(parent) || ((parent == cst.TypeName || parent == cst.MethodDecl) && typeNameSeg) {
 			return classifyIdent(parent, calleeMember)
 		}
 		return stKeyword, 0, true
