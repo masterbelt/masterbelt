@@ -79,4 +79,11 @@ pub type relation<M> = builtin<M> impl {
 
   /// The number of rows in the relation.
   pub extern fn count(): nint
+
+  /// The sum of a numeric column over the relation's rows. The selector binds the
+  /// columns of M and names the column to add (c.cost). The result is the
+  /// arbitrary-precision nint — a sum can exceed the column's own range, the same
+  /// widening SQL gives a sum — so it inhabits a type wide enough to hold it. An
+  /// empty relation sums to zero.
+  pub extern fn sum<T: numeric>(selector: fn(c: columns<M>): column<M, T>): nint
 }

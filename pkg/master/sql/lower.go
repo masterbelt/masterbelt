@@ -282,6 +282,64 @@ func (l *lowering) overrides(v ir.Value, method string) bool {
 	return declaresMethod(nonNullType(elem), method)
 }
 
+// sqlSummable reports whether a column of element type T can be summed by the
+// engine's plain SQL sum() and read back through the int64 the engine scans. The
+// result type is the arbitrary-precision nint, so a sum that exceeds the column's own
+// range is well-typed; what this guards is the engine's int64 read, not the result
+// type. It is true for a fixed-width integer the engine scans faithfully. The
+// exclusions:
+//
+//   - a type that declares its own add — a user-defined numeric whose arithmetic SQL
+//     would not carry, the same exclusion the comparison lowering makes for a custom
+//     operator;
+//   - an arbitrary-precision (nint/nuint) or 64-bit unsigned (ulong) underlying
+//     builtin, whose values or sum can exceed the int64 the engine scans — reached
+//     through an alias too (type Big = nint), so the underlying builtin is unwrapped
+//     before the check.
+//
+// A column the sum cannot honor is rejected rather than summed with the wrong
+// arithmetic or a truncated total.
+func sqlSummable(elem ir.Type) bool {
+	t := nonNullType(elem)
+	if declaresMethod(t, "add") {
+		return false
+	}
+	seen := map[*ir.TypeDef]bool{}
+	for {
+		switch x := t.(type) {
+		case *ir.Builtin:
+			return summableBuiltin(x.Name)
+		case *ir.Named:
+			def := x.Def
+			if def == nil || seen[def] {
+				return false
+			}
+			seen[def] = true
+			if def.Builtin {
+				return summableBuiltin(def.Name)
+			}
+			t = def.Body
+		default:
+			return false
+		}
+		if t == nil {
+			return false
+		}
+	}
+}
+
+// summableBuiltin reports whether a builtin numeric's plain SQL sum fits the int64
+// the engine reads it into: every integer but the arbitrary-precision ones and the
+// 64-bit unsigned, whose totals overflow a signed 64-bit result.
+func summableBuiltin(name string) bool {
+	switch name {
+	case builtin.NameNint, builtin.NameNuint, builtin.NameUlong:
+		return false
+	default:
+		return true
+	}
+}
+
 // nonNullType strips a null member from a union, yielding the single remaining
 // member — so a nullable type T | null is examined as T. A non-union, or a union
 // with more than one non-null member, is returned unchanged.

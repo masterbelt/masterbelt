@@ -8,6 +8,8 @@ package builtin
 // agreement test pins them together.
 const (
 	NameNint     = "nint"
+	NameNuint    = "nuint"
+	NameUlong    = "ulong"
 	NameBool     = "bool"
 	NameString   = "string"
 	NameList     = "list"

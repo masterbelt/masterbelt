@@ -24,8 +24,48 @@ func CountRelation(chain ir.Value, env eval.GraphEnv) (rel Relation, master *ir.
 	if !ok || len(count.Args) != 0 {
 		return Relation{}, nil, nil, false
 	}
+	return relationChain(count.Receiver, env)
+}
+
+// SumRelation recognizes a relation sum query — sum(fn(c) -> c.col) over a chain of
+// where narrowings over a master relation, the shape Cards.sum(fn(c) -> c.cost)
+// lowers to — and returns the Relation to sum, the column to add, the master it is
+// over, and any where predicates lowered to SQL. ok is false when the value is not
+// such a chain or the selector does not name a column. The numeric-ness of the
+// column is the checker's guarantee (the sum selector's T: numeric bound), so the
+// driver lowers the column unconditionally; env folds the where operands as in
+// CountRelation.
+func SumRelation(chain ir.Value, env eval.GraphEnv) (rel Relation, column string, master *ir.TypeDef, unsupported []Unsupported, ok bool) {
+	sum, ok := asCall(chain, "sum")
+	if !ok || len(sum.Args) != 1 {
+		return Relation{}, "", nil, nil, false
+	}
+	col, ok := selectorColumn(sum.Args[0])
+	if !ok {
+		return Relation{}, "", nil, nil, false
+	}
+	rel, master, unsupported, ok = relationChain(sum.Receiver, env)
+	if !ok {
+		return Relation{}, "", nil, nil, false
+	}
+	// The column's numeric-ness is the checker's bound; its summability by plain SQL
+	// is not. An arbitrary-precision column (the sum may exceed int64) or one whose
+	// type carries a custom add is rejected here, the aggregate twin of the
+	// comparison lowering's custom-operator guard, so the engine never sums it with
+	// the wrong arithmetic or a truncated total.
+	elem, _ := columnElem(col)
+	if !sqlSummable(elem) {
+		unsupported = append(unsupported, Unsupported{Node: col, Reason: "sum of this column type"})
+	}
+	return rel, col.Field, master, unsupported, ok
+}
+
+// relationChain walks the where-narrowing chain over a master relation that an
+// aggregate sits on — [where(fn(c)->pred)]* over MasterRelation — accumulating the
+// lowered filter. It is shared by every aggregate (count, sum), so they recognize
+// the same relation shape and lower the same where predicates.
+func relationChain(recv ir.Value, env eval.GraphEnv) (rel Relation, master *ir.TypeDef, unsupported []Unsupported, ok bool) {
 	rel = All()
-	recv := count.Receiver
 	for {
 		switch r := unwrap(recv).(type) {
 		case *ir.MasterRelation:
@@ -46,6 +86,26 @@ func CountRelation(chain ir.Value, env eval.GraphEnv) (rel Relation, master *ir.
 			return Relation{}, nil, nil, false
 		}
 	}
+}
+
+// selectorColumn returns the single column reference a sum selector names (the c.cost
+// of fn(c) -> c.cost). It requires the arrow-lambda shape whereBody requires and a
+// body that is a column<M, T> field access, so a selector that computes a value
+// rather than naming a column is not recognized. The field access carries the
+// column's name and its element type, both of which the caller reads.
+func selectorColumn(v ir.Value) (*ir.FieldAccess, bool) {
+	body, ok := whereBody(v)
+	if !ok {
+		return nil, false
+	}
+	fa, ok := unwrap(body).(*ir.FieldAccess)
+	if !ok {
+		return nil, false
+	}
+	if _, ok := columnElem(fa); !ok {
+		return nil, false
+	}
+	return fa, true
 }
 
 // foldOperands replaces every data-independent subexpression of a predicate with

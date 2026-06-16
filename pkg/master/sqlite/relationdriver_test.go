@@ -1,6 +1,8 @@
 package sqlite_test
 
 import (
+	"math"
+	"math/big"
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/belt/eval"
@@ -104,6 +106,120 @@ func TestRelationDriverFoldsConstOperands(t *testing.T) {
 			}
 			if got != tc.want {
 				t.Errorf("count = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestRelationDriverSum is the sum aggregate's end-to-end proof: a relation sum
+// written in source (Cards.sum(fn(c) -> c.cost), filtered, and over an empty result)
+// is resolved to a chain, the driver recognizes it and reads the summed column and
+// the where filter, and the engine — loaded with the master's rows — runs the SQL
+// sum and returns the scalar. An empty relation sums to zero.
+func TestRelationDriverSum(t *testing.T) {
+	const masterSrc = "master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n"
+	fields := []ir.Field{builtinField("id", "int"), builtinField("cost", "int")}
+	table := master.Table{Columns: []string{"id", "cost"}, Rows: []master.Row{
+		introw(2, 1, 10),
+		introw(3, 2, 20),
+		introw(4, 3, 40),
+	}}
+	eng, err := sqlite.Load(fields, table)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	defer closeEngine(t, eng)
+
+	cases := []struct {
+		name, body string
+		want       int64
+	}{
+		{"unfiltered", "Cards.sum(fn(c) -> c.cost)", 70},
+		{"filtered", "Cards.where(fn(c) -> c.cost < 30).sum(fn(c) -> c.cost)", 30}, // 10 + 20
+		{"empty is zero", "Cards.where(fn(c) -> c.cost > 999).sum(fn(c) -> c.cost)", 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			src := masterSrc + "fn probe(): nint {\n  return " + tc.body + "\n}\n"
+			chain, env := chainOf(t, src)
+			rel, col, m, unsupported, ok := mastersql.SumRelation(chain, env)
+			if !ok {
+				t.Fatalf("driver did not recognize the sum chain")
+			}
+			if len(unsupported) != 0 {
+				t.Fatalf("predicate did not lower: %+v", unsupported)
+			}
+			if m == nil || m.Name != "Cards" {
+				t.Fatalf("chain master = %v, want Cards", m)
+			}
+			if col != "cost" {
+				t.Fatalf("summed column = %q, want cost", col)
+			}
+			got, err := eng.Sum(rel, col)
+			if err != nil {
+				t.Fatalf("Sum: %v", err)
+			}
+			if got.Cmp(big.NewInt(tc.want)) != 0 {
+				t.Errorf("sum = %s, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestRelationDriverSumWidensBeyondInt64 pins that a sum is accumulated in arbitrary
+// precision, not scanned from SQLite's int64 sum(): a long column whose total exceeds
+// int64 (long.Max + 1) is summed to the exact wider value the nint result type
+// promises, where SQLite's own sum() would raise an integer-overflow error.
+func TestRelationDriverSumWidensBeyondInt64(t *testing.T) {
+	const src = "master Cards {\n  record { id: int, big: long }\n  primary id\n}\n" +
+		"fn probe(): nint {\n  return Cards.sum(fn(c) -> c.big)\n}\n"
+	chain, env := chainOf(t, src)
+	rel, col, _, unsupported, ok := mastersql.SumRelation(chain, env)
+	if !ok || len(unsupported) != 0 {
+		t.Fatalf("a long column must be summable: ok=%v unsupported=%+v", ok, unsupported)
+	}
+	fields := []ir.Field{builtinField("id", "int"), builtinField("big", "long")}
+	table := master.Table{Columns: []string{"id", "big"}, Rows: []master.Row{
+		introw(2, 1, math.MaxInt64),
+		introw(3, 2, 1),
+	}}
+	eng, err := sqlite.Load(fields, table)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	defer closeEngine(t, eng)
+	got, err := eng.Sum(rel, col)
+	if err != nil {
+		t.Fatalf("Sum: %v", err)
+	}
+	want := new(big.Int).Add(big.NewInt(math.MaxInt64), big.NewInt(1)) // 2^63, beyond int64
+	if got.Cmp(want) != 0 {
+		t.Errorf("sum = %s, want %s (the total widened beyond int64)", got, want)
+	}
+}
+
+// TestRelationDriverRejectsUnsummableColumn pins that a sum the engine's int64-scanned
+// SQL sum cannot hold is reported unsupported (the caller treats any Unsupported as a
+// rejection) rather than summed with a wrong or truncated total. Each column passes
+// the selector's numeric bound at the checker but is caught here: an arbitrary-
+// precision column and its alias (values or sum exceed int64) and a 64-bit unsigned
+// column (likewise). A fixed-width column — including a refinement of one — is
+// summable, since the nint result holds the total.
+func TestRelationDriverRejectsUnsummableColumn(t *testing.T) {
+	cases := map[string]string{
+		"arbitrary precision": "master Cards {\n  record { id: int, v: nint }\n  primary id\n}\n" +
+			"fn probe(): nint {\n  return Cards.sum(fn(c) -> c.v)\n}\n",
+		"alias of arbitrary precision": "pub type Big = nint\nmaster Cards {\n  record { id: int, v: Big }\n  primary id\n}\n" +
+			"fn probe(): nint {\n  return Cards.sum(fn(c) -> c.v)\n}\n",
+		"64-bit unsigned": "master Cards {\n  record { id: int, v: ulong }\n  primary id\n}\n" +
+			"fn probe(): nint {\n  return Cards.sum(fn(c) -> c.v)\n}\n",
+	}
+	for name, src := range cases {
+		t.Run(name, func(t *testing.T) {
+			chain, env := chainOf(t, src)
+			_, _, _, unsupported, ok := mastersql.SumRelation(chain, env)
+			if ok && len(unsupported) == 0 {
+				t.Fatalf("a sum over a %s column must be unsupported, not summed into int64", name)
 			}
 		})
 	}
