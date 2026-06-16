@@ -24,8 +24,36 @@ func CountRelation(chain ir.Value, env eval.GraphEnv) (rel Relation, master *ir.
 	if !ok || len(count.Args) != 0 {
 		return Relation{}, nil, nil, false
 	}
+	return relationChain(count.Receiver, env)
+}
+
+// SumRelation recognizes a relation sum query — sum(fn(c) -> c.col) over a chain of
+// where narrowings over a master relation, the shape Cards.sum(fn(c) -> c.cost)
+// lowers to — and returns the Relation to sum, the column to add, the master it is
+// over, and any where predicates lowered to SQL. ok is false when the value is not
+// such a chain or the selector does not name a column. The numeric-ness of the
+// column is the checker's guarantee (the sum selector's T: numeric bound), so the
+// driver lowers the column unconditionally; env folds the where operands as in
+// CountRelation.
+func SumRelation(chain ir.Value, env eval.GraphEnv) (rel Relation, column string, master *ir.TypeDef, unsupported []Unsupported, ok bool) {
+	sum, ok := asCall(chain, "sum")
+	if !ok || len(sum.Args) != 1 {
+		return Relation{}, "", nil, nil, false
+	}
+	column, ok = selectorColumn(sum.Args[0])
+	if !ok {
+		return Relation{}, "", nil, nil, false
+	}
+	rel, master, unsupported, ok = relationChain(sum.Receiver, env)
+	return rel, column, master, unsupported, ok
+}
+
+// relationChain walks the where-narrowing chain over a master relation that an
+// aggregate sits on — [where(fn(c)->pred)]* over MasterRelation — accumulating the
+// lowered filter. It is shared by every aggregate (count, sum), so they recognize
+// the same relation shape and lower the same where predicates.
+func relationChain(recv ir.Value, env eval.GraphEnv) (rel Relation, master *ir.TypeDef, unsupported []Unsupported, ok bool) {
 	rel = All()
-	recv := count.Receiver
 	for {
 		switch r := unwrap(recv).(type) {
 		case *ir.MasterRelation:
@@ -46,6 +74,25 @@ func CountRelation(chain ir.Value, env eval.GraphEnv) (rel Relation, master *ir.
 			return Relation{}, nil, nil, false
 		}
 	}
+}
+
+// selectorColumn returns the column a sum selector names: the field of the single
+// column reference its lambda yields (fn(c) -> c.cost). It requires the arrow-lambda
+// shape whereBody requires and a body that is a column<M, T> field access, so a
+// selector that computes a value rather than naming a column is not recognized.
+func selectorColumn(v ir.Value) (string, bool) {
+	body, ok := whereBody(v)
+	if !ok {
+		return "", false
+	}
+	fa, ok := unwrap(body).(*ir.FieldAccess)
+	if !ok {
+		return "", false
+	}
+	if _, ok := columnElem(fa); !ok {
+		return "", false
+	}
+	return fa.Field, true
 }
 
 // foldOperands replaces every data-independent subexpression of a predicate with

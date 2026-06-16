@@ -146,6 +146,22 @@ func (e *Engine) Count(rel mastersql.Relation) (int64, error) {
 	return n, nil
 }
 
+// Sum runs the relation's sum of a column against the loaded rows and returns the
+// scalar — the aggregate twin of Count, over the same relation-to-SQL the sql
+// package renders. An empty relation sums to zero (the SQL COALESCEs NULL away).
+func (e *Engine) Sum(rel mastersql.Relation, column string) (int64, error) {
+	query, binds := rel.SumSQL(column, tableName, dialect)
+	args, err := bindArgs(binds)
+	if err != nil {
+		return 0, err
+	}
+	var n int64
+	if err := e.db.QueryRow(query, args...).Scan(&n); err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
 // create builds the single table from the loaded columns. A master always
 // declares at least one field, so the column list is never empty.
 func (e *Engine) create() error {

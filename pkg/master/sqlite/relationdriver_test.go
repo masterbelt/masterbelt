@@ -109,6 +109,61 @@ func TestRelationDriverFoldsConstOperands(t *testing.T) {
 	}
 }
 
+// TestRelationDriverSum is the sum aggregate's end-to-end proof: a relation sum
+// written in source (Cards.sum(fn(c) -> c.cost), filtered, and over an empty result)
+// is resolved to a chain, the driver recognizes it and reads the summed column and
+// the where filter, and the engine — loaded with the master's rows — runs the SQL
+// sum and returns the scalar. An empty relation sums to zero.
+func TestRelationDriverSum(t *testing.T) {
+	const masterSrc = "master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n"
+	fields := []ir.Field{builtinField("id", "int"), builtinField("cost", "int")}
+	table := master.Table{Columns: []string{"id", "cost"}, Rows: []master.Row{
+		introw(2, 1, 10),
+		introw(3, 2, 20),
+		introw(4, 3, 40),
+	}}
+	eng, err := sqlite.Load(fields, table)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	defer closeEngine(t, eng)
+
+	cases := []struct {
+		name, body string
+		want       int64
+	}{
+		{"unfiltered", "Cards.sum(fn(c) -> c.cost)", 70},
+		{"filtered", "Cards.where(fn(c) -> c.cost < 30).sum(fn(c) -> c.cost)", 30}, // 10 + 20
+		{"empty is zero", "Cards.where(fn(c) -> c.cost > 999).sum(fn(c) -> c.cost)", 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			src := masterSrc + "fn probe(): int {\n  return " + tc.body + "\n}\n"
+			chain, env := chainOf(t, src)
+			rel, col, m, unsupported, ok := mastersql.SumRelation(chain, env)
+			if !ok {
+				t.Fatalf("driver did not recognize the sum chain")
+			}
+			if len(unsupported) != 0 {
+				t.Fatalf("predicate did not lower: %+v", unsupported)
+			}
+			if m == nil || m.Name != "Cards" {
+				t.Fatalf("chain master = %v, want Cards", m)
+			}
+			if col != "cost" {
+				t.Fatalf("summed column = %q, want cost", col)
+			}
+			got, err := eng.Sum(rel, col)
+			if err != nil {
+				t.Fatalf("Sum: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("sum = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
 // TestRelationDriverSeesThroughNestedAdapt pins that the driver recognizes a count
 // chain wrapped in more than one Adapt — the shape write-back produces when the
 // query's result is coerced through nested adaptations, e.g. returning it from a

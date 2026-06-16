@@ -157,6 +157,31 @@ func TestMasterNameResolvesToRelation(t *testing.T) {
 	}
 }
 
+// TestRelationSumResolves pins the sum aggregate's type: sum selects a numeric
+// column and yields that column's element type, so Cards.sum(fn(c) -> c.cost) and a
+// filtered sum settle to the column's type; a non-numeric column is rejected by the
+// selector's T: numeric bound rather than type-checking and failing the lowering.
+func TestRelationSumResolves(t *testing.T) {
+	for _, body := range []string{
+		"Cards.sum(fn(c) -> c.cost)",
+		"Cards.where(fn(c) -> c.cost > 0).sum(fn(c) -> c.cost)",
+	} {
+		src := queryCardsMaster + "fn probe(): int {\n  return " + body + "\n}\n"
+		m, diags := analyze(src)
+		if len(diags) != 0 {
+			t.Fatalf("%q: unexpected diagnostics: %v", body, codes(diags))
+		}
+		if got := probeReturnType(m); got == nil || got.String() != "int" {
+			t.Errorf("%q: return type = %v, want int", body, got)
+		}
+	}
+	// A non-numeric column violates the sum selector's numeric bound.
+	bad := queryCardsMaster + "fn probe(): string {\n  return Cards.sum(fn(c) -> c.name)\n}\n"
+	if _, diags := analyze(bad); !hasCode(diags, "belt.semantic.bound_not_satisfied") {
+		t.Errorf("sum(c.name): want bound_not_satisfied, got %v", codes(diags))
+	}
+}
+
 // TestQualifiedMasterResolvesToRelation pins that a master reached through a
 // namespace import is its relation the same way a local master name is: an imported
 // deck.Cards.where(...).count() (and the unfiltered deck.Cards.count()) type-checks,
