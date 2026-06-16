@@ -507,3 +507,61 @@ func TestNominalDerivation(t *testing.T) {
 		t.Errorf("nint should be assignable to the nominal integer Level")
 	}
 }
+
+// TestMethodBoundViolation pins that a generic method's type-parameter bound is
+// enforced on the type-level path the same way it is at an AST-driven call, with the
+// three robustness rules the bound check needs: the type-level MethodResult runs the
+// check (not only the checker), a solution that is itself a type variable is judged
+// by its own bound, and a bound naming another solved variable is substituted before
+// the check.
+func TestMethodBoundViolation(t *testing.T) {
+	reg := builtin.Default()
+
+	// An interface I, a type Good that opts in, and Bad that does not. A host type
+	// with f<T: I>(x: T): nint.
+	idef := &ir.TypeDef{Name: "I", Interface: &ir.InterfaceDef{Required: []string{"m"}},
+		Methods: []*ir.Method{{Name: "m", Result: bt("nint")}}}
+	iface := &ir.Named{Def: idef}
+	good := &ir.Named{Def: &ir.TypeDef{Name: "Good", Body: bt("nint"), Impls: []ir.Type{iface}}}
+	bad := &ir.Named{Def: &ir.TypeDef{Name: "Bad", Body: bt("nint")}}
+	hostDef := &ir.TypeDef{Name: "Host", Builtin: true}
+	hostDef.Methods = []*ir.Method{
+		{Name: "f", Params: []ir.Param{{Name: "x", Type: &ir.TypeVar{Name: "T", Bound: iface}}}, Result: bt("nint")},
+	}
+	host := &ir.Named{Def: hostDef}
+	fMethod := hostDef.Methods[0]
+
+	// A — the no-AST MethodResult path enforces the bound: Good resolves, Bad is invalid.
+	if got := MethodResult(reg, host, "f", []ir.Type{good}).String(); got != "nint" {
+		t.Errorf("f(Good): MethodResult = %s, want nint", got)
+	}
+	if got := MethodResult(reg, host, "f", []ir.Type{bad}); got != ir.Invalid {
+		t.Errorf("f(Bad): MethodResult = %s, want invalid (Bad does not satisfy I)", got)
+	}
+
+	// B — a solution that is itself a type variable is checked through its own bound:
+	// an unbounded U violates, a U: I satisfies.
+	if _, b := MethodBoundViolation(reg, fMethod, map[string]ir.Type{"T": &ir.TypeVar{Name: "U"}}); b == nil {
+		t.Error("f with T=unbounded U: want a bound violation")
+	}
+	if _, b := MethodBoundViolation(reg, fMethod, map[string]ir.Type{"T": &ir.TypeVar{Name: "U", Bound: iface}}); b != nil {
+		t.Errorf("f with T=(U: I): want no violation, got %s", b)
+	}
+
+	// C — a bound that names another solved variable is substituted before the check.
+	// g<T: box<E>>(x: T) with box<E> the bound; on a receiver binding E, the bound is
+	// box<that>, not the unresolved box<E>.
+	boxDef := &ir.TypeDef{Name: "box", Interface: &ir.InterfaceDef{Required: []string{"unbox"}},
+		Params: []*ir.TypeParam{{Name: "E"}}, Methods: []*ir.Method{{Name: "unbox", Result: &ir.TypeVar{Name: "E"}}}}
+	boxOf := func(e ir.Type) ir.Type { return &ir.App{Def: boxDef, Args: []ir.Type{e}} }
+	intBox := &ir.Named{Def: &ir.TypeDef{Name: "IntBox", Body: bt("nint"), Impls: []ir.Type{boxOf(bt("nint"))}}}
+	gMethod := &ir.Method{Name: "g", Params: []ir.Param{{Name: "x", Type: &ir.TypeVar{Name: "T", Bound: boxOf(&ir.TypeVar{Name: "E"})}}}}
+	// E=nint: the bound resolves to box<nint>, which IntBox satisfies — no violation.
+	if _, b := MethodBoundViolation(reg, gMethod, map[string]ir.Type{"E": bt("nint"), "T": intBox}); b != nil {
+		t.Errorf("g(IntBox) with E=nint: want no violation (IntBox impl box<nint>), got %s", b)
+	}
+	// E=bool: the bound resolves to box<bool>, which IntBox does not satisfy.
+	if _, b := MethodBoundViolation(reg, gMethod, map[string]ir.Type{"E": bt("bool"), "T": intBox}); b == nil {
+		t.Error("g(IntBox) with E=bool: want a violation (IntBox impl box<nint>, not box<bool>)")
+	}
+}
