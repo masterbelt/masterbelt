@@ -79,9 +79,4 @@ pub type relation<M> = builtin<M> impl {
 
   /// The number of rows in the relation.
   pub extern fn count(): nint
-
-  /// The sum of a numeric column over the relation's rows. The selector binds the
-  /// columns of M and names the column to add (c.cost), so the result is the
-  /// column's element type T. An empty relation sums to zero.
-  pub extern fn sum<T: numeric>(selector: fn(c: columns<M>): column<M, T>): T
 }

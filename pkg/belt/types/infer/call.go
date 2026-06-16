@@ -177,7 +177,7 @@ func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method str
 	// shared with the type-level MethodResult, so a numeric sum selector's column
 	// must be numeric (not a string column the SQL sum cannot add) whichever path
 	// types the call.
-	if solved, bound := types.MethodBoundViolation(reg, m, subst); bound != nil {
+	if solved, bound := types.MethodBoundViolation(reg, m, subst, recv); bound != nil {
 		sink.boundNotSatisfied(e, solved, bound)
 		return ir.Invalid
 	}

@@ -126,3 +126,21 @@ func TestGenericMethodBodyTypeParamAnnotation(t *testing.T) {
 		t.Fatalf("T is the enclosing type's parameter; want no unknown_type for the body annotation, got %v", codes(diags))
 	}
 }
+
+// TestGenericMethodBoundEnforced pins that a generic method's type-parameter bound
+// is checked at the call — the method twin of the function call's bound check, which
+// the method path did not run before any bounded method existed. add<T: numeric>(x:
+// T) accepts a numeric argument and rejects a non-numeric one; the bound is a real
+// constraint, not a decorative annotation.
+func TestGenericMethodBoundEnforced(t *testing.T) {
+	const def = "pub type Box = { v: int } impl {\n" +
+		"  pub fn add<T: numeric>(x: T): T {\n    return x\n  }\n}\n"
+	// A numeric argument satisfies the bound.
+	if _, diags := analyze(def + "fn probe(b: Box): int {\n  return b.add(5)\n}\n"); hasCode(diags, CodeBoundNotSatisfied) {
+		t.Fatalf("add(5): 5 is numeric, want no bound_not_satisfied, got %v", codes(diags))
+	}
+	// A non-numeric argument violates it — the bound check the method path now runs.
+	if _, diags := analyze(def + "fn probe(b: Box): string {\n  return b.add(\"s\")\n}\n"); !hasCode(diags, CodeBoundNotSatisfied) {
+		t.Errorf(`add("s"): string is not numeric, want bound_not_satisfied`)
+	}
+}

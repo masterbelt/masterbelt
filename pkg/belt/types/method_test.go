@@ -541,10 +541,10 @@ func TestMethodBoundViolation(t *testing.T) {
 
 	// B — a solution that is itself a type variable is checked through its own bound:
 	// an unbounded U violates, a U: I satisfies.
-	if _, b := MethodBoundViolation(reg, fMethod, map[string]ir.Type{"T": &ir.TypeVar{Name: "U"}}); b == nil {
+	if _, b := MethodBoundViolation(reg, fMethod, map[string]ir.Type{"T": &ir.TypeVar{Name: "U"}}, host); b == nil {
 		t.Error("f with T=unbounded U: want a bound violation")
 	}
-	if _, b := MethodBoundViolation(reg, fMethod, map[string]ir.Type{"T": &ir.TypeVar{Name: "U", Bound: iface}}); b != nil {
+	if _, b := MethodBoundViolation(reg, fMethod, map[string]ir.Type{"T": &ir.TypeVar{Name: "U", Bound: iface}}, host); b != nil {
 		t.Errorf("f with T=(U: I): want no violation, got %s", b)
 	}
 
@@ -557,11 +557,22 @@ func TestMethodBoundViolation(t *testing.T) {
 	intBox := &ir.Named{Def: &ir.TypeDef{Name: "IntBox", Body: bt("nint"), Impls: []ir.Type{boxOf(bt("nint"))}}}
 	gMethod := &ir.Method{Name: "g", Params: []ir.Param{{Name: "x", Type: &ir.TypeVar{Name: "T", Bound: boxOf(&ir.TypeVar{Name: "E"})}}}}
 	// E=nint: the bound resolves to box<nint>, which IntBox satisfies — no violation.
-	if _, b := MethodBoundViolation(reg, gMethod, map[string]ir.Type{"E": bt("nint"), "T": intBox}); b != nil {
+	if _, b := MethodBoundViolation(reg, gMethod, map[string]ir.Type{"E": bt("nint"), "T": intBox}, host); b != nil {
 		t.Errorf("g(IntBox) with E=nint: want no violation (IntBox impl box<nint>), got %s", b)
 	}
 	// E=bool: the bound resolves to box<bool>, which IntBox does not satisfy.
-	if _, b := MethodBoundViolation(reg, gMethod, map[string]ir.Type{"E": bt("bool"), "T": intBox}); b == nil {
+	if _, b := MethodBoundViolation(reg, gMethod, map[string]ir.Type{"E": bt("bool"), "T": intBox}, host); b == nil {
 		t.Error("g(IntBox) with E=bool: want a violation (IntBox impl box<nint>, not box<bool>)")
+	}
+
+	// Self in the bound is resolved to the receiver. selfBox<T: box<self>>(x: T) on a
+	// receiver SelfHost that opts into box<SelfHost>: the bound is box<SelfHost>, which
+	// the receiver satisfies — checked against the unresolved box<self> it would not.
+	selfHost := &ir.TypeDef{Name: "SelfHost", Builtin: true, Impls: []ir.Type{boxOf(nil)}}
+	selfHost.Impls[0] = boxOf(&ir.Named{Def: selfHost})
+	selfRecv := &ir.Named{Def: selfHost}
+	selfBox := &ir.Method{Name: "selfBox", Params: []ir.Param{{Name: "x", Type: &ir.TypeVar{Name: "T", Bound: boxOf(&ir.SelfType{})}}}}
+	if _, b := MethodBoundViolation(reg, selfBox, map[string]ir.Type{"T": selfRecv}, selfRecv); b != nil {
+		t.Errorf("selfBox(SelfHost) on SelfHost: want no violation (box<self> = box<SelfHost>), got %s", b)
 	}
 }
