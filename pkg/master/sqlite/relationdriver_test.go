@@ -37,6 +37,19 @@ func chainOf(t *testing.T, src, fileID, fnName string) ir.Value {
 	return nil
 }
 
+// TestRelationDriverRejectsBlockLambda pins that a where lambda with block control
+// flow is not recognized rather than silently lowered to one branch's predicate: a
+// conditional return means CountRelation reports ok=false, so the caller rejects the
+// query instead of counting the wrong rows.
+func TestRelationDriverRejectsBlockLambda(t *testing.T) {
+	const src = "master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n" +
+		"fn probe(): nint {\n  return Cards.where(fn(c) {\n    if c.id > 0 {\n      return c.cost < 30\n    }\n    return c.cost > 10\n  }).count()\n}\n"
+	chain := chainOf(t, src, "cards.belt", "probe")
+	if _, _, _, ok := mastersql.CountRelation(chain); ok {
+		t.Fatal("a block-control-flow where lambda must not be recognized as a simple count chain")
+	}
+}
+
 // TestRelationDriverCount is the query driver's end-to-end proof: a relation query
 // written in source (Cards.where(...).count(), and the unfiltered Cards.count()) is
 // resolved to a chain, the driver recognizes it and lowers the where predicate to a

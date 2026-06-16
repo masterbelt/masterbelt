@@ -51,20 +51,21 @@ func asCall(v ir.Value, method string) (*ir.Call, bool) {
 	return c, true
 }
 
-// whereBody returns the predicate a where lambda yields: the value its single
-// return statement carries. It is false for anything that is not a function
-// literal returning a value.
+// whereBody returns the predicate a where lambda yields: the value of its single
+// return. It requires exactly that shape — one return of a value, the form the
+// arrow lambda fn(c) -> pred takes — and is false for anything else, so a lambda
+// with block control flow (multiple statements, a conditional return) is left
+// unrecognized rather than silently lowered to one branch's predicate.
 func whereBody(v ir.Value) (ir.Value, bool) {
 	lit, ok := unwrap(v).(*ir.FuncLiteral)
-	if !ok {
+	if !ok || len(lit.Body) != 1 {
 		return nil, false
 	}
-	for _, s := range lit.Body {
-		if r, ok := s.(*ir.Return); ok && r.Value != nil {
-			return r.Value, true
-		}
+	r, ok := lit.Body[0].(*ir.Return)
+	if !ok || r.Value == nil {
+		return nil, false
 	}
-	return nil, false
+	return r.Value, true
 }
 
 // unwrap sees a value through the Adapt an accepted conversion wraps it in.

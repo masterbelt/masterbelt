@@ -170,13 +170,12 @@ func (s constScope) leaf(e ast.Expr) ir.Type {
 		if target := s.env.Resolve(e); target != nil {
 			return s.env.TypeOf(target)
 		}
-		// A bare master name in value position is its relation; every other bare
-		// type name is a compile-time type value of type `type` (the metatype):
-		// const x = int8. A value of that name (a constant) wins above.
-		if def, ok := s.universe()[e.Name]; ok {
-			if def.Master != nil {
-				return RelationType(s.registry(), def)
-			}
+		// A bare type name in value position is a compile-time type value, of type
+		// `type` (the metatype): const x = int8. A value of that name (a constant)
+		// wins above, so only a name resolving to a type alone reaches here. (A
+		// master is its relation only in a body, where the query driver can run it
+		// against data; a const cannot evaluate a relation, so it stays a type value.)
+		if _, ok := s.universe()[e.Name]; ok {
 			return metatype()
 		}
 	case *ast.MemberExpr:
