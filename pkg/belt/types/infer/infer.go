@@ -465,10 +465,62 @@ func fieldType(recv ir.Type, name string) ir.Type {
 // Type.Name paths (enum member, associated constant) the receiver-as-type forms
 // take. The result is ir.Invalid when neither a field nor a getter matches.
 func memberReadType(reg *builtin.Registry, recv ir.Type, name string) ir.Type {
+	if t := columnsFieldType(reg, recv, name); t != ir.Invalid {
+		return t
+	}
 	if t := fieldType(recv, name); t != ir.Invalid {
 		return t
 	}
 	return getterType(reg, recv, name)
+}
+
+// columnsFieldType reads a column off a query binding: a field access c.name on a
+// receiver of type columns<M> is the column<M, FieldType> for M's row field name —
+// the field's value type lifted into query (column) mode, so a comparison of it
+// produces a predicate<M> rather than a value. It is ir.Invalid for any other
+// receiver (a non-columns type, or a name M's row has no field of), so the read
+// falls through to the ordinary field/getter readings. This is the one place a
+// query names a column: self in query position exposes the relation's methods, not
+// its columns, so a column is reached only through the binding.
+func columnsFieldType(reg *builtin.Registry, recv ir.Type, name string) ir.Type {
+	app, ok := recv.(*ir.App)
+	if !ok || app.Def == nil || len(app.Args) != 1 {
+		return ir.Invalid
+	}
+	// Match the prelude's columns by identity, not by name: an ordinary file can
+	// shadow the name with its own generic type (type columns<T> = ...), and that
+	// type's field access must read the user's type, not the query binding.
+	if def, ok := reg.Lookup(builtin.NameColumns); !ok || app.Def != def {
+		return ir.Invalid
+	}
+	master := app.Args[0]
+	if n, ok := master.(*ir.Named); !ok || n.Def == nil || n.Def.Master == nil {
+		return ir.Invalid // columns<M> only names a master's columns
+	}
+	ft := fieldType(master, name)
+	if ft == ir.Invalid {
+		return ir.Invalid
+	}
+	colDef, ok := reg.Lookup(builtin.NameColumn)
+	if !ok || colDef == nil {
+		return ir.Invalid
+	}
+	return &ir.App{Def: colDef, Args: []ir.Type{master, ft}}
+}
+
+// queryColumnElem returns the value type T of a column<M, T> receiver — the type a
+// comparison against the column expects its operand to be — matching the prelude's
+// column by identity. It is how a bare member argument (c.rarity == legend) finds
+// its enum: the expectation is the column's element type, not the column wrapper.
+func queryColumnElem(reg *builtin.Registry, t ir.Type) (ir.Type, bool) {
+	app, ok := t.(*ir.App)
+	if !ok || app.Def == nil || len(app.Args) != 2 {
+		return nil, false
+	}
+	if def, ok := reg.Lookup(builtin.NameColumn); !ok || app.Def != def {
+		return nil, false
+	}
+	return app.Args[1], true
 }
 
 // IsReadableMember reports whether name reads one of recv's readable members — a

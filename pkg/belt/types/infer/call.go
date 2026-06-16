@@ -139,6 +139,18 @@ func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method str
 	// the suppression style survives overloading.
 	known := synthMethodArgs(e, recv, args, &bad, s, sink)
 
+	// A query column's comparison is valid only when its element type supports the
+	// same comparison as a value: column<M, T> offers the comparison operators for
+	// every T, but a comparison stands only if T itself has the operator, mirroring
+	// value mode (a bool column has no >, a non-comparable column no ==). The type
+	// system cannot bound the column's methods by T, so the rule is checked here.
+	if !queryColumnComparisonValid(reg, recv, method) {
+		if !bad {
+			sink.invalidOp(e, method, typesList(recv, args))
+		}
+		return ir.Invalid
+	}
+
 	matches, _ := types.SelectOverload(reg, recv, method, known)
 	if len(matches) != 1 {
 		return reportMethodOverloadFailure(e, recv, method, args, matches, candidates, bad, s, sink)
@@ -221,18 +233,13 @@ func synthMethodArgs(e *ast.CallExpr, recv ir.Type, args []ir.Type, bad *bool, s
 		}
 		args[i] = check(a, s, sink)
 		if args[i] == ir.Invalid {
-			// A bare member of the receiver's enum (rarity == Legend, desugared
-			// to rarity.eql(Legend)) is that enum's value — the same channel the
-			// lowering's argument binder resolves it through, tried after
-			// ordinary resolution so a same-named binding still shadows the
-			// member. Streamed out so the typed value graph carries it.
-			if id, ok := a.(*ast.Identifier); ok {
-				if mt := enumMemberExpectation(recv, id.Name); mt != nil {
-					args[i] = mt
-					known[i] = mt
-					sink.typed(a, mt)
-					continue
-				}
+			// A bare member of the receiver's enum (rarity == Legend) resolves
+			// against the enum after ordinary resolution fails, so a same-named
+			// binding still shadows the member.
+			if mt := bareEnumMemberArg(recv, a, s, sink); mt != nil {
+				args[i] = mt
+				known[i] = mt
+				continue
 			}
 			*bad = true
 			continue
@@ -240,6 +247,87 @@ func synthMethodArgs(e *ast.CallExpr, recv ir.Type, args []ir.Type, bad *bool, s
 		known[i] = args[i]
 	}
 	return known
+}
+
+// queryComparisonMethods are the comparison operators a query column offers — the
+// equality pair and the orderings. A column comparison stands only when its element
+// type has the same operator, so each of these is guarded against the element type.
+var queryComparisonMethods = map[string]bool{
+	"eql": true, "neq": true, "lt": true, "lteq": true, "gt": true, "gteq": true,
+}
+
+// queryColumnComparisonValid reports whether a method call is allowed under the
+// query-column comparison rule: true unless the receiver is a query column<M, T>,
+// the method is a comparison, and the element type T has no such operator of its
+// own. It mirrors value mode — a column comparison stands exactly where the value
+// comparison would — closing the gap that column<M, T> offers every comparison for
+// every T regardless of whether T supports it (a bool column has no ordering, a
+// non-comparable column no equality).
+func queryColumnComparisonValid(reg *builtin.Registry, recv ir.Type, method string) bool {
+	if !queryComparisonMethods[method] {
+		return true
+	}
+	elem, ok := queryColumnElem(reg, recv)
+	if !ok {
+		return true
+	}
+	// A nullable column (T | null) is judged by T: a comparison against it, null
+	// included, stands where T's does — the lowering renders == null as IS NULL and
+	// a value comparison on the non-null T. Unwrap the null member before asking for
+	// the operator, since a union itself has no method table.
+	elem = nonNullType(elem)
+	_, _, hasOp := types.Candidates(reg, elem, method)
+	return hasOp
+}
+
+// nonNullType strips a null member from a union, yielding the single remaining
+// member — so a nullable type T | null is judged as T. A non-union, or a union with
+// more than one non-null member (no single operator set to check), is returned
+// unchanged.
+func nonNullType(t ir.Type) ir.Type {
+	u, ok := t.(*ir.Union)
+	if !ok {
+		return t
+	}
+	var nonNull []ir.Type
+	for _, m := range u.Members {
+		if b, ok := m.(*ir.Builtin); ok && b.Name == builtin.NameNull {
+			continue
+		}
+		nonNull = append(nonNull, m)
+	}
+	if len(nonNull) == 1 {
+		return nonNull[0]
+	}
+	return t
+}
+
+// bareEnumMemberArg resolves a bare identifier argument as a member of the enum the
+// receiver's comparison expects — the same channel the lowering's argument binder
+// uses, tried after ordinary resolution. The expectation is the enum directly
+// (value mode, rarity.eql(Legend)) or, for a query column (c.rarity.eql(Legend)),
+// the column's element type, so the column<M, T> wrapper is unwrapped first. It
+// returns the enum type and streams the resolved member so the write-back rebuilds
+// the identifier as an EnumMemberValue (the node the query lowering reads its base
+// value off), or nil when the argument is not such a member.
+func bareEnumMemberArg(recv ir.Type, a ast.Expr, s scope, sink *Sink) ir.Type {
+	id, ok := a.(*ast.Identifier)
+	if !ok {
+		return nil
+	}
+	want := recv
+	if elem, ok := queryColumnElem(s.registry(), recv); ok {
+		want = elem
+	}
+	mt := enumMemberExpectation(want, id.Name)
+	if mt == nil {
+		return nil
+	}
+	sink.typed(a, mt)
+	if def := types.EnumDef(mt); def != nil {
+		sink.resolvedEnumMember(a, def, enumMemberIndex(def, id.Name))
+	}
+	return mt
 }
 
 // reportMethodOverloadFailure handles the no-single-match arm of methodCallType:

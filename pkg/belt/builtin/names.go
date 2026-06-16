@@ -16,12 +16,21 @@ const (
 	NameDatetime = "datetime"
 	NameDuration = "duration"
 	NameError    = "error"
+	NameNull     = "null"
 	// NameType is the metatype: the type of a reified type value (type : type).
 	// It is opaque — no value range, no operators — and declared in no prelude
 	// file (its name is the `type` keyword a declaration head reserves), so it is
 	// registered as a definition but not a Names() primitive and carries no
 	// NativeType.
 	NameType = "type"
+	// The query-algebra types (query/column mode): columns<M> is a query binding's
+	// columns, a field access off it reads column<M, T>, and a comparison of
+	// columns yields predicate<M>. They are `= builtin` with no NativeType — their
+	// operators lower to SQL rather than folding — so, like the metatype, the layer
+	// that asks "is this the column type?" spells the name through these constants.
+	NameColumn    = "column"
+	NamePredicate = "predicate"
+	NameColumns   = "columns"
 )
 
 // The canonical operator-method names every operand type shares: the

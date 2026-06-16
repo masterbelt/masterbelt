@@ -25,8 +25,20 @@ func builtinField(name, prim string) ir.Field {
 	return ir.Field{Name: name, Type: &ir.Builtin{Name: prim}}
 }
 
-func selfField(name string) *ir.FieldAccess {
-	return &ir.FieldAccess{Receiver: &ir.SelfValue{}, Field: name}
+// columnDef stands in for the prelude's column<M, T>: the query lowering keys a
+// column on its type's name, so a bare builtin def of that name with two
+// parameters is enough for an engine test to build a column reference by hand.
+var columnDef = &ir.TypeDef{Name: "column", Builtin: true, Params: []*ir.TypeParam{{Name: "M"}, {Name: "T"}}}
+
+// colField builds a query column reference c.name of element type elem — the shape
+// the query lowering recognizes: a field access whose type is column<M, elem>, read
+// off the query binding rather than self.
+func colField(name, elem string) *ir.FieldAccess {
+	return &ir.FieldAccess{
+		Receiver: &ir.ParamRef{Name: "c"},
+		Field:    name,
+		Type:     &ir.App{Def: columnDef, Args: []ir.Type{&ir.Named{Def: &ir.TypeDef{Name: "M"}}, &ir.Builtin{Name: elem}}},
+	}
 }
 
 func call(method string, recv ir.Value, args ...ir.Value) *ir.Call {
@@ -86,7 +98,7 @@ func TestViolationsFlagsFailingRows(t *testing.T) {
 		introw(4, 3, 40, 40), // 40 >= 40, holds
 		introw(5, 4, 1, 99),  // 1 >= 99, fails
 	}}
-	pred, unsupported := mastersql.Lower(call("gteq", selfField("power"), selfField("cost")), fields)
+	pred, unsupported := mastersql.Lower(call("gteq", colField("power", "int"), colField("cost", "int")))
 	if len(unsupported) != 0 {
 		t.Fatalf("predicate did not lower: %+v", unsupported)
 	}
@@ -128,7 +140,7 @@ func TestViolationsNullIsFailSafe(t *testing.T) {
 			{Value: nil, Origin: master.Origin{Row: 3, Col: 2}},
 		}}, // opt is NULL, NULL >= 0 is NULL, flagged
 	}}
-	pred, unsupported := mastersql.Lower(call("gteq", selfField("opt"), &ir.IntLiteral{Text: "0"}), fields)
+	pred, unsupported := mastersql.Lower(call("gteq", colField("opt", "int"), &ir.IntLiteral{Text: "0"}))
 	if len(unsupported) != 0 {
 		t.Fatalf("predicate did not lower: %+v", unsupported)
 	}
@@ -164,10 +176,10 @@ func TestViolationsStringAndBool(t *testing.T) {
 		row(4, 3, "fire", false), // active mismatch, fails
 	}}
 	cond := call("anan",
-		call("eql", selfField("name"), &ir.StringLiteral{Value: "fire"}),
-		call("eql", selfField("active"), &ir.BoolLiteral{Value: true}),
+		call("eql", colField("name", "string"), &ir.StringLiteral{Value: "fire"}),
+		call("eql", colField("active", "bool"), &ir.BoolLiteral{Value: true}),
 	)
-	pred, unsupported := mastersql.Lower(cond, fields)
+	pred, unsupported := mastersql.Lower(cond)
 	if len(unsupported) != 0 {
 		t.Fatalf("predicate did not lower: %+v", unsupported)
 	}
@@ -229,7 +241,7 @@ func TestViolationsWithRowidColumn(t *testing.T) {
 		introw(3, 200, -1), // val -1 >= 0 fails, row index 1
 		introw(4, 300, 7),  // holds
 	}}
-	pred, unsupported := mastersql.Lower(call("gteq", selfField("val"), &ir.IntLiteral{Text: "0"}), fields)
+	pred, unsupported := mastersql.Lower(call("gteq", colField("val", "int"), &ir.IntLiteral{Text: "0"}))
 	if len(unsupported) != 0 {
 		t.Fatalf("predicate did not lower: %+v", unsupported)
 	}
@@ -261,7 +273,7 @@ func TestViolationsConcurrent(t *testing.T) {
 		introw(2, 1, 5),
 		introw(3, 2, -1), // fails power >= 0, row index 1
 	}}
-	pred, unsupported := mastersql.Lower(call("gteq", selfField("power"), &ir.IntLiteral{Text: "0"}), fields)
+	pred, unsupported := mastersql.Lower(call("gteq", colField("power", "int"), &ir.IntLiteral{Text: "0"}))
 	if len(unsupported) != 0 {
 		t.Fatalf("predicate did not lower: %+v", unsupported)
 	}
@@ -324,7 +336,7 @@ func TestCountAllAndFiltered(t *testing.T) {
 		t.Errorf("count(all) = %d, want 4", all)
 	}
 
-	pred, unsupported := mastersql.Lower(call("gt", selfField("power"), &ir.IntLiteral{Text: "0"}), fields)
+	pred, unsupported := mastersql.Lower(call("gt", colField("power", "int"), &ir.IntLiteral{Text: "0"}))
 	if len(unsupported) != 0 {
 		t.Fatalf("predicate did not lower: %+v", unsupported)
 	}
@@ -338,7 +350,7 @@ func TestCountAllAndFiltered(t *testing.T) {
 
 	// Narrowing again intersects: power > 0 AND power < 10 keeps only the row with
 	// power 5, not every row matching the second filter alone.
-	small, lowered := mastersql.Lower(call("lt", selfField("power"), &ir.IntLiteral{Text: "10"}), fields)
+	small, lowered := mastersql.Lower(call("lt", colField("power", "int"), &ir.IntLiteral{Text: "10"}))
 	if len(lowered) != 0 {
 		t.Fatalf("predicate did not lower: %+v", lowered)
 	}
@@ -354,10 +366,13 @@ func TestCountAllAndFiltered(t *testing.T) {
 // --- end-to-end fixture: a real project loaded and validated -----------------
 
 // TestEngineOnProjectFixture is the canonical proof: a project of a .belt master
-// and its .csv data is read through the real load path, the master's row check is
-// lowered to SQL, and the engine flags exactly the rows that fail it — the same
-// rows the per-row evaluator reports — each anchored at its source line. It proves
-// the SQLite engine agrees with the evaluator on real data without replacing it.
+// and its .csv data is read through the real load path, a query condition over the
+// master's columns (a predicate<M> from the query binding) is lowered to SQL, and
+// the engine flags exactly the rows that fail it — the same rows the per-row
+// evaluator independently reports for the equivalent value-mode validate. It proves
+// the column-mode SQL path and the value-mode evaluator agree on real data: the
+// query says c.power >= c.cost, the validate says self.power >= self.cost, and both
+// flag the same rows.
 func TestEngineOnProjectFixture(t *testing.T) {
 	root := t.TempDir()
 	writeFixture(t, root, "data/skills.csv", "id,power,cost\n1,30,10\n2,5,20\n3,40,40\n4,1,99\n")
@@ -366,7 +381,8 @@ func TestEngineOnProjectFixture(t *testing.T) {
 		"  primary id\n" +
 		"  validate {\n    each {\n      assert self.power >= self.cost\n    }\n  }\n" +
 		"  source { csv \"skills.csv\" }\n" +
-		"}\n"
+		"}\n" +
+		"fn strong(c: columns<Skill>): predicate<Skill> {\n  return c.power >= c.cost\n}\n"
 
 	prog := semantic.NewProgram()
 	prog.SetFile("skills.belt", abstract.NewDocument([]byte(belt)), nil)
@@ -384,12 +400,9 @@ func TestEngineOnProjectFixture(t *testing.T) {
 	if !ok {
 		t.Fatal("row fields did not resolve")
 	}
-	if len(def.Master.RowChecks) != 1 {
-		t.Fatalf("row checks = %d, want 1", len(def.Master.RowChecks))
-	}
-	pred, unsupported := mastersql.Lower(def.Master.RowChecks[0].Cond, fields)
+	pred, unsupported := mastersql.Lower(probePredicate(t, prog, "strong"))
 	if len(unsupported) != 0 {
-		t.Fatalf("the row check did not lower: %+v", unsupported)
+		t.Fatalf("the query condition did not lower: %+v", unsupported)
 	}
 
 	eng, err := sqlite.Load(fields, loaded[0].Table)
@@ -425,6 +438,29 @@ func TestEngineOnProjectFixture(t *testing.T) {
 	if got := countRowValidationFailures(diags); got != len(vios) {
 		t.Errorf("loader reported %d row-validation failures, engine found %d; they must agree", got, len(vios))
 	}
+}
+
+// probePredicate returns the resolved query condition a probe function yields — the
+// predicate<M> value graph of fn name(c: columns<M>): predicate<M> { return cond } —
+// the real graph the query pipeline lowers.
+func probePredicate(t *testing.T, prog *semantic.Program, name string) ir.Value {
+	t.Helper()
+	module := prog.Module("skills.belt")
+	if module == nil {
+		t.Fatal("no module for skills.belt")
+	}
+	for _, f := range module.Funcs {
+		if f.Name != name {
+			continue
+		}
+		for _, s := range f.Body {
+			if r, ok := s.(*ir.Return); ok && r.Value != nil {
+				return r.Value
+			}
+		}
+	}
+	t.Fatalf("no predicate resolved for probe %q", name)
+	return nil
 }
 
 func masterDef(t *testing.T, prog *semantic.Program) *ir.TypeDef {

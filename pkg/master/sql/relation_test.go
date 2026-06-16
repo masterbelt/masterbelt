@@ -22,7 +22,7 @@ func TestRelationCountAll(t *testing.T) {
 // fragment Lower produces) becomes the WHERE clause, and its binds travel with the
 // query. The fragment is the lowering's, so it is parenthesized and dialect-quoted.
 func TestRelationCountWhere(t *testing.T) {
-	pred, unsupported := lowerValidate(t, "id: int, power: int", "self.power > 0")
+	pred, unsupported := lowerProbe(t, "", "id: int, power: int", "c.power > 0")
 	if len(unsupported) != 0 {
 		t.Fatalf("predicate did not lower: %+v", unsupported)
 	}
@@ -41,8 +41,8 @@ func TestRelationCountWhere(t *testing.T) {
 // further filters a scoped relation must not silently drop the scope.
 func TestRelationWhereIntersects(t *testing.T) {
 	const fields = "id: int, power: int, cost: int"
-	p1, u1 := lowerValidate(t, fields, "self.power > 0")
-	p2, u2 := lowerValidate(t, fields, "self.cost < 100")
+	p1, u1 := lowerProbe(t, "", fields, "c.power > 0")
+	p2, u2 := lowerProbe(t, "", fields, "c.cost < 100")
 	if len(u1)+len(u2) != 0 {
 		t.Fatalf("predicates did not lower: %+v %+v", u1, u2)
 	}
@@ -59,7 +59,7 @@ func TestRelationWhereIntersects(t *testing.T) {
 // predicate: the count and the WHERE are shared, while identifier quoting and the
 // placeholder follow the dialect.
 func TestRelationCountDialects(t *testing.T) {
-	pred, unsupported := lowerValidate(t, "id: int, power: int, cost: int", "self.power >= self.cost")
+	pred, unsupported := lowerProbe(t, "", "id: int, power: int, cost: int", "c.power >= c.cost")
 	if len(unsupported) != 0 {
 		t.Fatalf("predicate did not lower: %+v", unsupported)
 	}
