@@ -497,6 +497,19 @@ func TestLowerInterfaceDecl(t *testing.T) {
 	}
 }
 
+// TestLowerInterfaceKeywordMember pins that an interface method requirement may be
+// named with a reserved word, the same as a concrete method — so an interface can
+// require a keyword-named method that an impl declares (interface { where(): nint }).
+func TestLowerInterfaceKeywordMember(t *testing.T) {
+	file, diags := Lower([]byte("interface I {\n  where(): nint\n}\n"))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if m := file.Interfaces[0].Members; len(m) != 1 || m[0].Name != "where" {
+		t.Fatalf("members = %+v, want one required member named where", m)
+	}
+}
+
 func TestLowerInterfaceParents(t *testing.T) {
 	// A child interface lowers its parents (supertraits) into Parents, in
 	// declaration order, each a type expression (a bare or applied interface).

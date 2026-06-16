@@ -290,7 +290,7 @@ func (p *parser) parseInterfaceDecl(lead []cst.Green) *cst.Node {
 			return cst.NewNode(cst.InterfaceDecl, children)
 		case p.peekSignificant() == token.EOF:
 			return cst.NewNode(cst.InterfaceDecl, children)
-		case p.peekSignificant() == token.Pub || p.peekSignificant() == token.Ident:
+		case p.peekSignificant() == token.Pub || methodName(p.peekSignificant()):
 			var lead []cst.Green
 			p.skipTrivia(&lead)
 			children = append(children, p.parseInterfaceMember(lead))
@@ -324,9 +324,10 @@ func (p *parser) parseInterfaceMember(lead []cst.Green) *cst.Node {
 		children = append(children, p.bump())
 	}
 	p.interfaceModifier(&children)
-	if p.peekSignificant() == token.Ident {
+	if methodName(p.peekSignificant()) {
 		p.skipTrivia(&children)
-		children = append(children, p.bump()) // the member name
+		children = append(children, p.bump()) // the member name (a reserved word
+		// names an interface member the same way it names a concrete method)
 	} else {
 		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
 	}

@@ -827,8 +827,12 @@ func lowerInterfaceMember(t cst.Tree, buf source.Buffer) *ast.InterfaceMember {
 					name = child.Text(buf)
 				}
 			default:
-				// Any other token (the "fn" keyword, parens, the "->" arrow)
-				// sets no field of the interface member: it is skipped.
+				// A keyword in the name position names the member the same as an
+				// Ident (where(): nint); a declaration marker is structural, not a
+				// name. The fn keyword and the punctuation set no field either.
+				if name == "" && tok.Kind().Keyword() && !tok.Kind().MethodMarker() {
+					name = child.Text(buf)
+				}
 			}
 			continue
 		}
