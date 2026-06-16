@@ -42,6 +42,7 @@ belt.semantic.master_missing_row,master {master} に行レコードがありま�
 belt.semantic.master_duplicate_primary_key,master {master} は primary キー列 {key} を重複させています
 belt.semantic.master_where_unsupported,master {master} の行述語(where)はまだサポートされていません
 belt.semantic.master_validate_not_assert,master {master} の validate ブロックには assert 文のみ記述できます
+belt.semantic.master_validate_all_relation_unsupported,master {master} の validate all チェックは relation クエリ(master への where/count)をまだサポートしていません
 belt.semantic.uninferable_record,このレコードリテラルの型を推論できません。型名を付けるか型注釈を付けてください
 belt.semantic.not_a_record,{typ} はレコード型ではありません
 belt.semantic.uninferable_result,この関数リテラルの結果型を推論できません。注釈を付けるか値を返してください
