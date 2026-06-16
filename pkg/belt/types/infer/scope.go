@@ -310,6 +310,19 @@ func RelationType(reg *builtin.Registry, master *ir.TypeDef) ir.Type {
 	return &ir.App{Def: def, Args: []ir.Type{&ir.Named{Def: master}}}
 }
 
+// isRelationType reports whether t is a relation<M> — an application of the
+// relation builtin. It is the value-reading test the static-call path uses to tell
+// an unshadowed master name (which reads as its relation) from a master shadowed by
+// a constant (which reads as the constant, not the relation).
+func isRelationType(reg *builtin.Registry, t ir.Type) bool {
+	app, ok := t.(*ir.App)
+	if !ok {
+		return false
+	}
+	def, ok := reg.Lookup(builtin.NameRelation)
+	return ok && app.Def == def
+}
+
 // Body infers the type of a method-body expression: self, a parameter, a
 // literal, a record field access, a type conversion (T(x)), or a method call
 // (the form operators desugar to). An unresolvable expression is ir.Invalid.

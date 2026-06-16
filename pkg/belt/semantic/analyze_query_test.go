@@ -83,6 +83,25 @@ func TestConstShadowsMaster(t *testing.T) {
 	}
 }
 
+// TestConstShadowedMasterCallNotSuppressed pins that a method call over a
+// const-shadowed master name is not silently accepted: the static-call path defers
+// to the relation method path only when the name reads as the relation, so a const
+// shadowing the master (the name is then the constant, not the relation) does not
+// suppress the call. Cards.count() with a shadowing const reports unknown_static
+// rather than leaving an untyped call with a nil result type.
+func TestConstShadowedMasterCallNotSuppressed(t *testing.T) {
+	src := "master Cards {\n  record { id: int }\n  primary id\n}\n" +
+		"const Cards = 5\n" +
+		"fn probe(): nint {\n  return Cards.count()\n}\n"
+	_, diags := analyze(src)
+	if len(diags) == 0 {
+		t.Fatal("a method call over a const-shadowed master must not be silently accepted")
+	}
+	if !hasCode(diags, "belt.semantic.unknown_static") {
+		t.Fatalf("want unknown_static for the shadowed-master call, got %v", codes(diags))
+	}
+}
+
 // TestMasterNameResolvesToRelation pins that a master in value position is its
 // relation: Cards.where(fn(c) -> ...).count() and Cards.count() resolve to nint,
 // the query operations resolving as methods on relation<Cards>. A name that is one

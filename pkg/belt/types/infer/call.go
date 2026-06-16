@@ -565,8 +565,12 @@ func staticCallType(e *ast.CallExpr, member *ast.MemberExpr, s scope, sink *Sink
 		// not one of its static fns is a relation method (Cards.where(...),
 		// Cards.count()): defer to the method-call path, which types the receiver as
 		// relation<M> and resolves the method there, rather than reporting a missing
-		// static fn.
-		if def.Master != nil {
+		// static fn. The defer applies only when the name actually reads as the
+		// relation here — a constant shadowing the master makes the bare name the
+		// constant, a value rather than the relation, so the leaf does not type it as
+		// one and the call is reported here instead of being suppressed over the
+		// untyped constant receiver the method path would otherwise see.
+		if def.Master != nil && isRelationType(s.registry(), s.leaf(id)) {
 			return ir.Invalid, false
 		}
 		// The receiver names a type but it has no static fn of that name. This is
