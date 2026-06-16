@@ -666,9 +666,13 @@ func (b bodyBinder) leafNamespaceOrTypeMember(e *ast.MemberExpr) ir.Value {
 	if v := typeMemberValue(b.reg, infer.MemberReceiverDef(b.r.Defs, b.r.Qualified, shadowed, e.Receiver), e); v != nil {
 		return v
 	}
-	// A bare namespace-qualified type name used as a value (geo.Item, no trailing
-	// projection) reifies to a type value, the qualified twin of a bare local type
-	// name, so a body folds geo.Item == geo.Item exactly as a const does.
+	// A namespace-qualified master name used as a value (geo.Cards) is its relation,
+	// the qualified twin of the bare master name leafIdentifier lowers — the value
+	// the query operations are methods on. Every other qualified type name reifies
+	// to a type value, so a body folds geo.Item == geo.Item exactly as a const does.
+	if def := infer.QualifiedTypeDef(b.r.Qualified, shadowed, e); def != nil && def.Master != nil {
+		return &ir.MasterRelation{Master: def, Syntax: e}
+	}
 	return qualifiedTypeValue(b.r.Qualified, shadowed, e)
 }
 

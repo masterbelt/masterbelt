@@ -1,8 +1,13 @@
 package semantic
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/masterbelt/masterbelt/internal/belttest"
+	"github.com/masterbelt/masterbelt/pkg/belt/parser/abstract"
+	"github.com/masterbelt/masterbelt/pkg/project"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
@@ -102,6 +107,112 @@ func TestMasterNameResolvesToRelation(t *testing.T) {
 				t.Errorf("return type = %v, want nint", got)
 			}
 		})
+	}
+}
+
+// TestQualifiedMasterResolvesToRelation pins that a master reached through a
+// namespace import is its relation the same way a local master name is: an imported
+// deck.Cards.where(...).count() (and the unfiltered deck.Cards.count()) type-checks,
+// resolving the query operations as methods on relation<Cards> rather than reporting
+// a method on the metatype, and the reference walk does not mistake the relation
+// method for a type-member access. Without the qualified twin of the bare-name
+// relation reading, deck.Cards.count() reports "cannot apply method count to type".
+func TestQualifiedMasterResolvesToRelation(t *testing.T) {
+	diags := analyzeProject(t, map[string]string{
+		"cards.belt": "pub master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n",
+		"main.belt": "use deck from \"cards.belt\"\n" +
+			"fn filtered(): nint {\n  return deck.Cards.where(fn(r) -> r.cost < 10).count()\n}\n" +
+			"fn total(): nint {\n  return deck.Cards.count()\n}\n",
+	})
+	if len(diags) != 0 {
+		t.Fatalf("a qualified master relation query must type-check: %v", codes(diags))
+	}
+}
+
+// findMasterRelation returns the first MasterRelation reachable from v by
+// descending a method-call chain's receivers and arguments — the leaf a relation
+// query lowers to, under any number of where/count calls.
+func findMasterRelation(v ir.Value) *ir.MasterRelation {
+	switch n := v.(type) {
+	case *ir.MasterRelation:
+		return n
+	case *ir.Call:
+		if r := findMasterRelation(n.Receiver); r != nil {
+			return r
+		}
+		for _, a := range n.Args {
+			if r := findMasterRelation(a); r != nil {
+				return r
+			}
+		}
+	}
+	return nil
+}
+
+// TestQualifiedMasterLowersToRelation pins that the lowering — not only the checker
+// — reads an imported master in value position as its relation: the resolved IR of
+// deck.Cards.where(...).count() carries a MasterRelation over the imported Cards
+// master at the foot of the call chain, not a reified type value. Were the lowering
+// to keep the type-value reading, the checker (which types it as relation) and the
+// lowering would disagree, and the query driver would never recognize the chain.
+func TestQualifiedMasterLowersToRelation(t *testing.T) {
+	files := map[string]string{
+		"masterbelt.toml": "entry = \"main.belt\"\n",
+		"cards.belt":      "pub master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n",
+		"main.belt": "use deck from \"cards.belt\"\n" +
+			"fn probe(): nint {\n  return deck.Cards.where(fn(r) -> r.cost < 10).count()\n}\n",
+	}
+	root := belttest.WriteFiles(t, files)
+	proj, pdiags := project.Open(root)
+	if pdiags.Len() > 0 {
+		t.Fatalf("project diagnostics: %v", pdiags.Items())
+	}
+	docs := map[FileID]*abstract.Document{}
+	uses := map[FileID]map[*ast.UseDecl]FileID{}
+	var mainID FileID
+	for _, f := range proj.Files() {
+		docs[FileID(f.ID)] = f.AST
+		uses[FileID(f.ID)] = UsesOf(f.Uses)
+		if strings.HasSuffix(string(f.ID), "main.belt") {
+			mainID = FileID(f.ID)
+		}
+	}
+	modules, diags := AnalyzeProgram(docs, uses)
+	if ds := diags[mainID]; len(ds) != 0 {
+		t.Fatalf("main.belt did not type-check: %v", codes(ds))
+	}
+	var rel *ir.MasterRelation
+	for _, f := range modules[mainID].Funcs {
+		if f.Name == "probe" {
+			for _, s := range f.Body {
+				if r, ok := s.(*ir.Return); ok && r.Value != nil {
+					rel = findMasterRelation(r.Value)
+				}
+			}
+		}
+	}
+	if rel == nil {
+		t.Fatal("the query chain lowered no MasterRelation; the imported master was not read as a relation")
+	}
+	if rel.Master == nil || rel.Master.Name != "Cards" {
+		t.Fatalf("MasterRelation master = %v, want the imported Cards", rel.Master)
+	}
+}
+
+// TestQualifiedRelationCountInAssert pins that the reference walk treats a relation
+// method on an imported master as a relation method, not a type-member access: a
+// comptime assert over deck.Cards.where(...).count() reports no
+// unknown_associated_const, the qualified twin of the bare-name validate-all case.
+// (The reference walk only runs in comptime contexts — an assert, a validate clause,
+// a constant — not a plain function body, so the assert is what exercises it.)
+func TestQualifiedRelationCountInAssert(t *testing.T) {
+	diags := analyzeProject(t, map[string]string{
+		"cards.belt": "pub master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n",
+		"main.belt": "use deck from \"cards.belt\"\n" +
+			"assert deck.Cards.where(fn(r) -> r.cost > 10).count() < 50\n",
+	})
+	if hasCode(diags, CodeUnknownAssociatedConst) {
+		t.Fatalf("a qualified relation method must not be reported as a type member: %v", codes(diags))
 	}
 }
 

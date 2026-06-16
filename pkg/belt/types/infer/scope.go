@@ -510,6 +510,12 @@ func (s BodyScope) typeMemberValue(e *ast.MemberExpr) (ir.Type, bool) {
 	if recv, ok := e.Receiver.(*ast.Identifier); ok && s.shadows(recv.Name) {
 		return ir.Invalid, false
 	}
+	// A namespace-qualified master name in value position is its relation — the
+	// qualified twin of the bare master name, on which where and count are methods.
+	// The bare reading is identifierLeaf's; this is the imported one.
+	if def := QualifiedTypeDef(s.Qualified, s.valueShadows, e); def != nil && def.Master != nil {
+		return RelationType(s.Reg, def), true
+	}
 	if t := typeMemberType(s.Reg, s.Universe, s.Qualified, s.valueShadows, e); t != ir.Invalid {
 		return t, true
 	}
