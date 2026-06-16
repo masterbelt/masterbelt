@@ -1,6 +1,9 @@
 package sql
 
-import "github.com/masterbelt/masterbelt/pkg/source/ir"
+import (
+	"github.com/masterbelt/masterbelt/pkg/belt/eval"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
+)
 
 // CountRelation recognizes a relation count query — count() over a chain of where
 // narrowings over a master relation, the shape Cards.where(...).count() and
@@ -10,10 +13,13 @@ import "github.com/masterbelt/masterbelt/pkg/source/ir"
 // the caller leaves it to the ordinary fold. A predicate the core cannot express
 // yields Unsupported entries, which the caller treats as a rejection.
 //
-// The query driver pairs the returned Relation with the master's loaded engine and
-// runs engine.Count; the recognition and the predicate lowering live here, apart
-// from the engine, so they need no data.
-func CountRelation(chain ir.Value) (rel Relation, master *ir.TypeDef, unsupported []Unsupported, ok bool) {
+// env folds a where predicate's data-independent operands to constants before
+// lowering — a named constant (c.cost > MIN) or an arithmetic expression
+// (c.id > 1 + 2) — since Lower binds only literals. It resolves constants, not
+// master rows: the recognition and lowering still need no row data, which the
+// query driver supplies by pairing the returned Relation with the master's loaded
+// engine and running engine.Count.
+func CountRelation(chain ir.Value, env eval.GraphEnv) (rel Relation, master *ir.TypeDef, unsupported []Unsupported, ok bool) {
 	count, ok := asCall(chain, "count")
 	if !ok || len(count.Args) != 0 {
 		return Relation{}, nil, nil, false
@@ -32,13 +38,66 @@ func CountRelation(chain ir.Value) (rel Relation, master *ir.TypeDef, unsupporte
 			if !ok {
 				return Relation{}, nil, nil, false
 			}
-			p, u := Lower(pred)
+			p, u := Lower(foldOperands(pred, env))
 			unsupported = append(unsupported, u...)
 			rel = rel.Where(p)
 			recv = r.Receiver
 		default:
 			return Relation{}, nil, nil, false
 		}
+	}
+}
+
+// foldOperands replaces every data-independent subexpression of a predicate with
+// the constant it evaluates to, so a named-constant or arithmetic operand reaches
+// Lower as a literal it can bind. A subexpression that reads a column (or the query
+// binding) is data-dependent: eval.Graph leaves it unevaluable (nil), so it is kept
+// and its children are folded instead — the column comparison stays, only the value
+// side collapses. The fold never reduces the column, the relation, or the count
+// (all unevaluable without row data); it only resolves the constants the predicate
+// compares against, which Lower otherwise rejects as non-literal expressions.
+func foldOperands(v ir.Value, env eval.GraphEnv) ir.Value {
+	if v == nil {
+		return nil
+	}
+	if lit := constantToValue(eval.Graph(v, env)); lit != nil {
+		return lit
+	}
+	switch n := v.(type) {
+	case *ir.Call:
+		folded := *n
+		folded.Receiver = foldOperands(n.Receiver, env)
+		folded.Args = make([]ir.Value, len(n.Args))
+		for i, a := range n.Args {
+			folded.Args[i] = foldOperands(a, env)
+		}
+		return &folded
+	case *ir.Adapt:
+		folded := *n
+		folded.Value = foldOperands(n.Value, env)
+		return &folded
+	default:
+		return v
+	}
+}
+
+// constantToValue renders a folded constant as the literal node Lower binds: an
+// integer, string, or boolean. It is nil for a constant Lower does not bind (a
+// collection, a record, an error, an enum base) and for a nil constant (an
+// unevaluable subexpression), leaving the original node in place.
+func constantToValue(c *ir.Constant) ir.Value {
+	if c == nil {
+		return nil
+	}
+	switch c.Kind {
+	case ir.ConstInt:
+		return &ir.IntLiteral{Text: c.Int.String()}
+	case ir.ConstString:
+		return &ir.StringLiteral{Value: c.Str}
+	case ir.ConstBool:
+		return &ir.BoolLiteral{Value: c.Bool}
+	default:
+		return nil
 	}
 }
 
