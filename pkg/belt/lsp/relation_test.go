@@ -266,6 +266,40 @@ func TestHoverRelationMethodInSwitchArmValue(t *testing.T) {
 	}
 }
 
+// TestHoverGenericRelationMethodShowsTypeParams pins that a generic relation method's
+// hover renders its type-parameter list and bound — sum<T: numeric> — so a T in its
+// parameters and result is explained, the way a function signature shows its own.
+func TestHoverGenericRelationMethodShowsTypeParams(t *testing.T) {
+	src := relationMaster + "fn probe(): nint {\n  return Cards.sum(fn(c) -> c.cost)\n}\n"
+	doc := testView(src)
+	h := hover(doc, strings.Index(src, "Cards.sum(")+len("Cards."))
+	if h == nil {
+		t.Fatal("no hover on the relation method sum")
+	}
+	if !strings.Contains(h.Contents.Value, "<T: numeric>") {
+		t.Errorf("sum hover should render its type parameter <T: numeric>: %q", h.Contents.Value)
+	}
+}
+
+// TestHoverCalledMasterMemberPrefersRelationMethod pins that hovering a called master
+// member resolves to the relation method, not a same-named associated constant: the
+// checker resolves Cards.sum(...) to the relation method (a const only shadows a read,
+// not a call), so the constant hover yields to the relation method's signature.
+func TestHoverCalledMasterMemberPrefersRelationMethod(t *testing.T) {
+	src := "master Cards {\n  record { id: int, cost: int } impl {\n    pub const sum: int = 0\n  }\n  primary id\n}\n" +
+		"fn probe(): nint {\n  return Cards.sum(fn(c) -> c.cost)\n}\n"
+	doc := testView(src)
+	h := hover(doc, strings.Index(src, "Cards.sum(")+len("Cards."))
+	if h == nil {
+		t.Fatal("no hover on the called master member sum")
+	}
+	// The relation method's signature names its numeric bound; the associated
+	// constant would render `sum: int = 0`, which carries no such word.
+	if !strings.Contains(h.Contents.Value, "numeric") {
+		t.Errorf("a called master member should hover as the relation method, not the const: %q", h.Contents.Value)
+	}
+}
+
 // qualifiedRelationMain is the file that queries an imported master's relation.
 const qualifiedRelationMain = "use deck from \"cards.belt\"\n" +
 	"fn probe(): nint {\n  return deck.Cards.count()\n}\n"

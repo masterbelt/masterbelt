@@ -101,6 +101,11 @@ func methodSignatureSubst(m *ir.Method, subst map[string]ir.Type) string {
 		b.WriteString(eff + " ")
 	}
 	b.WriteString(m.Name)
+	// A generic method's own type parameters and their bounds, rendered as declared
+	// (sum<T: numeric>) the way a function's signature does — the receiver's
+	// substitution pins the receiver's variables, not the method's own, so they show
+	// unsolved, the bound that explains a `T` in the parameters and result alongside.
+	b.WriteString(typeParamList(m.TypeParams))
 	b.WriteString("(")
 	for i, p := range m.Params {
 		if i > 0 {
@@ -560,6 +565,20 @@ func enumMemberHover(doc view, offset int) *protocol.Hover {
 	}
 }
 
+// memberIsCallee reports whether a member access is the callee of a call in the
+// file — X.m used as X.m(...). It distinguishes a member read (a value) from a
+// member call (a method, static fn, or relation method), so a value-position hover
+// (an associated constant) does not claim a called member the call-aware hover owns.
+func memberIsCallee(doc view, member *ast.MemberExpr) bool {
+	found := false
+	forEachExpr(doc.AST().File(), func(e ast.Expr) {
+		if call, ok := e.(*ast.CallExpr); ok && call.Callee == member {
+			found = true
+		}
+	})
+	return found
+}
+
 // assocConstHover describes an associated-constant access at offset (int8.Max,
 // Level.Max): the qualified name with its type, its folded value, and the
 // constant's doc comments beneath — rendered as `int8.Max: int = 127`. It
@@ -568,6 +587,14 @@ func enumMemberHover(doc view, offset int) *protocol.Hover {
 func assocConstHover(doc view, offset int) *protocol.Hover {
 	member, ok := memberAccessAt(doc, offset)
 	if !ok {
+		return nil
+	}
+	// A called member (Cards.sum(...)) is a method, static fn, or relation method,
+	// not a value read: the checker resolves a master's relation method over a
+	// same-named associated constant when the name is called, so the const hover must
+	// not claim it — the call-aware member hover does. A bare read (Cards.sum) is the
+	// constant and stays here.
+	if memberIsCallee(doc, member) {
 		return nil
 	}
 	recv, ok := member.Receiver.(*ast.Identifier)
