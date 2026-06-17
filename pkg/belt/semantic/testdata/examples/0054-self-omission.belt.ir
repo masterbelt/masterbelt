@@ -254,6 +254,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "Total stat budget: power and defense are bare reads of self's fields."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "nint"
@@ -290,6 +291,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "A bare field read alongside a parameter — bonus is the parameter, power" "and defense the fields; no name is shared, so there is no ambiguity."
+          TypeParams: ~
           Params:
             Param
               Name: "bonus"
@@ -342,6 +344,7 @@ Module
           Kind: 1
           Effects: ~
           Doc: "A getter body reads a sibling field bare."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "nint"
@@ -375,6 +378,7 @@ Module
           Kind: 1
           Effects: ~
           Doc: "A getter body reads a sibling getter bare (doubledPower means" "self.doubledPower) and a field bare in the same expression."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "nint"
@@ -435,6 +439,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "The same total, written with self. spelled out."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "nint"
@@ -487,6 +492,7 @@ Module
           Kind: 1
           Effects: ~
           Doc: "The health expressed in tens — self is the underlying nint."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "nint"
@@ -520,6 +526,7 @@ Module
           Kind: 1
           Effects: ~
           Doc: "One band above the current one: band is a bare read of the getter above."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "nint"
@@ -569,6 +576,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "Whether the score lies in the valid band — a bare read of self."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "bool"

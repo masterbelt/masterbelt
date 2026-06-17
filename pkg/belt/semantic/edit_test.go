@@ -8,6 +8,7 @@ import (
 
 	"github.com/masterbelt/masterbelt/pkg/belt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/source"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 // editable drives a one-file Program the way an editor does: edits go to the
@@ -176,6 +177,80 @@ func TestFuncLitTypes(t *testing.T) {
 	want := "fn(bool): bool|fn(nint): nint|fn(nint): nint|fn(nint): nint"
 	if strings.Join(got, "|") != want {
 		t.Fatalf("FuncLitTypes = %v, want %s", got, want)
+	}
+}
+
+// TestExprTypesRelationChain pins that the checker writes back a relation type for a
+// master query, so the editor reads it rather than re-deriving the scope rules: a
+// master in a body reads as its relation and a where chain carries relation<Cards>,
+// the types a chained .count or .sum resolves through. The bare master and the where
+// call both settle to relation<Cards>, so the stream carries it at least twice.
+func TestExprTypesRelationChain(t *testing.T) {
+	src := "master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n" +
+		"fn probe(): nint {\n  return Cards.where(fn(c) -> c.cost > 0).count()\n}\n"
+	e := newEditable([]byte(src))
+	n := 0
+	for _, ty := range e.prog.ExprTypes(soleFileID) {
+		if ty != nil && ty.String() == "relation<Cards>" {
+			n++
+		}
+	}
+	if n < 2 {
+		t.Fatalf("ExprTypes should carry relation<Cards> for the bare master and the where chain; got %d such entries", n)
+	}
+}
+
+// TestInterfaceMethodTypeParamsResolved pins that a generic interface method keeps
+// its explicit type parameters and their bounds on the resolved ir.Method — the
+// interface twin of a concrete method — so an IR dump and text round-trip carry the
+// declared list rather than serializing it away.
+func TestInterfaceMethodTypeParamsResolved(t *testing.T) {
+	src := "pub interface ordered {\n  pub lt(other: self): bool\n}\n" +
+		"pub interface seq<V> {\n  pick<A: ordered>(init: A): A\n}\n"
+	e := newEditable([]byte(src))
+	var pick *ir.Method
+	for _, def := range e.prog.Module(soleFileID).Types {
+		if def.Name != "seq" {
+			continue
+		}
+		for _, m := range def.Methods {
+			if m.Name == "pick" {
+				pick = m
+			}
+		}
+	}
+	if pick == nil {
+		t.Fatal("did not resolve the interface method pick")
+	}
+	if len(pick.TypeParams) != 1 || pick.TypeParams[0].Name != "A" {
+		t.Fatalf("pick.TypeParams = %#v, want one parameter A", pick.TypeParams)
+	}
+	if pick.TypeParams[0].Bound == nil {
+		t.Fatalf("pick.TypeParams[0].Bound is nil, want the ordered interface bound recorded")
+	}
+}
+
+// TestGenericBoundReportedOnce pins that an invalid type-parameter bound is reported
+// exactly once: recording the resolved type parameters reuses the bounds the signature
+// already settled rather than settling them a second time, so a generic function — and
+// a generic method or interface member, which share the recording path — does not emit
+// the same unknown_type twice.
+func TestGenericBoundReportedOnce(t *testing.T) {
+	for _, src := range []string{
+		"pub fn g<T: Nope>(x: T): T {\n  return x\n}\n",
+		"pub type Box<V> = { v: V } impl {\n  pub fn g<T: Nope>(x: T): T {\n    return x\n  }\n}\n",
+		"pub interface seq<V> {\n  pick<T: Nope>(x: T): T\n}\n",
+	} {
+		e := newEditable([]byte(src))
+		n := 0
+		for _, d := range e.prog.Diagnostics(soleFileID) {
+			if strings.Contains(d.Message, "Nope") {
+				n++
+			}
+		}
+		if n != 1 {
+			t.Errorf("an unknown bound should be reported once, got %d for:\n%s", n, src)
+		}
 	}
 }
 

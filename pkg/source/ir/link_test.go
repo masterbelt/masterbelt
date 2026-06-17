@@ -102,6 +102,57 @@ func TestLinkRelinksMasterRowFields(t *testing.T) {
 	}
 }
 
+// TestLinkRelinksMethodTypeParamBounds pins that a generic method's type-parameter
+// bound is relinked across a text round-trip — the method twin of the function
+// relink: the bound names another declaration (the interface it constrains to), so
+// Link must re-point it to the module's own def or it keeps the by-name placeholder
+// unmarshalling produces.
+func TestLinkRelinksMethodTypeParamBounds(t *testing.T) {
+	numeric := &TypeDef{Name: "Numeric", Anchor: "belt:/Numeric", Interface: &InterfaceDef{}}
+	box := &TypeDef{
+		Name:   "Box",
+		Anchor: "belt:/Box",
+		Body:   &Record{Fields: []Field{{Name: "v", Type: &Builtin{Name: "int"}}}},
+		Methods: []*Method{{
+			Name:       "sum",
+			Anchor:     "belt:/Box.sum",
+			TypeParams: []*TypeParam{{Name: "T", Bound: &Named{Def: numeric}}},
+			Result:     &Builtin{Name: "int"},
+		}},
+	}
+	data, err := (&Module{Types: []*TypeDef{numeric, box}}).MarshalText()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back Module
+	if err := back.UnmarshalText(data); err != nil {
+		t.Fatal(err)
+	}
+	if err := back.Link(Resolver{}); err != nil {
+		t.Fatal(err)
+	}
+	var backNumeric, backBox *TypeDef
+	for _, td := range back.Types {
+		switch td.Name {
+		case "Numeric":
+			backNumeric = td
+		case "Box":
+			backBox = td
+		}
+	}
+	if backNumeric == nil || backBox == nil || len(backBox.Methods) != 1 {
+		t.Fatal("round-trip lost a declaration or the method")
+	}
+	tps := backBox.Methods[0].TypeParams
+	if len(tps) != 1 {
+		t.Fatalf("method type params = %#v, want one", tps)
+	}
+	n, ok := tps[0].Bound.(*Named)
+	if !ok || n.Def != backNumeric {
+		t.Fatalf("method bound = %#v, want it relinked to the module's Numeric def", tps[0].Bound)
+	}
+}
+
 // TestLinkCoversEveryValue drives the relink walk over every value form: the
 // linker is an exhaustive switch guarded by a panic, and this pin turns an
 // unhandled form into a failing test rather than a runtime crash on the first

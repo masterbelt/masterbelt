@@ -25,6 +25,10 @@ Module
           Kind: 0
           Effects: ~
           Doc: "The required primitive: fold the underlying list."
+          TypeParams:
+            TypeParam
+              Name: "A"
+              Bound: ~
           Params:
             Param
               Name: "init"
@@ -94,6 +98,10 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams:
+            TypeParam
+              Name: "A"
+              Bound: ~
           Params:
             Param
               Name: "init"
@@ -129,6 +137,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "Provided: the number of elements, folded from the primitive."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "nint"
@@ -194,6 +203,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "Provided: whether any element satisfies the predicate."
+          TypeParams: ~
           Params:
             Param
               Name: "pred"

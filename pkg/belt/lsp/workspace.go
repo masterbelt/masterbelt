@@ -125,6 +125,15 @@ func (v view) ReceiverMethods(recv ir.Type) ([]*ir.Method, map[string]ir.Type, b
 
 func (v view) FuncLitTypes() map[*ast.FuncLit]*ir.Func { return v.ws.prog.FuncLitTypes(v.id) }
 
+// ExprTypes is the type the checker settled for every expression node it typed
+// with a usable value — the typed-value-graph stream, keyed by node. It is the
+// editor's read of the checker's own typing, the single source of truth a
+// member-access receiver resolves through (a body's master-as-relation, a relation
+// chain's result) instead of re-deriving the scope rules. Building it runs the
+// checking walks over the file, so a request reads it once and threads the map
+// through the receiver resolver rather than rebuilding it per lookup.
+func (v view) ExprTypes() map[ast.Expr]ir.Type { return v.ws.prog.ExprTypes(v.id) }
+
 func (v view) Diagnostics() []diagnostic.Diagnostic { return v.ws.prog.Diagnostics(v.id) }
 
 // Lint returns the file's advisory lint diagnostics — the editor surfaces them

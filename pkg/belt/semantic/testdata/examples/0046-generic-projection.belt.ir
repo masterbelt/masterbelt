@@ -295,6 +295,7 @@ Module
           Kind: 1
           Effects: ~
           Doc: "Read as cell.held (no parens), like a field."
+          TypeParams: ~
           Params: ~
           Result: TypeVar
             Name: "T"
@@ -374,6 +375,7 @@ Module
           Kind: 1
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params: ~
           Result: TypeVar
             Name: "T"

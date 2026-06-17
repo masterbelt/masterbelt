@@ -65,6 +65,30 @@ func methodSignature(m *ir.Method) string {
 	return methodSignatureSubst(m, nil)
 }
 
+// typeParamListSubst renders a generic parameter list with the receiver's solved
+// type arguments substituted into each bound — so a method bound that mentions the
+// receiver's own parameter (Box<int>.pick<U: wrapper<T>>) shows the pinned type
+// (wrapper<int>), not the unbound owner variable. The parameter name itself is the
+// method's own and stays unsolved; a nil or empty subst renders the bounds as
+// declared, exactly as typeParamList does.
+func typeParamListSubst(params []*ir.TypeParam, subst map[string]ir.Type) string {
+	if len(params) == 0 {
+		return ""
+	}
+	parts := make([]string, len(params))
+	for i, p := range params {
+		parts[i] = p.Name
+		if p.Bound != nil {
+			bound := p.Bound
+			if len(subst) > 0 {
+				bound = types.Substitute(bound, subst)
+			}
+			parts[i] += ": " + bound.String()
+		}
+	}
+	return "<" + strings.Join(parts, ", ") + ">"
+}
+
 // methodSignatureSubst is methodSignature with the receiver's solved type
 // arguments substituted in, so list<int8>.map shows fn(item: int8).
 func methodSignatureSubst(m *ir.Method, subst map[string]ir.Type) string {
@@ -101,6 +125,12 @@ func methodSignatureSubst(m *ir.Method, subst map[string]ir.Type) string {
 		b.WriteString(eff + " ")
 	}
 	b.WriteString(m.Name)
+	// A generic method's own type parameters and their bounds, rendered as declared
+	// (sum<T: numeric>) the way a function's signature does. The method's own variable
+	// shows unsolved (the receiver pins the receiver's variables, not the method's),
+	// but a bound that mentions the receiver's parameter takes its substitution too —
+	// Box<int>.pick<U: wrapper<T>> shows U: wrapper<int>, not the unbound owner T.
+	b.WriteString(typeParamListSubst(m.TypeParams, subst))
 	b.WriteString("(")
 	for i, p := range m.Params {
 		if i > 0 {
@@ -148,7 +178,7 @@ func memberHover(doc view, offset int, trees map[cst.Green]cst.Tree) *protocol.H
 		return nil
 	}
 
-	recv := receiverTypeOf(doc, member.Receiver, trees, offset)
+	recv := receiverTypeOf(doc, member.Receiver, trees, offset, doc.ExprTypes())
 	if recv == nil || recv == ir.Invalid {
 		return nil
 	}
@@ -249,13 +279,16 @@ func receiverGetter(doc view, recv ir.Type, name string) (*ir.Method, map[string
 	return nil, nil, false
 }
 
-// receiverTypeOf resolves the type a member access's receiver has: self is
-// the enclosing impl's type, an identifier is the constant it names or the
-// parameter it denotes, a namespace member is the constant it imports, and a
-// chained access is the field's type on the inner receiver. Anything else —
-// a collection literal, an operator chain — goes through the real inference
-// in the file's top-level scope.
-func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset int) ir.Type {
+// receiverTypeOf resolves the type a member access's receiver has. Where the
+// checker type-checked the receiver, its own settled type is the answer
+// (doc.exprType): a master in a body reads as its relation, a relation chain
+// carries its result type, a shadowing local or type parameter wins — every scope
+// rule the checker already applies, read rather than re-derived. The remaining
+// cases are the ones the checker leaves untyped: self (the enclosing impl's type),
+// a constant or a parameter a bare name denotes, a namespace member's imported
+// constant, and a chained field read on an inner receiver the checker did not type.
+// Anything else falls back to top-level inference.
+func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset int, exprTypes map[ast.Expr]ir.Type) ir.Type {
 	switch e := e.(type) {
 	case *ast.SelfExpr:
 		if def := enclosingMethodOwner(doc, trees, offset); def != nil {
@@ -266,22 +299,54 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 		if c := doc.Resolve(e); c != nil {
 			return c.Type
 		}
-		return paramTypeAt(doc, e.Name, trees, offset)
+		if t := paramTypeAt(doc, e.Name, trees, offset); t != nil {
+			return t
+		}
 	case *ast.MemberExpr:
+		// The checker's settled type wins: a namespace-qualified master (deck.Cards)
+		// reads as its relation even when the namespace also exports a same-named const,
+		// which ResolveMember returns first and would mask the relation — the checker
+		// resolves the qualified type over the const (it shadows by the namespace name,
+		// not the member), so the editor reads its settled type before the const.
+		if t := settledType(exprTypes, e); t != ir.Invalid {
+			return t
+		}
 		if c := doc.ResolveMember(e); c != nil {
 			return c.Type
 		}
-		if inner := receiverTypeOf(doc, e.Receiver, trees, offset); inner != nil {
+		// Otherwise a chained field read on an inner receiver the checker left untyped.
+		if inner := receiverTypeOf(doc, e.Receiver, trees, offset, exprTypes); inner != nil {
 			if f, ok := memberFieldOf(inner, e.Member.Name); ok {
 				return f.Type
 			}
 		}
 		return nil
 	}
+	// The checker's settled type for the receiver, read before the top-level
+	// fallback for every remaining form — a bare master (its relation in a body), a
+	// relation chain (its result, including a self-returning or overloaded one), a
+	// ternary over relations — each typed by the body walk the const-scope fallback
+	// cannot reproduce. A name the checker leaves untyped (a body-local a let shadows,
+	// a constant) falls through, honoured by its own scope rule above or the fallback.
+	if t := settledType(exprTypes, e); t != ir.Invalid {
+		return t
+	}
 	if t := doc.TypeOfExpr(e); t != ir.Invalid {
 		return t
 	}
 	return nil
+}
+
+// settledType reads the type the checker settled for an expression node from the
+// per-request map, or ir.Invalid when the checker typed it with no usable type (a
+// master in a constant initializer, a name a local shadows, an unresolved form). The
+// map is built once per request and threaded through the receiver resolver, so a
+// chained receiver does not rebuild it per lookup.
+func settledType(exprTypes map[ast.Expr]ir.Type, e ast.Expr) ir.Type {
+	if t, ok := exprTypes[e]; ok && t != nil {
+		return t
+	}
+	return ir.Invalid
 }
 
 // enclosingMethodOwner returns the type definition whose impl method body spans
@@ -528,6 +593,20 @@ func enumMemberHover(doc view, offset int) *protocol.Hover {
 	}
 }
 
+// memberIsCallee reports whether a member access is the callee of a call in the
+// file — X.m used as X.m(...). It distinguishes a member read (a value) from a
+// member call (a method, static fn, or relation method), so a value-position hover
+// (an associated constant) does not claim a called member the call-aware hover owns.
+func memberIsCallee(doc view, member *ast.MemberExpr) bool {
+	found := false
+	forEachExpr(doc.AST().File(), func(e ast.Expr) {
+		if call, ok := e.(*ast.CallExpr); ok && call.Callee == member {
+			found = true
+		}
+	})
+	return found
+}
+
 // assocConstHover describes an associated-constant access at offset (int8.Max,
 // Level.Max): the qualified name with its type, its folded value, and the
 // constant's doc comments beneath — rendered as `int8.Max: int = 127`. It
@@ -536,6 +615,14 @@ func enumMemberHover(doc view, offset int) *protocol.Hover {
 func assocConstHover(doc view, offset int) *protocol.Hover {
 	member, ok := memberAccessAt(doc, offset)
 	if !ok {
+		return nil
+	}
+	// A called member (Cards.sum(...)) is a method, static fn, or relation method,
+	// not a value read: the checker resolves a master's relation method over a
+	// same-named associated constant when the name is called, so the const hover must
+	// not claim it — the call-aware member hover does. A bare read (Cards.sum) is the
+	// constant and stays here.
+	if memberIsCallee(doc, member) {
 		return nil
 	}
 	recv, ok := member.Receiver.(*ast.Identifier)

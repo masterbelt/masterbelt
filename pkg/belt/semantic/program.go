@@ -325,7 +325,47 @@ func (p *Program) FuncLitTypes(id FileID) map[*ast.FuncLit]*ir.Func {
 func funcLitTypesOf(db *database, fileID FileID, file *ast.File) map[*ast.FuncLit]*ir.Func {
 	out := map[*ast.FuncLit]*ir.Func{}
 	sink := &infer.Sink{SolvedFuncLit: func(lit *ast.FuncLit, t *ir.Func) { out[lit] = t }}
+	runCheckWalks(db, fileID, file, sink)
+	return out
+}
 
+// ExprTypes returns the type the checking walk settles for every expression in
+// file it types with a usable (non-Invalid) value — the typed-value-graph stream
+// (Sink.Typed), captured over the same walks assemble runs. It is the editor's
+// single source of truth for a sub-expression's type: a master in a body reads as
+// its relation, a relation chain carries its result type, a shadowing local wins —
+// all by the checker's own scope rules, so the editor reads the type rather than
+// re-deriving the rules. A constant initializer is walked in the const scope (a
+// master stays a metatype there, since a const cannot evaluate a relation), so the
+// body-vs-const distinction falls out of the walk rather than being special-cased.
+func (p *Program) ExprTypes(id FileID) map[ast.Expr]ir.Type {
+	doc := p.docs[id]
+	if doc == nil {
+		return nil
+	}
+	return exprTypesOf(p.db, id, doc.File())
+}
+
+// exprTypesOf is the walk behind ExprTypes: it captures the Typed stream over the
+// shared checking walks, keyed by expression node.
+func exprTypesOf(db *database, fileID FileID, file *ast.File) map[ast.Expr]ir.Type {
+	out := map[ast.Expr]ir.Type{}
+	sink := &infer.Sink{Typed: func(e ast.Expr, t ir.Type) { out[e] = t }}
+	runCheckWalks(db, fileID, file, sink)
+	return out
+}
+
+// runCheckWalks runs every checking walk assemble runs — the constant
+// initializers, the asserts, and the method and function bodies (a master's
+// validate clauses among them) — driving sink, reading every fact through the
+// engine so it reuses the memoized resolution and types of the last analysis. It
+// is the shared walk behind the editor-facing type queries (FuncLitTypes,
+// ExprTypes): each builds a sink that captures one of the walk's informational
+// streams. Diagnostics are suppressed (a nil diagnostic list and the zero folder),
+// so only the streams the caller wired fire, while the body walk still reaches
+// every expression, including those in a switch arm or a lambda nested in a
+// top-level fn body, exactly as assemble does.
+func runCheckWalks(db *database, fileID FileID, file *ast.File, sink *infer.Sink) {
 	q := engineQueries{db}
 	env := typeEnv{q: q, file: fileID}
 	reg := q.registry()
@@ -347,29 +387,21 @@ func funcLitTypesOf(db *database, fileID FileID, file *ast.File) map[*ast.FuncLi
 			infer.Check(decl.Value, env, sink)
 		}
 	}
-	// An assert condition is checked exactly as an un-annotated initializer,
-	// so a literal inside one settles its signature here too.
+	// An assert condition is checked exactly as an un-annotated initializer.
 	for _, a := range file.Asserts {
 		if a.Cond != nil {
 			infer.Check(a.Cond, env, sink)
 		}
 	}
-	// Diagnostics are not wanted here — only the SolvedFuncLit sink — so the
-	// switch checks are suppressed by a nil diagnostic list; the body walk still
-	// reaches every function literal, including those in a switch arm. Both
-	// method and function bodies are walked, exactly as assemble does, so a
-	// lambda nested in a top-level fn body settles its signature for the editor
-	// the same way one inside a method body or a const initializer does.
 	funcs := buildFuncSymbols(file)
 	qualifiedFuncs := qualifiedFuncsFrom(q, q.importsOf(fileID))
 	constShadows := constShadowsFrom(q, fileID)
 	nsShadows := namespaceShadowsFrom(q, fileID)
 	// A nil diagnostic list (the sink-only walks) folds nothing, so the fold
-	// channel is the zero folder (its queries unread), exactly as the
-	// method-body walk here always has.
+	// channel is the zero folder (its queries unread), exactly as the method-body
+	// walk here always has.
 	checkMethodBodies(reg, q.typeDefs(fileID), q.universe(fileID), qualified, funcs, qualifiedFuncs, constShadows, nsShadows, exprFolder{}, sink, nil, nil)
 	checkFuncBodies(reg, file, q.universe(fileID), qualified, funcs, qualifiedFuncs, constShadows, nsShadows, exprFolder{}, sink, nil, nil)
-	return out
 }
 
 // QualifiedTypeNames returns the namespace-qualified type names in scope in

@@ -325,6 +325,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "The next percentage point."
+          TypeParams: ~
           Params: ~
           Result: SelfType
           Body:
@@ -415,6 +416,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "Whether the score is within the valid band."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "bool"

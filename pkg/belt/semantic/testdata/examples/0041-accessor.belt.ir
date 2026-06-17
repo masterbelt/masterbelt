@@ -292,6 +292,7 @@ Module
           Kind: 3
           Effects: ~
           Doc: "The freezing point of water."
+          TypeParams: ~
           Params: ~
           Result: Named
             Def: "Celsius"
@@ -317,6 +318,7 @@ Module
           Kind: 3
           Effects: ~
           Doc: "A degree reading converted from a fahrenheit value."
+          TypeParams: ~
           Params:
             Param
               Name: "v"
@@ -382,6 +384,7 @@ Module
           Kind: 3
           Effects: ~
           Doc: "A degree reading converted from a celsius value (the static overload:" "same name, a Celsius argument rather than a nint)."
+          TypeParams: ~
           Params:
             Param
               Name: "c"
@@ -404,6 +407,7 @@ Module
           Kind: 1
           Effects: ~
           Doc: "Fahrenheit reading: c.fahrenheit."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "nint"
@@ -461,6 +465,7 @@ Module
           Kind: 2
           Effects: ~
           Doc: "Fahrenheit write: c.fahrenheit = 212 (c is a let local)."
+          TypeParams: ~
           Params:
             Param
               Name: "v"
@@ -541,6 +546,7 @@ Module
           Kind: 3
           Effects: ~
           Doc: "A full health bar."
+          TypeParams: ~
           Params: ~
           Result: Named
             Def: "Health"
@@ -563,6 +569,7 @@ Module
           Kind: 1
           Effects: ~
           Doc: "The health expressed in tens (the band a UI shows)."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "nint"
@@ -637,6 +644,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -653,6 +661,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -669,6 +678,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -685,6 +695,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -701,6 +712,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -717,6 +729,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -733,6 +746,7 @@ Module
           Kind: 1
           Effects: ~
           Doc: "Whether this element is Fire."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "bool"
@@ -763,6 +777,7 @@ Module
           Kind: 3
           Effects: ~
           Doc: "The default element."
+          TypeParams: ~
           Params: ~
           Result: Named
             Def: "Element"

@@ -99,15 +99,67 @@ func memberItems(doc view, offset int) ([]protocol.CompletionItem, bool) {
 	}
 	// A member access whose receiver names a type (Rarity., int8., Level.)
 	// offers the type's members — enum members and associated constants — each
-	// labelled with its value.
-	if items, ok := typeMemberItems(doc, member); ok {
-		return items, true
+	// labelled with its value. A master is both a type (its static fns) and a
+	// relation value (where, count, sum): its type members are gathered here but,
+	// unlike a plain type, the value-method path below also runs, so Cards. offers
+	// both the static fns and the relation's methods.
+	typeItems, isType := typeMemberItems(doc, member)
+	if isType && !masterReceiver(doc, member.Receiver) {
+		return typeItems, true
 	}
-	recv := receiverTypeOf(doc, member.Receiver, doc.Trees(), offset)
+	recv := receiverTypeOf(doc, member.Receiver, doc.Trees(), offset, doc.ExprTypes())
 	if recv == nil || recv == ir.Invalid {
-		return nil, true
+		return typeItems, true
 	}
+	// The value-position members of the receiver's type (methods, getters, fields)
+	// and — for a master, whose name is also a type — its static fns, gathered above.
+	// A static fn shadows a relation method of the same name (the checker resolves the
+	// static call first), so a relation method a static fn already provides is dropped.
+	// Only a static fn shadows it: an associated constant or enum member of the same
+	// name is not callable as the method, so both are offered, the way Cards.where is
+	// the relation method and a const where its value.
+	value := dropShadowed(valueMemberItems(doc, recv), staticFnItems(typeItems))
+	return append(value, typeItems...), true
+}
 
+// staticFnItems keeps the static-fn entries of a type's members — the only ones a
+// relation method of the same name yields to. typeMemberItems tags each static fn a
+// Function, distinct from the EnumMember and Constant kinds of the readings that do
+// not shadow, so the kind is the filter.
+func staticFnItems(items []protocol.CompletionItem) []protocol.CompletionItem {
+	var out []protocol.CompletionItem
+	for _, it := range items {
+		if it.Kind != nil && *it.Kind == protocol.CompletionItemKindFunction {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
+// dropShadowed returns items without those whose label a shadowing item already
+// carries — the relation methods a master's static fns of the same name take
+// precedence over, so each name appears once, as the member the checker resolves.
+func dropShadowed(items, shadowing []protocol.CompletionItem) []protocol.CompletionItem {
+	if len(shadowing) == 0 {
+		return items
+	}
+	names := make(map[string]bool, len(shadowing))
+	for _, it := range shadowing {
+		names[it.Label] = true
+	}
+	out := items[:0]
+	for _, it := range items {
+		if !names[it.Label] {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
+// valueMemberItems is the value-position members of a receiver's type: its methods
+// (a call snippet), its getters (a property read), and its record fields. A setter
+// and a static fn are not value members and are left out.
+func valueMemberItems(doc view, recv ir.Type) []protocol.CompletionItem {
 	var items []protocol.CompletionItem
 	if methods, subst, ok := doc.ReceiverMethods(recv); ok {
 		methodKind := protocol.CompletionItemKindMethod
@@ -160,7 +212,20 @@ func memberItems(doc view, offset int) ([]protocol.CompletionItem, bool) {
 			})
 		}
 	}
-	return items, true
+	return items
+}
+
+// masterReceiver reports whether a member access's receiver is a bare master name —
+// an identifier naming a master, not shadowed by a value of the same name. A master
+// in value position is its relation, so its member access offers the relation's
+// methods (the value path) as well as the master's static fns (the type path).
+func masterReceiver(doc view, recv ast.Expr) bool {
+	id, ok := recv.(*ast.Identifier)
+	if !ok || doc.Resolve(id) != nil {
+		return false
+	}
+	def := lookupTypeName(doc, id.Name)
+	return def != nil && def.Master != nil
 }
 
 // typeMemberItems returns the completion items for a type member access

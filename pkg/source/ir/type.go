@@ -401,9 +401,15 @@ type Method struct {
 	Kind    MethodKind // the accessor/static modifier, or MethodNormal
 	Effects []string   // the declared effects in source order, or nil for pure
 	Doc     []string
-	Params  []Param
-	Result  Type
-	Body    []Stmt // the resolved body, or nil for an extern method
+	// TypeParams are the method's own generic type parameters (the T in
+	// sum<T: numeric>(...)), each a name with an optional resolved bound, distinct
+	// from the owning type's parameters. Empty for a non-generic method. A value
+	// typed as one inside the body resolves through its bound, and an editor's
+	// scope check reads them to tell a master name from a same-named parameter.
+	TypeParams []*TypeParam
+	Params     []Param
+	Result     Type
+	Body       []Stmt // the resolved body, or nil for an extern method
 	// Owner is the definition this method belongs to — the backpointer
 	// mirroring Named.Def, so a resolved method names its owner without a
 	// module walk (the text form renders Owner.name(signature)). It is

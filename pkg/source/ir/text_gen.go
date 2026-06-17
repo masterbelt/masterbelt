@@ -2448,6 +2448,21 @@ func writeMethod(w *treetext.Writer, n *Method, depth int) error {
 	w.Line(depth, "Kind: "+strconv.Itoa(int(n.Kind)))
 	w.Line(depth, "Effects: "+treetext.QuoteStrings(n.Effects))
 	w.Line(depth, "Doc: "+treetext.QuoteStrings(n.Doc))
+	if len(n.TypeParams) == 0 {
+		w.Line(depth, "TypeParams: "+treetext.Nil)
+	} else {
+		w.Line(depth, "TypeParams:")
+		for _, item := range n.TypeParams {
+			if item == nil {
+				w.Line(depth+1, treetext.Nil)
+				continue
+			}
+			w.Line(depth+1, "TypeParam")
+			if err := writeTypeParam(w, item, depth+2); err != nil {
+				return err
+			}
+		}
+	}
 	if len(n.Params) == 0 {
 		w.Line(depth, "Params: "+treetext.Nil)
 	} else {
@@ -2478,7 +2493,7 @@ func writeMethod(w *treetext.Writer, n *Method, depth int) error {
 
 // decodeMethod builds a Method from its element.
 func decodeMethod(e *treetext.Element) (*Method, error) {
-	if err := treetext.ExpectFields(e, "Name", "Anchor", "Public", "Extern", "Kind", "Effects", "Doc", "Params", "Result", "Body", "Owner"); err != nil {
+	if err := treetext.ExpectFields(e, "Name", "Anchor", "Public", "Extern", "Kind", "Effects", "Doc", "TypeParams", "Params", "Result", "Body", "Owner"); err != nil {
 		return nil, err
 	}
 	n := &Method{}
@@ -2522,6 +2537,29 @@ func decodeMethod(e *treetext.Element) (*Method, error) {
 	case f.Items == nil:
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
 	default:
+		out := make([]*TypeParam, 0, len(f.Items))
+		for j := range f.Items {
+			item := &f.Items[j]
+			if item.Head == treetext.Nil {
+				out = append(out, nil)
+				continue
+			}
+			if item.Head != "TypeParam" {
+				return nil, fmt.Errorf("treetext: line %d: %s is not a TypeParam", item.Line, item.Head)
+			}
+			v, err := decodeTypeParam(item)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, v)
+		}
+		n.TypeParams = out
+	}
+	switch f := e.Fields[8]; {
+	case f.Inline == treetext.Nil:
+	case f.Items == nil:
+		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
+	default:
 		out := make([]Param, 0, len(f.Items))
 		for j := range f.Items {
 			item := &f.Items[j]
@@ -2536,12 +2574,12 @@ func decodeMethod(e *treetext.Element) (*Method, error) {
 		}
 		n.Params = out
 	}
-	if v, err := decodeTypeField(e.Fields[8]); err != nil {
+	if v, err := decodeTypeField(e.Fields[9]); err != nil {
 		return nil, err
 	} else {
 		n.Result = v
 	}
-	switch f := e.Fields[9]; {
+	switch f := e.Fields[10]; {
 	case f.Inline == treetext.Nil:
 	case f.Items == nil:
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
@@ -2561,7 +2599,7 @@ func decodeMethod(e *treetext.Element) (*Method, error) {
 		}
 		n.Body = out
 	}
-	if v, err := unrefTypeDef(e.Fields[10]); err != nil {
+	if v, err := unrefTypeDef(e.Fields[11]); err != nil {
 		return nil, err
 	} else {
 		n.Owner = v

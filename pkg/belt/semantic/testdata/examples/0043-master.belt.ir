@@ -17,6 +17,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -33,6 +34,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -49,6 +51,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -65,6 +68,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -81,6 +85,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -97,6 +102,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -174,6 +180,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "The skill's display label."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "string"
