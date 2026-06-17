@@ -4,7 +4,85 @@ import (
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
+
+// TestMasterStaticSelfRelation checks that a master's static fn reads self as its
+// relation: average_cost composes where/sum/count over self, type-checks clean, and
+// its body lowers self to the master's relation — the same MasterRelation a bare
+// master name lowers to — ready for the data-fold driver. A non-master static fn's
+// self stays an error (TestStaticDiagnostics "static body cannot use self").
+func TestMasterStaticSelfRelation(t *testing.T) {
+	src := "pub enum Rarity {\n  Common, Rare, Legend\n}\n" +
+		"pub master Cards {\n  record { id: int, cost: int, rarity: Rarity } impl {\n" +
+		"    pub static fn average_cost(r: Rarity): int {\n" +
+		"      let matching = self.where(fn(c) -> c.rarity == r)\n" +
+		"      return matching.sum(fn(c) -> c.cost) / matching.count()\n" +
+		"    }\n  }\n  primary id\n}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("average_cost should type-check with self as the relation: %v", codes(diags))
+	}
+	var avg *ir.Method
+	for _, def := range m.Types {
+		if def.Master == nil {
+			continue
+		}
+		for _, mm := range def.Methods {
+			if mm.Name == "average_cost" {
+				avg = mm
+			}
+		}
+	}
+	if avg == nil {
+		t.Fatal("did not resolve the master static fn average_cost")
+	}
+	found := false
+	ir.WalkBody(avg.Body, func(v ir.Value) bool {
+		if _, ok := v.(*ir.MasterRelation); ok {
+			found = true
+		}
+		return true
+	})
+	if !found {
+		t.Error("average_cost body should lower self to the master's relation (MasterRelation)")
+	}
+}
+
+// TestMasterStaticImplicitSelfRelation checks that an implicit self-call in a master
+// static fn (a query method written without self) reads self as the relation too:
+// a bare count() lowers to the same MasterRelation receiver the explicit self.count()
+// does — so the data driver anchors it whether or not self was written, rather than
+// to a self value it cannot anchor.
+func TestMasterStaticImplicitSelfRelation(t *testing.T) {
+	src := "pub master Cards {\n  record { id: int, cost: int } impl {\n" +
+		"    pub static fn total(): nint {\n      return count()\n    }\n" +
+		"  }\n  primary id\n}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("an implicit self relation call should type-check: %v", codes(diags))
+	}
+	found := false
+	for _, def := range m.Types {
+		if def.Master == nil {
+			continue
+		}
+		for _, mm := range def.Methods {
+			if mm.Name != "total" {
+				continue
+			}
+			ir.WalkBody(mm.Body, func(v ir.Value) bool {
+				if _, ok := v.(*ir.MasterRelation); ok {
+					found = true
+				}
+				return true
+			})
+		}
+	}
+	if !found {
+		t.Error("an implicit self-call in a master static fn should lower to the master's relation (MasterRelation)")
+	}
+}
 
 // TestStaticCall checks a static fn is called Type.name(...) and folds — the
 // Type.Name path, scoped to the type.

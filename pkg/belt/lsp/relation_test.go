@@ -300,6 +300,24 @@ func TestHoverCalledMasterMemberPrefersRelationMethod(t *testing.T) {
 	}
 }
 
+// TestHoverSelfRelationMethodInStaticFn pins that self in a master's static fn reads
+// as the master's relation in the editor too: self.count() hovers count as a relation
+// method, the checker's settled self type winning over the enclosing-owner (row)
+// reading so the relation's query methods surface rather than the row's.
+func TestHoverSelfRelationMethodInStaticFn(t *testing.T) {
+	src := "master Cards {\n  record { id: int, cost: int } impl {\n" +
+		"    pub static fn total(): nint {\n      return self.count()\n    }\n" +
+		"  }\n  primary id\n}\n"
+	doc := testView(src)
+	h := hover(doc, strings.Index(src, "self.count()")+len("self."))
+	if h == nil {
+		t.Fatal("self in a master static fn is its relation; count should hover as a relation method")
+	}
+	if !strings.Contains(h.Contents.Value, "count") {
+		t.Errorf("hover should name the relation method count: %q", h.Contents.Value)
+	}
+}
+
 // qualifiedRelationMain is the file that queries an imported master's relation.
 const qualifiedRelationMain = "use deck from \"cards.belt\"\n" +
 	"fn probe(): nint {\n  return deck.Cards.count()\n}\n"

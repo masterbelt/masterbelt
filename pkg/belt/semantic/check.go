@@ -337,13 +337,20 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 			}
 			// A static fn has no receiver: its body is checked with self unbound
 			// (Self ir.Invalid) and a self reference reported (self_outside_method),
-			// exactly as a top-level function body is. An instance method, getter, or
-			// setter binds self to the receiver and passes a nil noSelf.
+			// exactly as a top-level function body is — except a master's static fn,
+			// whose self is the master's relation (the rows the query methods operate
+			// on), so a static aggregate (average_cost) composes them over self. An
+			// instance method, getter, or setter binds self to the receiver (a row) and
+			// passes a nil noSelf.
 			selfT := ir.Type(self)
 			var bodyNoSelf func(ast.Node)
 			if irm.Kind == ir.MethodStatic {
-				selfT = ir.Invalid
-				bodyNoSelf = noSelf
+				if def.Master != nil {
+					selfT = infer.RelationType(reg, def)
+				} else {
+					selfT = ir.Invalid
+					bodyNoSelf = noSelf
+				}
 			}
 			params := make(map[string]ir.Type, len(irm.Params))
 			for _, p := range irm.Params {
