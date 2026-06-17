@@ -49,6 +49,41 @@ func TestMasterStaticSelfRelation(t *testing.T) {
 	}
 }
 
+// TestMasterStaticImplicitSelfRelation checks that an implicit self-call in a master
+// static fn (a query method written without self) reads self as the relation too:
+// a bare count() lowers to the same MasterRelation receiver the explicit self.count()
+// does — so the data driver anchors it whether or not self was written, rather than
+// to a self value it cannot anchor.
+func TestMasterStaticImplicitSelfRelation(t *testing.T) {
+	src := "pub master Cards {\n  record { id: int, cost: int } impl {\n" +
+		"    pub static fn total(): nint {\n      return count()\n    }\n" +
+		"  }\n  primary id\n}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("an implicit self relation call should type-check: %v", codes(diags))
+	}
+	found := false
+	for _, def := range m.Types {
+		if def.Master == nil {
+			continue
+		}
+		for _, mm := range def.Methods {
+			if mm.Name != "total" {
+				continue
+			}
+			ir.WalkBody(mm.Body, func(v ir.Value) bool {
+				if _, ok := v.(*ir.MasterRelation); ok {
+					found = true
+				}
+				return true
+			})
+		}
+	}
+	if !found {
+		t.Error("an implicit self-call in a master static fn should lower to the master's relation (MasterRelation)")
+	}
+}
+
 // TestStaticCall checks a static fn is called Type.name(...) and folds — the
 // Type.Name path, scoped to the type.
 func TestStaticCall(t *testing.T) {

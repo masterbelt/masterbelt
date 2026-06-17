@@ -721,9 +721,23 @@ func (b bodyBinder) leafIdentCall(e *ast.CallExpr, callee *ast.Identifier, sub f
 		for i, a := range e.Arguments {
 			args[i] = sub(a)
 		}
-		return &ir.Call{Receiver: &ir.SelfValue{}, Method: callee.Name, Args: args, Syntax: e}
+		// A master's static fn reads self as the master's relation, so an implicit
+		// self-call there (count()) lowers to the same MasterRelation receiver the
+		// explicit self.count() does — the data driver anchors it whether or not self
+		// was written. Every other body's self is a row, lowering to a self value.
+		return &ir.Call{Receiver: b.selfReceiver(), Method: callee.Name, Args: args, Syntax: e}
 	}
 	return nil
+}
+
+// selfReceiver is the value an implicit self-call's receiver denotes in this body: a
+// master static fn's relation (the same MasterRelation a bare master name lowers
+// to), or a row self everywhere else.
+func (b bodyBinder) selfReceiver() ir.Value {
+	if b.relationSelf != nil {
+		return &ir.MasterRelation{Master: b.relationSelf}
+	}
+	return &ir.SelfValue{}
 }
 
 // leafMemberCall lowers a call whose callee is a member access: a namespace
