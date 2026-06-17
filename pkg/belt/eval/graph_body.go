@@ -494,8 +494,14 @@ func graphForRange(s *ir.For, iter *ir.Constant, ctx graphCtx) (*ir.Constant, gr
 func graphIteration(s *ir.For, elem *ir.Constant, ctx graphCtx) (*ir.Constant, graphOutcome) {
 	scope := newGraphScope(ctx.locals, ctx.relationLocals)
 	defer scope.restore()
-	if s.Var != "" && elem != nil {
-		scope.bind(s.Var, elem)
+	if s.Var != "" {
+		// The loop variable shadows any relation local of the same name for the body,
+		// so a use of it reads the iteration value rather than inlining the outer
+		// relation chain (which graphCall would otherwise try first).
+		scope.hideRelation(s.Var)
+		if elem != nil {
+			scope.bind(s.Var, elem)
+		}
 	}
 	return graphStmts(s.Body, ctx, scope)
 }
