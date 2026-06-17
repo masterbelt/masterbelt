@@ -148,7 +148,7 @@ func memberHover(doc view, offset int, trees map[cst.Green]cst.Tree) *protocol.H
 		return nil
 	}
 
-	recv := receiverTypeOf(doc, member.Receiver, trees, offset)
+	recv := receiverTypeOf(doc, member.Receiver, trees, offset, doc.ExprTypes())
 	if recv == nil || recv == ir.Invalid {
 		return nil
 	}
@@ -258,7 +258,7 @@ func receiverGetter(doc view, recv ir.Type, name string) (*ir.Method, map[string
 // a constant or a parameter a bare name denotes, a namespace member's imported
 // constant, and a chained field read on an inner receiver the checker did not type.
 // Anything else falls back to top-level inference.
-func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset int) ir.Type {
+func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset int, exprTypes map[ast.Expr]ir.Type) ir.Type {
 	switch e := e.(type) {
 	case *ast.SelfExpr:
 		if def := enclosingMethodOwner(doc, trees, offset); def != nil {
@@ -279,10 +279,10 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 		// The checker's settled type wins (a namespace-qualified master geo.Cards reads
 		// as its relation, honouring a value of the same name shadowing the namespace);
 		// otherwise a chained field read on an inner receiver the checker left untyped.
-		if t := doc.exprType(e); t != ir.Invalid {
+		if t := settledType(exprTypes, e); t != ir.Invalid {
 			return t
 		}
-		if inner := receiverTypeOf(doc, e.Receiver, trees, offset); inner != nil {
+		if inner := receiverTypeOf(doc, e.Receiver, trees, offset, exprTypes); inner != nil {
 			if f, ok := memberFieldOf(inner, e.Member.Name); ok {
 				return f.Type
 			}
@@ -295,13 +295,25 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 	// ternary over relations — each typed by the body walk the const-scope fallback
 	// cannot reproduce. A name the checker leaves untyped (a body-local a let shadows,
 	// a constant) falls through, honoured by its own scope rule above or the fallback.
-	if t := doc.exprType(e); t != ir.Invalid {
+	if t := settledType(exprTypes, e); t != ir.Invalid {
 		return t
 	}
 	if t := doc.TypeOfExpr(e); t != ir.Invalid {
 		return t
 	}
 	return nil
+}
+
+// settledType reads the type the checker settled for an expression node from the
+// per-request map, or ir.Invalid when the checker typed it with no usable type (a
+// master in a constant initializer, a name a local shadows, an unresolved form). The
+// map is built once per request and threaded through the receiver resolver, so a
+// chained receiver does not rebuild it per lookup.
+func settledType(exprTypes map[ast.Expr]ir.Type, e ast.Expr) ir.Type {
+	if t, ok := exprTypes[e]; ok && t != nil {
+		return t
+	}
+	return ir.Invalid
 }
 
 // enclosingMethodOwner returns the type definition whose impl method body spans

@@ -107,7 +107,7 @@ func memberItems(doc view, offset int) ([]protocol.CompletionItem, bool) {
 	if isType && !masterReceiver(doc, member.Receiver) {
 		return typeItems, true
 	}
-	recv := receiverTypeOf(doc, member.Receiver, doc.Trees(), offset)
+	recv := receiverTypeOf(doc, member.Receiver, doc.Trees(), offset, doc.ExprTypes())
 	if recv == nil || recv == ir.Invalid {
 		return typeItems, true
 	}
