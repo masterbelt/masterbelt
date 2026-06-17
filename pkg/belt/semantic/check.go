@@ -569,10 +569,19 @@ func checkSwitchStmt(stmt *ast.SwitchStmt, want ir.Type, bs infer.BodyScope, env
 	if diags != nil {
 		checkSwitch(stmt, bs, env, sink, at, diags)
 	} else if stmt.Scrutinee != nil {
-		// The sink-only walk (the editor's type capture) still types the scrutinee, so
-		// a relation read in it reaches Sink.Typed the way checkIf always types its
-		// condition; only the exhaustiveness and arm diagnostics are suppressed.
-		infer.CheckPredicate(stmt.Scrutinee, bs, sink)
+		// The sink-only walk (the editor's type capture) still types the scrutinee and
+		// the arm values, so a relation read in either reaches Sink.Typed the way
+		// checkIf always types its condition; only the exhaustiveness, comparability,
+		// and duplicate-arm diagnostics are suppressed. Each value checks against the
+		// scrutinee's type, exactly as checkSwitchArms does.
+		scrutT := infer.CheckPredicate(stmt.Scrutinee, bs, sink)
+		if scrutT != ir.Invalid {
+			for _, arm := range stmt.Arms {
+				for _, v := range arm.Values {
+					infer.CheckBody(v, scrutT, bs, sink)
+				}
+			}
+		}
 	}
 	for _, arm := range stmt.Arms {
 		checkStmts(arm.Body, want, bs, env, noSelf, sink, at, diags)
