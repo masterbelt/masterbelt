@@ -8,6 +8,7 @@ import (
 
 	"github.com/masterbelt/masterbelt/pkg/belt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/source"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 // editable drives a one-file Program the way an editor does: edits go to the
@@ -196,6 +197,36 @@ func TestExprTypesRelationChain(t *testing.T) {
 	}
 	if n < 2 {
 		t.Fatalf("ExprTypes should carry relation<Cards> for the bare master and the where chain; got %d such entries", n)
+	}
+}
+
+// TestInterfaceMethodTypeParamsResolved pins that a generic interface method keeps
+// its explicit type parameters and their bounds on the resolved ir.Method — the
+// interface twin of a concrete method — so an IR dump and text round-trip carry the
+// declared list rather than serializing it away.
+func TestInterfaceMethodTypeParamsResolved(t *testing.T) {
+	src := "pub interface ordered {\n  pub lt(other: self): bool\n}\n" +
+		"pub interface seq<V> {\n  pick<A: ordered>(init: A): A\n}\n"
+	e := newEditable([]byte(src))
+	var pick *ir.Method
+	for _, def := range e.prog.Module(soleFileID).Types {
+		if def.Name != "seq" {
+			continue
+		}
+		for _, m := range def.Methods {
+			if m.Name == "pick" {
+				pick = m
+			}
+		}
+	}
+	if pick == nil {
+		t.Fatal("did not resolve the interface method pick")
+	}
+	if len(pick.TypeParams) != 1 || pick.TypeParams[0].Name != "A" {
+		t.Fatalf("pick.TypeParams = %#v, want one parameter A", pick.TypeParams)
+	}
+	if pick.TypeParams[0].Bound == nil {
+		t.Fatalf("pick.TypeParams[0].Bound is nil, want the ordered interface bound recorded")
 	}
 }
 

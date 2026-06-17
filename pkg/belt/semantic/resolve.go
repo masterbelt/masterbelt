@@ -795,6 +795,12 @@ func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self i
 		// scope and back-fill it, so a member naming it carries the bound. The
 		// two-pass settle lets a bound project off another parameter (T: Box<U.x>).
 		infer.SettleBounds(r, m.TypeParams, mscope)
+		// Record the member's explicit type parameters (name plus resolved bound) on
+		// the resolved method, the way resolveMethod records a concrete method's, so a
+		// generic interface member (fold<A>) keeps its declared parameters and bounds
+		// through an IR dump and round-trip rather than serializing them away. The free
+		// names, inferred holes rather than declared parameters, are not recorded.
+		method.TypeParams = infer.ResolveFuncTypeParams(r, m.TypeParams, mscope)
 	}
 
 	params := make(map[string]bool, len(m.Params))

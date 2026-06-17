@@ -176,7 +176,10 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
-          TypeParams: ~
+          TypeParams:
+            TypeParam
+              Name: "A"
+              Bound: ~
           Params:
             Param
               Name: "init"
