@@ -179,6 +179,26 @@ func TestFuncLitTypes(t *testing.T) {
 	}
 }
 
+// TestExprTypesRelationChain pins that the checker writes back a relation type for a
+// master query, so the editor reads it rather than re-deriving the scope rules: a
+// master in a body reads as its relation and a where chain carries relation<Cards>,
+// the types a chained .count or .sum resolves through. The bare master and the where
+// call both settle to relation<Cards>, so the stream carries it at least twice.
+func TestExprTypesRelationChain(t *testing.T) {
+	src := "master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n" +
+		"fn probe(): nint {\n  return Cards.where(fn(c) -> c.cost > 0).count()\n}\n"
+	e := newEditable([]byte(src))
+	n := 0
+	for _, ty := range e.prog.ExprTypes(soleFileID) {
+		if ty != nil && ty.String() == "relation<Cards>" {
+			n++
+		}
+	}
+	if n < 2 {
+		t.Fatalf("ExprTypes should carry relation<Cards> for the bare master and the where chain; got %d such entries", n)
+	}
+}
+
 // TestEarlyCutoffLambdaBody checks that editing a lambda body re-checks only
 // what depends on it: the edit changes F's value but not its type
 // (list<int>), so the change must not propagate past F's dependents.

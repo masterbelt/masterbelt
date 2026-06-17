@@ -249,12 +249,15 @@ func receiverGetter(doc view, recv ir.Type, name string) (*ir.Method, map[string
 	return nil, nil, false
 }
 
-// receiverTypeOf resolves the type a member access's receiver has: self is
-// the enclosing impl's type, an identifier is the constant it names or the
-// parameter it denotes, a namespace member is the constant it imports, and a
-// chained access is the field's type on the inner receiver. Anything else —
-// a collection literal, an operator chain — goes through the real inference
-// in the file's top-level scope.
+// receiverTypeOf resolves the type a member access's receiver has. Where the
+// checker type-checked the receiver, its own settled type is the answer
+// (doc.exprType): a master in a body reads as its relation, a relation chain
+// carries its result type, a shadowing local or type parameter wins — every scope
+// rule the checker already applies, read rather than re-derived. The remaining
+// cases are the ones the checker leaves untyped: self (the enclosing impl's type),
+// a constant or a parameter a bare name denotes, a namespace member's imported
+// constant, and a chained field read on an inner receiver the checker did not type.
+// Anything else falls back to top-level inference.
 func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset int) ir.Type {
 	switch e := e.(type) {
 	case *ast.SelfExpr:
@@ -269,16 +272,22 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 		if t := paramTypeAt(doc, e.Name, trees, offset); t != nil {
 			return t
 		}
-		return masterRelationType(doc, e.Name, trees, offset)
+		// A bare master name reads as its relation in a body — the checker's own
+		// typing, which honours every shadow (a local declared before the use, a type
+		// parameter) without the editor re-deriving the scope rules.
+		if t := doc.exprType(e); t != ir.Invalid {
+			return t
+		}
+		return nil
 	case *ast.MemberExpr:
 		if c := doc.ResolveMember(e); c != nil {
 			return c.Type
 		}
 		// A namespace-qualified master (geo.Cards) in a body is its relation, the
-		// qualified twin of the bare master name, so its query methods complete and
-		// hover. A constant initializer keeps it the metatype, as for the bare name.
-		if def := qualifiedMaster(doc, e); def != nil && inBodyScope(doc, offset, trees) {
-			return doc.RelationType(def)
+		// qualified twin of the bare master name — the checker types it, honouring a
+		// value of the same name shadowing the namespace, so the editor reads its type.
+		if t := doc.exprType(e); t != ir.Invalid {
+			return t
 		}
 		if inner := receiverTypeOf(doc, e.Receiver, trees, offset); inner != nil {
 			if f, ok := memberFieldOf(inner, e.Member.Name); ok {
@@ -287,153 +296,16 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 		}
 		return nil
 	case *ast.CallExpr:
-		if t := chainRelationType(doc, e, trees, offset); t != nil {
+		// A relation method call (Cards.where(...)) carries its result type from the
+		// checker, so a chained .count or .sum resolves on it — including a
+		// self-returning or overloaded chain the editor cannot re-derive from the
+		// initial receiver alone.
+		if t := doc.exprType(e); t != ir.Invalid {
 			return t
 		}
 	}
 	if t := doc.TypeOfExpr(e); t != ir.Invalid {
 		return t
-	}
-	return nil
-}
-
-// masterRelationType is the relation<M> a bare master name has in value position, or
-// nil when name is not an unshadowed master in a body scope — the reading the checker
-// gives it: in a body (not a constant initializer, which keeps a master the metatype
-// since it cannot evaluate a relation) and unshadowed by a body-local or type
-// parameter of the same name. A constant or parameter is handled by the caller first.
-func masterRelationType(doc view, name string, trees map[cst.Green]cst.Tree, offset int) ir.Type {
-	def := lookupTypeName(doc, name)
-	if def == nil || def.Master == nil {
-		return nil
-	}
-	if !inBodyScope(doc, offset, trees) || masterNameShadowed(doc, name, trees, offset) {
-		return nil
-	}
-	return doc.RelationType(def)
-}
-
-// chainRelationType is the result type of a relation method call (Cards.where(...)),
-// so a chained .count or .sum resolves on it — the receiver typing follows the chain,
-// not only the initial master name — or nil when the call is not a resolvable method
-// call (the caller then falls back to the inferred type).
-func chainRelationType(doc view, e *ast.CallExpr, trees map[cst.Green]cst.Tree, offset int) ir.Type {
-	mem, ok := e.Callee.(*ast.MemberExpr)
-	if !ok {
-		return nil
-	}
-	rt := receiverTypeOf(doc, mem.Receiver, trees, offset)
-	if rt == nil {
-		return nil
-	}
-	if ms, subst, ok := doc.MethodCandidates(rt, mem.Member.Name); ok && len(ms) > 0 {
-		return types.Substitute(ms[0].Result, subst)
-	}
-	return nil
-}
-
-// inBodyScope reports whether offset is in a scope the checker type-checks with a
-// body scope — a function or method body, or a master's validate clause — where a
-// master reads as its relation. A constant initializer is not such a scope (a const
-// cannot evaluate a relation), so a master stays the metatype there.
-func inBodyScope(doc view, offset int, trees map[cst.Green]cst.Tree) bool {
-	if _, ok := enclosingBody(doc, offset, trees); ok {
-		return true
-	}
-	for _, def := range doc.Module().Types {
-		if def.MasterSyntax == nil {
-			continue
-		}
-		for _, c := range def.MasterSyntax.Validations {
-			if t, ok := trees[c.Syntax()]; ok && within(t, offset) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// masterNameShadowed reports whether a binding of name shadows a same-named master at
-// offset, mirroring the checker: a body-local let declared before the use, or a type
-// parameter of the enclosing function, method, or type declaration. A constant or
-// parameter is handled by receiverTypeOf's earlier cases.
-func masterNameShadowed(doc view, name string, trees map[cst.Green]cst.Tree, offset int) bool {
-	if body, ok := enclosingBody(doc, offset, trees); ok && letBeforeOffset(body, name, trees, offset) {
-		return true
-	}
-	return typeParamShadows(doc, name, trees, offset)
-}
-
-// letBeforeOffset reports whether the body binds name with a let whose declaration
-// precedes offset — the checker shadows a name only after its let comes into scope,
-// so a let after the use does not.
-func letBeforeOffset(body []ir.Stmt, name string, trees map[cst.Green]cst.Tree, offset int) bool {
-	for _, s := range body {
-		if l, ok := s.(*ir.Let); ok && l.Name == name && l.Syntax != nil {
-			if t, ok := trees[l.Syntax.Syntax()]; ok && t.Offset() < offset {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// typeParamShadows reports whether a type parameter of the function, method, or type
-// declaration enclosing offset is named name — the checker reads such a parameter as
-// a (rigid) type, not the master.
-func typeParamShadows(doc view, name string, trees map[cst.Green]cst.Tree, offset int) bool {
-	for _, fn := range doc.Module().Funcs {
-		if fn.Syntax == nil {
-			continue
-		}
-		if t, ok := trees[fn.Syntax.Syntax()]; ok && within(t, offset) && hasTypeParam(fn.TypeParams, name) {
-			return true
-		}
-	}
-	for _, def := range doc.Module().Types {
-		for _, m := range def.Methods {
-			if m.Syntax == nil {
-				continue
-			}
-			if t, ok := trees[m.Syntax.Syntax()]; ok && within(t, offset) &&
-				(hasTypeParam(def.Params, name) || hasTypeParam(m.TypeParams, name)) {
-				return true
-			}
-		}
-		if def.MasterSyntax != nil && hasTypeParam(def.Params, name) {
-			for _, c := range def.MasterSyntax.Validations {
-				if t, ok := trees[c.Syntax()]; ok && within(t, offset) {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
-
-// hasTypeParam reports whether a type-parameter list declares one named name.
-func hasTypeParam(tps []*ir.TypeParam, name string) bool {
-	for _, tp := range tps {
-		if tp.Name == name {
-			return true
-		}
-	}
-	return false
-}
-
-// qualifiedMaster resolves a namespace-qualified member access (geo.Cards) to the
-// master it names — the namespace's exported master of that name — or nil when it is
-// not a qualified master (a non-namespace receiver, a value shadowing the namespace,
-// or a non-master export).
-func qualifiedMaster(doc view, m *ast.MemberExpr) *ir.TypeDef {
-	ns, ok := m.Receiver.(*ast.Identifier)
-	if !ok || doc.Resolve(ns) != nil {
-		return nil
-	}
-	for _, def := range doc.QualifiedTypeNames()[ns.Name] {
-		if def.Name == m.Member.Name && def.Master != nil {
-			return def
-		}
 	}
 	return nil
 }

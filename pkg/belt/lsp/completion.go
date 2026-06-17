@@ -115,8 +115,25 @@ func memberItems(doc view, offset int) ([]protocol.CompletionItem, bool) {
 	// and — for a master, whose name is also a type — its static fns, gathered above.
 	// A static fn shadows a relation method of the same name (the checker resolves the
 	// static call first), so a relation method a static fn already provides is dropped.
-	value := dropShadowed(valueMemberItems(doc, recv), typeItems)
+	// Only a static fn shadows it: an associated constant or enum member of the same
+	// name is not callable as the method, so both are offered, the way Cards.where is
+	// the relation method and a const where its value.
+	value := dropShadowed(valueMemberItems(doc, recv), staticFnItems(typeItems))
 	return append(value, typeItems...), true
+}
+
+// staticFnItems keeps the static-fn entries of a type's members — the only ones a
+// relation method of the same name yields to. typeMemberItems tags each static fn a
+// Function, distinct from the EnumMember and Constant kinds of the readings that do
+// not shadow, so the kind is the filter.
+func staticFnItems(items []protocol.CompletionItem) []protocol.CompletionItem {
+	var out []protocol.CompletionItem
+	for _, it := range items {
+		if it.Kind != nil && *it.Kind == protocol.CompletionItemKindFunction {
+			out = append(out, it)
+		}
+	}
+	return out
 }
 
 // dropShadowed returns items without those whose label a shadowing item already

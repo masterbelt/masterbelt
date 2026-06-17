@@ -175,6 +175,49 @@ func TestCompletionTypeParamShadowsMaster(t *testing.T) {
 	}
 }
 
+// TestCompletionAssocConstDoesNotShadowRelationMethod pins that a master's
+// associated constant named like a relation method does not drop the method: only a
+// static fn shadows a relation method (the checker resolves the static call first),
+// while a constant of the same name is a value reached without a call, so both are
+// offered — Cards. with a const sum still advertises the sum relation method.
+func TestCompletionAssocConstDoesNotShadowRelationMethod(t *testing.T) {
+	src := "master Cards {\n  record { id: int, cost: int } impl {\n" +
+		"    pub const sum: int = 0\n" +
+		"  }\n  primary id\n}\n" +
+		"fn probe(): nint {\n  return Cards.\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "Cards.\n") + len("Cards.")
+	all := completion(doc, off).Items
+	found := false
+	for _, it := range all {
+		if it.Label == "sum" && it.Kind != nil && *it.Kind == protocol.CompletionItemKindMethod {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("a const sum must not shadow the relation method sum; it should still be offered as a Method: %v", labels(byLabel(all)))
+	}
+}
+
+// TestHoverChainOnSelfReturningMethod pins that a chained call on a self-returning
+// method hovers: the receiver of the second inc is the first inc() call, whose result
+// the checker settles to the receiver's own type (self resolved), so the chain
+// resolves the next method on it. The receiver typing reads the checker's settled
+// type, not a re-derivation that would leave a self result unsubstituted.
+func TestHoverChainOnSelfReturningMethod(t *testing.T) {
+	src := "pub type Counter = int impl {\n" +
+		"  pub fn inc(): self {\n    return self\n  }\n}\n" +
+		"fn probe(c: Counter): Counter {\n  return c.inc().inc()\n}\n"
+	doc := testView(src)
+	h := hover(doc, strings.LastIndex(src, ".inc()")+1)
+	if h == nil {
+		t.Fatal("no hover on the trailing inc of a self-returning chain")
+	}
+	if !strings.Contains(h.Contents.Value, "inc") {
+		t.Errorf("hover should name inc: %q", h.Contents.Value)
+	}
+}
+
 // qualifiedRelationMain is the file that queries an imported master's relation.
 const qualifiedRelationMain = "use deck from \"cards.belt\"\n" +
 	"fn probe(): nint {\n  return deck.Cards.count()\n}\n"
