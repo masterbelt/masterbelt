@@ -262,6 +262,14 @@ func (l *linker) linkMethod(m *Method) {
 		return
 	}
 	l.resolveTypeDef(&m.Owner)
+	// A generic method's type-parameter bound carries the same by-name references a
+	// signature does (an interface the bound names), so relink each or it keeps the
+	// detached placeholder unmarshalling produced — the method twin of linkFunction.
+	for _, p := range m.TypeParams {
+		if p != nil {
+			l.linkType(&p.Bound)
+		}
+	}
 	for i := range m.Params {
 		l.linkType(&m.Params[i].Type)
 	}
