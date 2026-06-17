@@ -374,6 +374,23 @@ func TestValidateAllAggregateIgnoresUnrelatedWideColumn(t *testing.T) {
 	}
 }
 
+// TestValidateAllAggregateIntoRefinedParam pins that a relation aggregate flowing
+// into a non-union refined type is checked against its predicate, not only its
+// width: a sum of 0 does not satisfy Positive (self > 0), so takes(Cards.sum(...))
+// must not pass on a 0 admitted only by the integer range. The violating argument
+// leaves the call unfoldable and the check fails safe.
+func TestValidateAllAggregateIntoRefinedParam(t *testing.T) {
+	const belt = "type Positive = int where self > 0\n" +
+		"fn takes(x: Positive): bool {\n  return true\n}\n" +
+		"master Cards {\n  record { id: int, cost: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert takes(Cards.sum(fn(c) -> c.cost))\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,0\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("takes(Cards.sum) with sum 0 into Positive: table_validation_failed = %d, want 1 (0 violates self > 0)", countTableFailures(diags))
+	}
+}
+
 func TestLoadTypedRows(t *testing.T) {
 	loaded, diags := run(t, skillBelt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,name,power\n1,Fireball,30\n2,Heal,12\n",
