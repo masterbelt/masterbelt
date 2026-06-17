@@ -278,15 +278,18 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 			return t
 		}
 	case *ast.MemberExpr:
-		if c := doc.ResolveMember(e); c != nil {
-			return c.Type
-		}
-		// The checker's settled type wins (a namespace-qualified master geo.Cards reads
-		// as its relation, honouring a value of the same name shadowing the namespace);
-		// otherwise a chained field read on an inner receiver the checker left untyped.
+		// The checker's settled type wins: a namespace-qualified master (deck.Cards)
+		// reads as its relation even when the namespace also exports a same-named const,
+		// which ResolveMember returns first and would mask the relation — the checker
+		// resolves the qualified type over the const (it shadows by the namespace name,
+		// not the member), so the editor reads its settled type before the const.
 		if t := settledType(exprTypes, e); t != ir.Invalid {
 			return t
 		}
+		if c := doc.ResolveMember(e); c != nil {
+			return c.Type
+		}
+		// Otherwise a chained field read on an inner receiver the checker left untyped.
 		if inner := receiverTypeOf(doc, e.Receiver, trees, offset, exprTypes); inner != nil {
 			if f, ok := memberFieldOf(inner, e.Member.Name); ok {
 				return f.Type

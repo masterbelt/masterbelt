@@ -304,6 +304,35 @@ func TestHoverCalledMasterMemberPrefersRelationMethod(t *testing.T) {
 const qualifiedRelationMain = "use deck from \"cards.belt\"\n" +
 	"fn probe(): nint {\n  return deck.Cards.count()\n}\n"
 
+// qualifiedShadowMain queries an imported master whose file also exports a
+// same-named constant.
+const qualifiedShadowMain = "use deck from \"cards.belt\"\n" +
+	"fn probe(): nint {\n  return deck.Cards.count()\n}\n"
+
+// TestHoverQualifiedRelationMethodPastNamespaceConst pins that a same-named constant
+// exported alongside a master does not mask the relation: the checker reads
+// deck.Cards as the master's relation (it shadows by the namespace name, not the
+// member), so the editor reads its settled type before the namespace constant and
+// count still hovers as a relation method.
+func TestHoverQualifiedRelationMethodPastNamespaceConst(t *testing.T) {
+	root := belttest.WriteFiles(t, map[string]string{
+		"masterbelt.toml": "entry = \"main.belt\"\n",
+		"cards.belt":      "pub master Cards {\n  record { id: int, cost: int }\n  primary id\n}\npub const Cards = 1\n",
+		"main.belt":       qualifiedShadowMain,
+	})
+	s := NewServer()
+	uri := openOnDisk(t, s, root, "main.belt")
+	v := s.open[uri]
+	off := strings.Index(qualifiedShadowMain, "deck.Cards.count()") + len("deck.Cards.")
+	h := hover(v, off)
+	if h == nil {
+		t.Fatal("a same-named const must not mask the imported master's relation; count should hover")
+	}
+	if !strings.Contains(h.Contents.Value, "count") {
+		t.Errorf("hover should name count: %q", h.Contents.Value)
+	}
+}
+
 // TestHoverQualifiedRelationMethod pins that a master reached through a namespace
 // import is its relation in the editor too: deck.Cards.count() hovers count as a
 // relation method, the qualified twin of the bare-master reading.
