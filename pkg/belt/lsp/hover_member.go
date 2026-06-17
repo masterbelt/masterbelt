@@ -65,6 +65,30 @@ func methodSignature(m *ir.Method) string {
 	return methodSignatureSubst(m, nil)
 }
 
+// typeParamListSubst renders a generic parameter list with the receiver's solved
+// type arguments substituted into each bound — so a method bound that mentions the
+// receiver's own parameter (Box<int>.pick<U: wrapper<T>>) shows the pinned type
+// (wrapper<int>), not the unbound owner variable. The parameter name itself is the
+// method's own and stays unsolved; a nil or empty subst renders the bounds as
+// declared, exactly as typeParamList does.
+func typeParamListSubst(params []*ir.TypeParam, subst map[string]ir.Type) string {
+	if len(params) == 0 {
+		return ""
+	}
+	parts := make([]string, len(params))
+	for i, p := range params {
+		parts[i] = p.Name
+		if p.Bound != nil {
+			bound := p.Bound
+			if len(subst) > 0 {
+				bound = types.Substitute(bound, subst)
+			}
+			parts[i] += ": " + bound.String()
+		}
+	}
+	return "<" + strings.Join(parts, ", ") + ">"
+}
+
 // methodSignatureSubst is methodSignature with the receiver's solved type
 // arguments substituted in, so list<int8>.map shows fn(item: int8).
 func methodSignatureSubst(m *ir.Method, subst map[string]ir.Type) string {
@@ -102,10 +126,11 @@ func methodSignatureSubst(m *ir.Method, subst map[string]ir.Type) string {
 	}
 	b.WriteString(m.Name)
 	// A generic method's own type parameters and their bounds, rendered as declared
-	// (sum<T: numeric>) the way a function's signature does — the receiver's
-	// substitution pins the receiver's variables, not the method's own, so they show
-	// unsolved, the bound that explains a `T` in the parameters and result alongside.
-	b.WriteString(typeParamList(m.TypeParams))
+	// (sum<T: numeric>) the way a function's signature does. The method's own variable
+	// shows unsolved (the receiver pins the receiver's variables, not the method's),
+	// but a bound that mentions the receiver's parameter takes its substitution too —
+	// Box<int>.pick<U: wrapper<T>> shows U: wrapper<int>, not the unbound owner T.
+	b.WriteString(typeParamListSubst(m.TypeParams, subst))
 	b.WriteString("(")
 	for i, p := range m.Params {
 		if i > 0 {

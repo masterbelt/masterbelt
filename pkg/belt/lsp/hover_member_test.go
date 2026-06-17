@@ -237,6 +237,27 @@ func TestMethodHoverGenericSubstitution(t *testing.T) {
 	}
 }
 
+// TestMethodHoverBoundSubstitution checks that a method type-parameter's bound that
+// mentions the receiver's own parameter takes the receiver's substitution: on a
+// Box<int>, pick<U: wrapper<T>> renders U: wrapper<int>, not the unbound owner T —
+// the bound is rendered through the same substitution the parameters and result are.
+func TestMethodHoverBoundSubstitution(t *testing.T) {
+	src := "pub interface wrapper<X> {\n  pub unwrap(): X\n}\n" +
+		"pub type Box<T> = { v: T } impl {\n  pub fn pick<U: wrapper<T>>(u: U): T {\n    return self.v\n  }\n}\n" +
+		"fn probe(b: Box<int>): int {\n  return b.pick(b)\n}\n"
+	doc := testView(src)
+	h := hover(doc, strings.Index(src, "b.pick(")+len("b."))
+	if h == nil {
+		t.Fatal("no hover on pick")
+	}
+	if !strings.Contains(h.Contents.Value, "wrapper<int>") {
+		t.Errorf("hover should substitute the receiver's int into the method bound: %q", h.Contents.Value)
+	}
+	if strings.Contains(h.Contents.Value, "wrapper<T>") {
+		t.Errorf("hover should not leave the owner variable T unbound: %q", h.Contents.Value)
+	}
+}
+
 // TestFieldHoverInsideIf checks that a field access in an if condition is
 // hoverable — the body-expression walk descends through an if's control flow.
 func TestFieldHoverInsideIf(t *testing.T) {
