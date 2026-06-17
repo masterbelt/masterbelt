@@ -291,6 +291,14 @@ func receiverGetter(doc view, recv ir.Type, name string) (*ir.Method, map[string
 func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset int, exprTypes map[ast.Expr]ir.Type) ir.Type {
 	switch e := e.(type) {
 	case *ast.SelfExpr:
+		// The checker's settled type for self wins: in a master's static fn self is the
+		// master's relation, not the row, so self. offers the relation's query methods
+		// rather than the row's surface. Every other body settles self to the row (or
+		// the enclosing type), the same the owner fallback gives, so this only changes
+		// the relation-self case; an uncovered self falls back to the enclosing owner.
+		if t := settledType(exprTypes, e); t != ir.Invalid {
+			return t
+		}
 		if def := enclosingMethodOwner(doc, trees, offset); def != nil {
 			return &ir.Named{Def: def}
 		}
