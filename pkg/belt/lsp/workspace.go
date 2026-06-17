@@ -123,6 +123,8 @@ func (v view) ReceiverMethods(recv ir.Type) ([]*ir.Method, map[string]ir.Type, b
 	return v.ws.prog.ReceiverMethods(recv)
 }
 
+func (v view) RelationType(master *ir.TypeDef) ir.Type { return v.ws.prog.RelationType(master) }
+
 func (v view) FuncLitTypes() map[*ast.FuncLit]*ir.Func { return v.ws.prog.FuncLitTypes(v.id) }
 
 func (v view) Diagnostics() []diagnostic.Diagnostic { return v.ws.prog.Diagnostics(v.id) }

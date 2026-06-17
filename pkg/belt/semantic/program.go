@@ -98,6 +98,15 @@ func (p *Program) EvalEnv(file FileID) eval.GraphEnv {
 	return graphFoldEnv{q: engineQueries{p.db}, file: file}
 }
 
+// RelationType is the relation<M> a master in value position has — the set of its
+// rows, on which the query operations (where, count, sum) are methods. The editor
+// reads it to resolve a bare master name's member access (Cards.where) and to offer
+// the relation's methods in completion, the same reading the checker gives a master
+// in value position.
+func (p *Program) RelationType(master *ir.TypeDef) ir.Type {
+	return infer.RelationType(p.db.reg, master)
+}
+
 // Stats returns the query-engine work of the last Refresh: per-kind counts of
 // the queries recomputed versus reused. It is a side-channel read — calling it
 // changes nothing the engine memoizes.

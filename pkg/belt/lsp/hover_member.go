@@ -266,7 +266,16 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 		if c := doc.Resolve(e); c != nil {
 			return c.Type
 		}
-		return paramTypeAt(doc, e.Name, trees, offset)
+		if t := paramTypeAt(doc, e.Name, trees, offset); t != nil {
+			return t
+		}
+		// A bare master name in value position is its relation — its members are the
+		// query operations (where, count, sum), the same reading the checker gives it.
+		// A constant or parameter of the same name shadows it (handled above first).
+		if def := lookupTypeName(doc, e.Name); def != nil && def.Master != nil {
+			return doc.RelationType(def)
+		}
+		return nil
 	case *ast.MemberExpr:
 		if c := doc.ResolveMember(e); c != nil {
 			return c.Type

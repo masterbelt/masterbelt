@@ -99,15 +99,27 @@ func memberItems(doc view, offset int) ([]protocol.CompletionItem, bool) {
 	}
 	// A member access whose receiver names a type (Rarity., int8., Level.)
 	// offers the type's members — enum members and associated constants — each
-	// labelled with its value.
-	if items, ok := typeMemberItems(doc, member); ok {
-		return items, true
+	// labelled with its value. A master is both a type (its static fns) and a
+	// relation value (where, count, sum): its type members are gathered here but,
+	// unlike a plain type, the value-method path below also runs, so Cards. offers
+	// both the static fns and the relation's methods.
+	typeItems, isType := typeMemberItems(doc, member)
+	if isType && !masterReceiver(doc, member.Receiver) {
+		return typeItems, true
 	}
 	recv := receiverTypeOf(doc, member.Receiver, doc.Trees(), offset)
 	if recv == nil || recv == ir.Invalid {
-		return nil, true
+		return typeItems, true
 	}
+	// The value-position members of the receiver's type (methods, getters, fields)
+	// and — for a master, whose name is also a type — its static fns, gathered above.
+	return append(valueMemberItems(doc, recv), typeItems...), true
+}
 
+// valueMemberItems is the value-position members of a receiver's type: its methods
+// (a call snippet), its getters (a property read), and its record fields. A setter
+// and a static fn are not value members and are left out.
+func valueMemberItems(doc view, recv ir.Type) []protocol.CompletionItem {
 	var items []protocol.CompletionItem
 	if methods, subst, ok := doc.ReceiverMethods(recv); ok {
 		methodKind := protocol.CompletionItemKindMethod
@@ -160,7 +172,20 @@ func memberItems(doc view, offset int) ([]protocol.CompletionItem, bool) {
 			})
 		}
 	}
-	return items, true
+	return items
+}
+
+// masterReceiver reports whether a member access's receiver is a bare master name —
+// an identifier naming a master, not shadowed by a value of the same name. A master
+// in value position is its relation, so its member access offers the relation's
+// methods (the value path) as well as the master's static fns (the type path).
+func masterReceiver(doc view, recv ast.Expr) bool {
+	id, ok := recv.(*ast.Identifier)
+	if !ok || doc.Resolve(id) != nil {
+		return false
+	}
+	def := lookupTypeName(doc, id.Name)
+	return def != nil && def.Master != nil
 }
 
 // typeMemberItems returns the completion items for a type member access
