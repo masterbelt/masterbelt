@@ -142,6 +142,35 @@ func TestValidateAllCountThroughHelper(t *testing.T) {
 	}
 }
 
+// TestValidateAllStaticRelationAggregate pins the let-bearing relation path: a
+// master static fn reads self as the relation, narrows it through a let-bound
+// where, and aggregates over the binding (sum over count). A per-table check that
+// calls it folds against the loaded rows — the driver runs the where-narrowed sum
+// and count in the engine and the arithmetic folds over the results. costs 10 and
+// 30 give sum 40 over count 2, an average of 20.
+func TestValidateAllStaticRelationAggregate(t *testing.T) {
+	mk := func(cmp string) string {
+		return "master Cards {\n" +
+			"  record { id: int, cost: int } impl {\n" +
+			"    pub static fn avg_cost(): nint {\n" +
+			"      let m = self.where(fn(c) -> c.cost > 0)\n" +
+			"      return m.sum(fn(c) -> c.cost) / m.count()\n" +
+			"    }\n  }\n" +
+			"  primary id\n" +
+			"  validate {\n    all {\n      assert Cards.avg_cost() " + cmp + "\n    }\n  }\n" +
+			"  source { csv \"cards.csv\" }\n}\n"
+	}
+	bases := map[string]string{"csv": "data"}
+	data := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n"}
+
+	if _, diags := run(t, mk("== 20"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("avg_cost == 20: table_validation_failed = %d, want 0 (sum 40 over count 2 = 20)", countTableFailures(diags))
+	}
+	if _, diags := run(t, mk("== 99"), bases, data); countTableFailures(diags) != 1 {
+		t.Errorf("avg_cost == 99: table_validation_failed = %d, want 1 (the average is 20, not 99)", countTableFailures(diags))
+	}
+}
+
 func TestLoadTypedRows(t *testing.T) {
 	loaded, diags := run(t, skillBelt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,name,power\n1,Fireball,30\n2,Heal,12\n",

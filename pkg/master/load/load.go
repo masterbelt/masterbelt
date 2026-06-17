@@ -25,6 +25,7 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/belt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/master"
+	"github.com/masterbelt/masterbelt/pkg/master/sqlite"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -138,7 +139,7 @@ func readMaster(def *ir.TypeDef, doc *abstract.Document, env eval.GraphEnv, root
 		refineDiags, refined := checkRefinements(typed, fields, spec, env)
 		diags = append(diags, refineDiags...)
 		diags = append(diags, checkRowValidations(typed, fields, refined, def, doc, spec, env)...)
-		diags = append(diags, checkAllValidations(typed, def, doc, spec, env)...)
+		diags = append(diags, checkAllValidations(typed, fields, def, doc, spec, env)...)
 		diags = append(diags, checkDuplicatePrimaryKeys(typed, def, spec)...)
 
 		loaded = append(loaded, Loaded{Master: def.Name, Display: spec.Display, Table: typed})
@@ -234,16 +235,35 @@ func checkRowValidations(typed master.Table, fields []ir.Field, refined map[int]
 // the check (a filtered count, where the engine runs the predicate, is a later
 // slice). A check that does not fold to a definite true fails, the fail-safe a
 // data check wants, anchored at its assert and naming the source as path.
-func checkAllValidations(typed master.Table, def *ir.TypeDef, doc *abstract.Document, spec master.SourceSpec, env eval.GraphEnv) []diagnostic.Diagnostic {
+func checkAllValidations(typed master.Table, fields []ir.Field, def *ir.TypeDef, doc *abstract.Document, spec master.SourceSpec, env eval.GraphEnv) []diagnostic.Diagnostic {
 	if len(def.Master.AllChecks) == 0 {
 		return nil
 	}
 	rows := ir.IntConstant(big.NewInt(int64(len(typed.Rows))))
+	// A check may compose a relation query the bare row count cannot answer (a
+	// where-narrowed count or sum, reached through a master static fn): the engine
+	// runs it against the loaded rows. It is built once for the table's checks; a
+	// table that fails to load leaves the queries undriven, so only the row count
+	// folds (the relation query then stays unfoldable and fails the check, as before).
+	var eng *sqlite.Engine
+	if e, err := sqlite.Load(fields, typed); err == nil {
+		eng = e
+		defer func() { _ = eng.Close() }()
+	}
 	var diags []diagnostic.Diagnostic
 	for _, check := range def.Master.AllChecks {
+		// Drive the relation queries in the check to constants against the rows, so the
+		// surrounding arithmetic and comparison fold the ordinary way. A query the
+		// driver cannot express leaves the check undriven — its existing fail-safe.
+		cond := check.Cond
+		if eng != nil {
+			if driven, unsupported := driveRelations(check.Cond, nil, eng, env); len(unsupported) == 0 {
+				cond = driven
+			}
+		}
 		// A check passes only when it folds to a definite true with the count in
 		// hand; a definite false, or a check that does not fold to a bool, fails it.
-		v := eval.GraphTableCheck(check.Cond, rows, def, env)
+		v := eval.GraphTableCheck(cond, rows, def, env)
 		if v == nil || v.Kind != ir.ConstBool || !v.Bool {
 			offset, width := assertSpan(doc, check.Syntax)
 			diags = append(diags, master.TableValidationFailed(offset, width, spec.Display))
