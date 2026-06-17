@@ -1107,7 +1107,19 @@ func ResolveFuncTypeParams(r *TypeResolver, params []*ast.TypeParam, scope TypeS
 	if len(params) == 0 {
 		return nil
 	}
-	bounds := SettleBounds(r, params, scope)
+	return TypeParamsFrom(params, SettleBounds(r, params, scope))
+}
+
+// TypeParamsFrom pairs each parameter with its already-settled bound — the tail of
+// ResolveFuncTypeParams, exposed so a caller that has already run SettleBounds (to
+// back-fill the scope before resolving the signature) records the parameters from
+// that result rather than settling the bounds a second time, which would re-report
+// an invalid bound's diagnostic. bounds is the SettleBounds result, one per
+// parameter.
+func TypeParamsFrom(params []*ast.TypeParam, bounds []ir.Type) []*ir.TypeParam {
+	if len(params) == 0 {
+		return nil
+	}
 	out := make([]*ir.TypeParam, len(params))
 	for i, p := range params {
 		out[i] = &ir.TypeParam{Name: p.Name, Bound: bounds[i]}

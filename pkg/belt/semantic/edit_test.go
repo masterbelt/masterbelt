@@ -230,6 +230,30 @@ func TestInterfaceMethodTypeParamsResolved(t *testing.T) {
 	}
 }
 
+// TestGenericBoundReportedOnce pins that an invalid type-parameter bound is reported
+// exactly once: recording the resolved type parameters reuses the bounds the signature
+// already settled rather than settling them a second time, so a generic function — and
+// a generic method or interface member, which share the recording path — does not emit
+// the same unknown_type twice.
+func TestGenericBoundReportedOnce(t *testing.T) {
+	for _, src := range []string{
+		"pub fn g<T: Nope>(x: T): T {\n  return x\n}\n",
+		"pub type Box<V> = { v: V } impl {\n  pub fn g<T: Nope>(x: T): T {\n    return x\n  }\n}\n",
+		"pub interface seq<V> {\n  pick<T: Nope>(x: T): T\n}\n",
+	} {
+		e := newEditable([]byte(src))
+		n := 0
+		for _, d := range e.prog.Diagnostics(soleFileID) {
+			if strings.Contains(d.Message, "Nope") {
+				n++
+			}
+		}
+		if n != 1 {
+			t.Errorf("an unknown bound should be reported once, got %d for:\n%s", n, src)
+		}
+	}
+}
+
 // TestEarlyCutoffLambdaBody checks that editing a lambda body re-checks only
 // what depends on it: the edit changes F's value but not its type
 // (list<int>), so the change must not propagate past F's dependents.
