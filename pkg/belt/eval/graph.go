@@ -37,6 +37,21 @@ type GraphEnv interface {
 	Registry() *builtin.Registry
 }
 
+// RelationFolder folds a relation aggregate — a count() or sum() over a master's
+// relation — against loaded data. The belt evaluator interprets the body a query
+// sits in (a static fn's lets and arithmetic, a helper, a conditional) but cannot
+// run the query itself (it has no rows, and the one-way layer rule keeps it from the
+// query driver), so when it reaches such an aggregate it delegates here. A
+// GraphEnv that carries loaded rows implements this; one without it (a pure
+// compile-time fold) does not, and the aggregate stays unfoldable as before.
+type RelationFolder interface {
+	// FoldRelationAggregate folds a count()/sum() over a master relation — the
+	// self-contained chain value, with any let-bound relation already inlined — to its
+	// integer value over the loaded rows, or ok=false when it is not such an aggregate
+	// or cannot be run (a different master, a predicate the driver cannot express).
+	FoldRelationAggregate(chain ir.Value) (*ir.Constant, bool)
+}
+
 // Graph folds a value graph to its constant value, or nil when it cannot be
 // evaluated.
 func Graph(v ir.Value, env GraphEnv) *ir.Constant {
@@ -161,6 +176,13 @@ type graphCtx struct {
 	// outside that path (a refinement or per-row fold), where a relation count
 	// cannot be evaluated and stays unfoldable.
 	relationCount *ir.Constant
+	// relationLocals binds each let-bound relation in scope to its chain value — a
+	// let m = self.where(...) records the where chain here rather than folding to a
+	// (non-existent) constant, so a query reached through the local (m.count()) is
+	// inlined back to the full chain before the relation folder runs it. It is set
+	// per routine body (a static fn's lets are its own) and nil where no relation can
+	// be bound (a refinement or per-row fold), leaving relation chains unfoldable.
+	relationLocals map[string]ir.Value
 }
 
 // unfoldable folds the values the evaluator does not reduce on its own: an await

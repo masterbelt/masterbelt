@@ -183,6 +183,14 @@ func graphLet(s *ir.Let, ctx graphCtx, scope *graphScope) bool {
 	if s.Value == nil {
 		return false
 	}
+	// A let that binds a relation (let m = self.where(...)) has no constant value —
+	// the relation folds against rows, not here — so its chain is recorded for a
+	// later use to inline rather than folded to nil (which would fail the let). A let
+	// binding a scalar aggregate (a count) or any other value folds the ordinary way.
+	if s.Name != "" && ctx.relationLocals != nil && isRelationExpr(s.Value, ctx.relationLocals) {
+		ctx.relationLocals[s.Name] = inlineRelation(s.Value, ctx.relationLocals)
+		return true
+	}
 	letCtx := graphExpectingType(ctx, s.Type)
 	v := graphValue(s.Value, letCtx)
 	return v != nil && s.Name != "" && scope.bind(s.Name, v)

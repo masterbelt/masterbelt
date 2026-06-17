@@ -251,19 +251,16 @@ func checkAllValidations(typed master.Table, fields []ir.Field, def *ir.TypeDef,
 		eng = e
 		defer func() { _ = eng.Close() }()
 	}
-	folder := relationFold{eng: eng, rows: rowCount, master: def, env: env}
+	// The check folds through an environment carrying the relation folder, so the
+	// evaluator interprets the body (the static fn's lets and arithmetic, a helper, a
+	// conditional) and runs any count/sum over the relation against the rows. A query
+	// the folder declines leaves that aggregate unfoldable, so the check fails safe.
+	foldEnv := relationEnv{GraphEnv: env, fold: relationFold{eng: eng, rows: rowCount, master: def, env: env}}
 	var diags []diagnostic.Diagnostic
 	for _, check := range def.Master.AllChecks {
-		// Drive the relation queries in the check to constants against the rows, so the
-		// surrounding arithmetic and comparison fold the ordinary way. A query the
-		// driver cannot express leaves the check undriven — its existing fail-safe.
-		cond := check.Cond
-		if driven, unsupported := folder.drive(check.Cond, nil); len(unsupported) == 0 {
-			cond = driven
-		}
 		// A check passes only when it folds to a definite true with the count in
 		// hand; a definite false, or a check that does not fold to a bool, fails it.
-		v := eval.GraphTableCheck(cond, rows, def, env)
+		v := eval.GraphTableCheck(check.Cond, rows, def, foldEnv)
 		if v == nil || v.Kind != ir.ConstBool || !v.Bool {
 			offset, width := assertSpan(doc, check.Syntax)
 			diags = append(diags, master.TableValidationFailed(offset, width, spec.Display))
