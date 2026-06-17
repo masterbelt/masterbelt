@@ -1906,15 +1906,21 @@ func resolveMethod(r *infer.TypeResolver, reg *builtin.Registry, self ir.Type, m
 		resolvedParams[p.Name] = t
 	}
 	method.Result = r.ResolveType(m.Result, mscope)
-	// A static fn has no receiver: its body lowers with self unbound, exactly as the
-	// checker types it (Self ir.Invalid), so a bare name there reads a top-level
-	// constant or a type — never an implicit self.field — and the lowered IR matches
-	// the checked expression. An instance method, getter, or setter binds self.
+	// A static fn has no receiver, so its body lowers with self unbound (a bare name
+	// reads a constant or a type, never an implicit self.field) — except a master's
+	// static fn, whose self is the master's relation: the body lowers self to the same
+	// MasterRelation a bare master name does, so a query chain over self (average_cost)
+	// lowers like one over the name. An instance method, getter, or setter binds self.
 	selfType, hasSelf := self, true
+	var relationSelf *ir.TypeDef
 	if m.Kind == ast.MethodStatic {
-		selfType, hasSelf = ir.Invalid, false
+		if n, ok := self.(*ir.Named); ok && n.Def != nil && n.Def.Master != nil {
+			selfType, relationSelf = infer.RelationType(reg, n.Def), n.Def
+		} else {
+			selfType, hasSelf = ir.Invalid, false
+		}
 	}
-	method.Body = lower.Body(m.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: resolvedParams, selfType: selfType, tscope: mscope, funcs: fns, self: hasSelf})
+	method.Body = lower.Body(m.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: resolvedParams, selfType: selfType, tscope: mscope, funcs: fns, self: hasSelf, relationSelf: relationSelf})
 	return method
 }
 

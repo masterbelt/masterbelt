@@ -357,6 +357,12 @@ type bodyBinder struct {
 	// relation rather than a row: a bare count there reads the relation's row count
 	// (an aggregate over the table), the per-table counterpart of self omission.
 	relation bool
+	// relationSelf is the master a static fn's self denotes, or nil. A master's
+	// static fn reads self as the master's relation (the rows the query methods
+	// operate on), so self there lowers to the same MasterRelation a bare master name
+	// does — the query chain over self lowers like one over the name. It is nil for
+	// every other body (an instance method's self is a row, a function has none).
+	relationSelf *ir.TypeDef
 	// locals maps each let-bound block-local in scope to its settled type. A
 	// reference to one lowers to an ir.LocalRef (shadowing a same-named parameter
 	// or type), and its type is read here when inferring a later let's value. It
@@ -563,6 +569,12 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 	case *ast.SelfExpr:
 		if !b.self {
 			return nil // a function body has no receiver
+		}
+		if b.relationSelf != nil {
+			// A master's static fn reads self as the master's relation — the same value
+			// a bare master name lowers to — so a query chain over self lowers like one
+			// over the name and the master-layer driver interprets it identically.
+			return &ir.MasterRelation{Master: b.relationSelf, Syntax: e}
 		}
 		return &ir.SelfValue{Syntax: e}
 	case *ast.NullLit:
