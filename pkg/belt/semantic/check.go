@@ -568,6 +568,11 @@ func checkSwitchStmt(stmt *ast.SwitchStmt, want ir.Type, bs infer.BodyScope, env
 	}
 	if diags != nil {
 		checkSwitch(stmt, bs, env, sink, at, diags)
+	} else if stmt.Scrutinee != nil {
+		// The sink-only walk (the editor's type capture) still types the scrutinee, so
+		// a relation read in it reaches Sink.Typed the way checkIf always types its
+		// condition; only the exhaustiveness and arm diagnostics are suppressed.
+		infer.CheckPredicate(stmt.Scrutinee, bs, sink)
 	}
 	for _, arm := range stmt.Arms {
 		checkStmts(arm.Body, want, bs, env, noSelf, sink, at, diags)
@@ -590,6 +595,11 @@ func checkMatchStmt(stmt *ast.MatchStmt, want ir.Type, bs infer.BodyScope, env e
 	}
 	if diags != nil {
 		checkMatch(stmt, bs, sink, at, diags)
+	} else if stmt.Scrutinee != nil {
+		// The sink-only walk still types the scrutinee (the editor's type capture), so
+		// a relation read in it reaches Sink.Typed; only the union and exhaustiveness
+		// diagnostics are suppressed.
+		infer.CheckPredicate(stmt.Scrutinee, bs, sink)
 	}
 	for _, arm := range stmt.Arms {
 		checkStmts(arm.Body, want, armNarrowedScope(bs, arm), env, noSelf, sink, at, diags)
@@ -612,6 +622,11 @@ func checkForStmt(stmt *ast.ForStmt, want ir.Type, bs infer.BodyScope, env exprF
 	}
 	if diags != nil {
 		checkFor(stmt, bs, sink, at, diags)
+	} else if stmt.Iter != nil {
+		// The sink-only walk still types the iterated expression (the editor's type
+		// capture), so a relation read in it reaches Sink.Typed; only the iterability
+		// diagnostic is suppressed.
+		infer.CheckPredicate(stmt.Iter, bs, sink)
 	}
 	checkStmts(stmt.Body, want, forNarrowedScope(bs, stmt), env, noSelf, sink, at, diags)
 }

@@ -272,20 +272,13 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 		if t := paramTypeAt(doc, e.Name, trees, offset); t != nil {
 			return t
 		}
-		// A bare master name reads as its relation in a body — the checker's own
-		// typing, which honours every shadow (a local declared before the use, a type
-		// parameter) without the editor re-deriving the scope rules.
-		if t := doc.exprType(e); t != ir.Invalid {
-			return t
-		}
-		return nil
 	case *ast.MemberExpr:
 		if c := doc.ResolveMember(e); c != nil {
 			return c.Type
 		}
-		// A namespace-qualified master (geo.Cards) in a body is its relation, the
-		// qualified twin of the bare master name — the checker types it, honouring a
-		// value of the same name shadowing the namespace, so the editor reads its type.
+		// The checker's settled type wins (a namespace-qualified master geo.Cards reads
+		// as its relation, honouring a value of the same name shadowing the namespace);
+		// otherwise a chained field read on an inner receiver the checker left untyped.
 		if t := doc.exprType(e); t != ir.Invalid {
 			return t
 		}
@@ -295,14 +288,15 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 			}
 		}
 		return nil
-	case *ast.CallExpr:
-		// A relation method call (Cards.where(...)) carries its result type from the
-		// checker, so a chained .count or .sum resolves on it — including a
-		// self-returning or overloaded chain the editor cannot re-derive from the
-		// initial receiver alone.
-		if t := doc.exprType(e); t != ir.Invalid {
-			return t
-		}
+	}
+	// The checker's settled type for the receiver, read before the top-level
+	// fallback for every remaining form — a bare master (its relation in a body), a
+	// relation chain (its result, including a self-returning or overloaded one), a
+	// ternary over relations — each typed by the body walk the const-scope fallback
+	// cannot reproduce. A name the checker leaves untyped (a body-local a let shadows,
+	// a constant) falls through, honoured by its own scope rule above or the fallback.
+	if t := doc.exprType(e); t != ir.Invalid {
+		return t
 	}
 	if t := doc.TypeOfExpr(e); t != ir.Invalid {
 		return t

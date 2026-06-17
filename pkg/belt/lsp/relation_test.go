@@ -218,6 +218,38 @@ func TestHoverChainOnSelfReturningMethod(t *testing.T) {
 	}
 }
 
+// TestHoverRelationMethodOnTernaryReceiver pins that a relation method on a ternary
+// receiver hovers: the checker settles (flag ? Cards : Cards) to relation<Cards>, and
+// the editor reads that settled type for every receiver form, not only a call or a
+// bare name, so a chained count resolves on it.
+func TestHoverRelationMethodOnTernaryReceiver(t *testing.T) {
+	src := relationMaster + "fn probe(flag: bool): nint {\n  return (flag ? Cards : Cards).count()\n}\n"
+	doc := testView(src)
+	h := hover(doc, strings.LastIndex(src, ".count()")+1)
+	if h == nil {
+		t.Fatal("no hover on count of a ternary relation receiver")
+	}
+	if !strings.Contains(h.Contents.Value, "count") {
+		t.Errorf("hover should name count: %q", h.Contents.Value)
+	}
+}
+
+// TestHoverRelationMethodInSwitchScrutinee pins that a relation read in a switch
+// scrutinee is typed for the editor: the checker types the scrutinee Cards.count() in
+// a body, so count hovers as a relation method even though the switch's own
+// diagnostics are suppressed in the editor's type-capture walk.
+func TestHoverRelationMethodInSwitchScrutinee(t *testing.T) {
+	src := relationMaster + "fn probe(): nint {\n  switch Cards.count() {\n    0 -> return 0\n    _ -> return 1\n  }\n}\n"
+	doc := testView(src)
+	h := hover(doc, strings.Index(src, "Cards.count()")+len("Cards."))
+	if h == nil {
+		t.Fatal("no hover on count in a switch scrutinee")
+	}
+	if !strings.Contains(h.Contents.Value, "count") {
+		t.Errorf("hover should name count: %q", h.Contents.Value)
+	}
+}
+
 // qualifiedRelationMain is the file that queries an imported master's relation.
 const qualifiedRelationMain = "use deck from \"cards.belt\"\n" +
 	"fn probe(): nint {\n  return deck.Cards.count()\n}\n"
