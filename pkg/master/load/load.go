@@ -239,27 +239,27 @@ func checkAllValidations(typed master.Table, fields []ir.Field, def *ir.TypeDef,
 	if len(def.Master.AllChecks) == 0 {
 		return nil
 	}
-	rows := ir.IntConstant(big.NewInt(int64(len(typed.Rows))))
+	rowCount := int64(len(typed.Rows))
+	rows := ir.IntConstant(big.NewInt(rowCount))
 	// A check may compose a relation query the bare row count cannot answer (a
 	// where-narrowed count or sum, reached through a master static fn): the engine
 	// runs it against the loaded rows. It is built once for the table's checks; a
-	// table that fails to load leaves the queries undriven, so only the row count
-	// folds (the relation query then stays unfoldable and fails the check, as before).
+	// table that fails to load leaves the engine nil, so a filtered query is undriven
+	// (the check then fails safe) while an unfiltered count still reads the row count.
 	var eng *sqlite.Engine
 	if e, err := sqlite.Load(fields, typed); err == nil {
 		eng = e
 		defer func() { _ = eng.Close() }()
 	}
+	folder := relationFold{eng: eng, rows: rowCount, master: def, env: env}
 	var diags []diagnostic.Diagnostic
 	for _, check := range def.Master.AllChecks {
 		// Drive the relation queries in the check to constants against the rows, so the
 		// surrounding arithmetic and comparison fold the ordinary way. A query the
 		// driver cannot express leaves the check undriven — its existing fail-safe.
 		cond := check.Cond
-		if eng != nil {
-			if driven, unsupported := driveRelations(check.Cond, nil, eng, env); len(unsupported) == 0 {
-				cond = driven
-			}
+		if driven, unsupported := folder.drive(check.Cond, nil); len(unsupported) == 0 {
+			cond = driven
 		}
 		// A check passes only when it folds to a definite true with the count in
 		// hand; a definite false, or a check that does not fold to a bool, fails it.

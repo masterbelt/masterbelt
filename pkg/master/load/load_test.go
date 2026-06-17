@@ -171,6 +171,81 @@ func TestValidateAllStaticRelationAggregate(t *testing.T) {
 	}
 }
 
+// TestValidateAllStaticRelationCrossMaster pins that a static fn returning another
+// master's relation is not folded against this master's engine: A's check calls a fn
+// returning B.count(), and the engine holds only A's rows, so driving it there would
+// answer with A's count. The cross-master query is left undriven and the check fails
+// safe (B has 2 rows, so == 1 is false either way — the point is it is not wrongly
+// passed by counting A's single row).
+func TestValidateAllStaticRelationCrossMaster(t *testing.T) {
+	const belt = "master B {\n  record { id: int }\n  primary id\n  source { csv \"b.csv\" }\n}\n" +
+		"master A {\n  record { id: int } impl {\n    pub static fn bcount(): nint {\n      return B.count()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert A.bcount() == 1\n    }\n  }\n  source { csv \"a.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/a.csv": "id\n1\n", "data/b.csv": "id\n1\n2\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("cross-master A.bcount() == 1: table_validation_failed = %d, want 1 (B has 2 rows; A's count must not pass it)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllStaticRelationResultOverflow pins that a static fn whose declared
+// result type cannot hold the aggregate is not folded to an in-range value: a sum of
+// 300 does not inhabit sbyte, so Cards.s() must not be driven to 300 and pass — the
+// overflowing result leaves the check undriven and it fails safe.
+func TestValidateAllStaticRelationResultOverflow(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, cost: int } impl {\n" +
+		"    pub static fn s(): sbyte {\n      return self.sum(fn(c) -> c.cost)\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.s() == 300\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,100\n2,100\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("sbyte overflow Cards.s() == 300: table_validation_failed = %d, want 1 (300 does not fit sbyte)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllStaticRelationThroughHelper pins that a relation query reached
+// through a top-level helper call is still driven: eq(Cards.size(), 2) drives the
+// argument (the row count) so the helper folds, rather than leaving the bare relation
+// for the evaluator to choke on.
+func TestValidateAllStaticRelationThroughHelper(t *testing.T) {
+	const belt = "fn eq(a: nint, b: nint): bool {\n  return a == b\n}\n" +
+		"master Cards {\n  record { id: int } impl {\n    pub static fn size(): nint {\n      return self.count()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert eq(Cards.size(), 2)\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id\n1\n2\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("eq(Cards.size(), 2) over 2 rows: table_validation_failed = %d, want 0 (the count drives through the helper)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllStaticScalarBody pins that a master static fn with no relation
+// query keeps its ordinary fold: a scalar let and arithmetic (let x = 3; return
+// x + 1) is left to the evaluator, not broken by the relation driver dropping the
+// binding.
+func TestValidateAllStaticScalarBody(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int } impl {\n    pub static fn f(): nint {\n      let x = 3\n      return x + 1\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.f() == 4\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id\n1\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("scalar Cards.f() == 4: table_validation_failed = %d, want 0 (let x = 3; return x + 1)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllStaticUnfilteredCountIgnoresCells pins that a static fn's unfiltered
+// count reads the row count, not the loaded cells: an out-of-range nint cell fails
+// the engine load, but Cards.size() (self.count(), no where) still counts the one row
+// so == 1 passes — the same independence the bare count check has.
+func TestValidateAllStaticUnfilteredCountIgnoresCells(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, n: nint } impl {\n    pub static fn size(): nint {\n      return self.count()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.size() == 1\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,n\n1,999999999999999999999999999\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("unfiltered Cards.size() == 1 with an out-of-range cell: table_validation_failed = %d, want 0 (count reads the row count)", countTableFailures(diags))
+	}
+}
+
 func TestLoadTypedRows(t *testing.T) {
 	loaded, diags := run(t, skillBelt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,name,power\n1,Fireball,30\n2,Heal,12\n",
