@@ -304,6 +304,76 @@ func TestValidateAllStaticRefinedResultViolation(t *testing.T) {
 	}
 }
 
+// TestValidateAllRelationLetShadowedInBlock pins that a relation local shadowed by
+// a nested block does not leak past the block: the inner block rebinds m to a
+// narrower filter, but after the block the outer m must still be the filter it was
+// bound to. Over ids 5, 15, 25, the outer m (id > 0) counts all three while a leaked
+// inner m (id > 10) would count two, so == 3 passes only when the block's binding is
+// restored on exit.
+func TestValidateAllRelationLetShadowedInBlock(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int } impl {\n    pub static fn outer(): nint {\n" +
+		"      let m = self.where(fn(c) -> c.id > 0)\n" +
+		"      if true {\n        let m = self.where(fn(c) -> c.id > 10)\n      }\n" +
+		"      return m.count()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.outer() == 3\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id\n5\n15\n25\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("shadowed relation let Cards.outer() == 3: table_validation_failed = %d, want 0 (the outer m counts all three; the inner block must not leak)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllAggregateIntoNarrowParam pins that a relation aggregate flowing
+// into a non-union sized position the analyzer could not check — a typed parameter —
+// is range-checked against the rows' value: a sum of 300 does not inhabit sbyte, so
+// fits(Cards.sum(...)) must not pass on a 300 smuggled past the annotation. The
+// overflowing argument leaves the call unfoldable and the check fails safe.
+func TestValidateAllAggregateIntoNarrowParam(t *testing.T) {
+	const belt = "fn fits(x: sbyte): bool {\n  return true\n}\n" +
+		"master Cards {\n  record { id: int, cost: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert fits(Cards.sum(fn(c) -> c.cost))\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,100\n2,100\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("fits(Cards.sum) with sum 300 into sbyte: table_validation_failed = %d, want 1 (300 does not fit sbyte)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllAggregateIntoNarrowLet pins the same range check at an annotated
+// let: let x: sbyte = self.sum(...) over a sum of 300 must not bind 300, so the body
+// is left unfoldable and the check fails safe rather than reading the out-of-range
+// value back as if it fit.
+func TestValidateAllAggregateIntoNarrowLet(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, cost: int } impl {\n    pub static fn ok(): bool {\n" +
+		"      let x: sbyte = self.sum(fn(c) -> c.cost)\n      return x >= 0\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.ok()\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,100\n2,100\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("let x: sbyte = sum 300: table_validation_failed = %d, want 1 (300 does not fit sbyte)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllAggregateIgnoresUnrelatedWideColumn pins that a column holding an
+// integer beyond SQLite's range does not disable an aggregate over the other
+// columns: sum(cost) is driven and passes despite a wide big cell, while a query that
+// reaches the dropped column itself (sum(big)) finds no such column and fails safe.
+func TestValidateAllAggregateIgnoresUnrelatedWideColumn(t *testing.T) {
+	mk := func(sel, cmp string) string {
+		return "master Cards {\n  record { id: int, cost: int, big: nint }\n  primary id\n" +
+			"  validate {\n    all {\n      assert Cards.sum(fn(c) -> c." + sel + ") " + cmp + "\n    }\n  }\n" +
+			"  source { csv \"cards.csv\" }\n}\n"
+	}
+	bases := map[string]string{"csv": "data"}
+	data := map[string]string{"data/cards.csv": "id,cost,big\n1,10,999999999999999999999999999\n2,20,1\n"}
+	if _, diags := run(t, mk("cost", "== 30"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("sum(cost) == 30 with a wide big cell: table_validation_failed = %d, want 0 (the unrelated wide column must not disable the aggregate)", countTableFailures(diags))
+	}
+	if _, diags := run(t, mk("big", "== 0"), bases, data); countTableFailures(diags) != 1 {
+		t.Errorf("sum(big) == 0 over the dropped column: table_validation_failed = %d, want 1 (a query reaching the wide column fails safe)", countTableFailures(diags))
+	}
+}
+
 func TestLoadTypedRows(t *testing.T) {
 	loaded, diags := run(t, skillBelt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,name,power\n1,Fireball,30\n2,Heal,12\n",

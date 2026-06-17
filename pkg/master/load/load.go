@@ -247,7 +247,8 @@ func checkAllValidations(typed master.Table, fields []ir.Field, def *ir.TypeDef,
 	// table that fails to load leaves the engine nil, so a filtered query is undriven
 	// (the check then fails safe) while an unfiltered count still reads the row count.
 	var eng *sqlite.Engine
-	if e, err := sqlite.Load(fields, typed); err == nil {
+	storedFields, storedTable := int64SafeColumns(fields, typed)
+	if e, err := sqlite.Load(storedFields, storedTable); err == nil {
 		eng = e
 		defer func() { _ = eng.Close() }()
 	}
@@ -267,6 +268,67 @@ func checkAllValidations(typed master.Table, fields []ir.Field, def *ir.TypeDef,
 		}
 	}
 	return diags
+}
+
+// int64SafeColumns restricts the fields and table to the columns the in-memory
+// engine can store. The engine is int64-backed, so a column holding an integer
+// beyond SQLite's 64-bit range would fail the whole load and leave every aggregate
+// undriven — even a query that never reads it. Dropping only the offending columns
+// keeps a query over the others runnable; a query that does reach a dropped column
+// then references a column the table lacks and errors, so that aggregate folds to
+// nothing and the check fails safe rather than reading a truncated value. The rows
+// are unchanged in number, so an unfiltered count still sees every row.
+func int64SafeColumns(fields []ir.Field, typed master.Table) ([]ir.Field, master.Table) {
+	drop := wideColumns(typed)
+	if len(drop) == 0 {
+		return fields, typed
+	}
+	keepIdx := make([]int, 0, len(typed.Columns))
+	cols := make([]string, 0, len(typed.Columns))
+	for i, name := range typed.Columns {
+		if !drop[name] {
+			keepIdx = append(keepIdx, i)
+			cols = append(cols, name)
+		}
+	}
+	rows := make([]master.Row, len(typed.Rows))
+	for r, row := range typed.Rows {
+		cells := make([]master.Cell, 0, len(keepIdx))
+		for _, i := range keepIdx {
+			if i < len(row.Cells) {
+				cells = append(cells, row.Cells[i])
+			}
+		}
+		rows[r] = master.Row{Cells: cells}
+	}
+	kept := make([]ir.Field, 0, len(fields))
+	for _, f := range fields {
+		if !drop[f.Name] {
+			kept = append(kept, f)
+		}
+	}
+	return kept, master.Table{Columns: cols, Rows: rows}
+}
+
+// wideColumns is the set of column names holding an integer beyond SQLite's 64-bit
+// range — the columns int64SafeColumns must leave out of the engine.
+func wideColumns(typed master.Table) map[string]bool {
+	drop := map[string]bool{}
+	for col, name := range typed.Columns {
+		for _, row := range typed.Rows {
+			if col < len(row.Cells) && cellExceedsInt64(row.Cells[col].Value) {
+				drop[name] = true
+				break
+			}
+		}
+	}
+	return drop
+}
+
+// cellExceedsInt64 reports whether a cell holds an integer outside the int64 the
+// engine stores — the same bound the engine's own bind enforces.
+func cellExceedsInt64(v *ir.Constant) bool {
+	return v != nil && v.Kind == ir.ConstInt && v.Int != nil && !v.Int.IsInt64()
 }
 
 // tableHasFields reports whether the coerced table carries a column for every

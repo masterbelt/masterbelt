@@ -226,7 +226,34 @@ func graphValue(v ir.Value, ctx graphCtx) *ir.Constant {
 		}
 		return ir.Tagged(c, tag)
 	}
+	// A data-dependent integer (a relation aggregate the rows decide) reaching a
+	// non-union sized annotation — a typed parameter, an annotated let, a declared
+	// result — could not be range-checked by the analyzer, which did not know the
+	// value. Enforce the bound here so an out-of-range aggregate leaves the position
+	// unfoldable rather than passing as if it fit. The receiver of a call folds with no
+	// expectation (graphValueRaw clears it), so a relation aggregate used as a receiver
+	// is not constrained by the enclosing call's type. A pure compile-time value was
+	// already checked by the analyzer, so the guard is scoped to the data layer's fold.
+	if !graphFitsExpected(ctx, c) {
+		return nil
+	}
 	return c
+}
+
+// graphFitsExpected reports whether a folded value inhabits the range of the
+// non-union type the immediate context expects it to. It checks only an integer's
+// range — a refinement predicate is left to graphMemberAdmits, whose own folding
+// would otherwise recurse through this check — and only when the fold is data-aware
+// (a relation folder present), since a compile-time value's range was settled by the
+// analyzer. A value with no expectation, or a non-integer, is admitted.
+func graphFitsExpected(ctx graphCtx, c *ir.Constant) bool {
+	if c.Kind != ir.ConstInt || ctx.expectedType == nil || ctx.expectedType == ir.Invalid {
+		return true
+	}
+	if _, dataAware := ctx.env.(RelationFolder); !dataAware {
+		return true
+	}
+	return types.Fits(ctx.env.Registry(), ctx.expectedType, c.Int)
 }
 
 // graphValueRaw folds one value node. The expectation channels are consumed at
