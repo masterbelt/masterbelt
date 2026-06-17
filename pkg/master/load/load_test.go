@@ -391,6 +391,51 @@ func TestValidateAllAggregateIntoRefinedParam(t *testing.T) {
 	}
 }
 
+// TestValidateAllAggregateIntoReassignment pins that a data-dependent aggregate
+// reassigned into a sized local is range-checked against the local's type, not bound
+// raw: a sum of 300 reassigned into an sbyte local must not pass. The narrowing's
+// adaption refuses the out-of-range value, leaving the body unfoldable and the check
+// failing safe.
+func TestValidateAllAggregateIntoReassignment(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, cost: int } impl {\n    pub static fn ok(): bool {\n" +
+		"      let x: sbyte = 1\n      x = self.sum(fn(c) -> c.cost)\n      return x >= 0\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.ok()\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,100\n2,100\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("reassign sum 300 into sbyte: table_validation_failed = %d, want 1 (300 does not fit sbyte)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllAggregateIntoCollectionElement pins that an aggregate nested in a
+// collection literal is checked against the element type: a sum of 300 in a
+// list<sbyte> must not pass. The element's adaption refuses the out-of-range value.
+func TestValidateAllAggregateIntoCollectionElement(t *testing.T) {
+	const belt = "fn takes(xs: list<sbyte>): bool {\n  return true\n}\n" +
+		"master Cards {\n  record { id: int, cost: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert takes([Cards.sum(fn(c) -> c.cost)])\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,100\n2,100\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("sum 300 as a list<sbyte> element: table_validation_failed = %d, want 1 (300 does not fit sbyte)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllAggregateIntoRefinedConversion pins that an explicit conversion of an
+// aggregate to a refined type is checked against its predicate: Positive(sum) over a
+// sum of 0 must not pass, since 0 violates self > 0. The conversion's adaption refuses
+// the predicate-violating value.
+func TestValidateAllAggregateIntoRefinedConversion(t *testing.T) {
+	const belt = "type Positive = int where self > 0\n" +
+		"master Cards {\n  record { id: int, cost: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Positive(Cards.sum(fn(c) -> c.cost)) >= 0\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,0\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("Positive(sum 0): table_validation_failed = %d, want 1 (0 violates self > 0)", countTableFailures(diags))
+	}
+}
+
 func TestLoadTypedRows(t *testing.T) {
 	loaded, diags := run(t, skillBelt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,name,power\n1,Fireball,30\n2,Heal,12\n",

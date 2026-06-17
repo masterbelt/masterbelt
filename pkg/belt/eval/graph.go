@@ -230,22 +230,11 @@ func graphValue(v ir.Value, ctx graphCtx) *ir.Constant {
 		}
 		return ir.Tagged(c, tag)
 	}
-	// A data-dependent value (a relation aggregate the rows decide) reaching a
-	// non-union sized or refined annotation — a typed parameter, an annotated let, a
-	// declared result — could not be checked by the analyzer, which did not know the
-	// value. Enforce the type's range and refinement here so an out-of-range or
-	// predicate-violating aggregate leaves the position unfoldable rather than passing
-	// as if it inhabited the type. The receiver of a call folds with no expectation
-	// (graphValueRaw clears it), so a relation aggregate used as a receiver is not
-	// constrained by the enclosing call's type.
-	if !graphAdmitsTyped(ctx, ctx.expectedType, c) {
-		return nil
-	}
 	return c
 }
 
 // graphAdmitsTyped reports whether a data-dependent value inhabits a non-union type
-// it is bound into — an integer's range and a refined type's predicate. It admits
+// it is adapted into — an integer's range and a refined type's predicate. It admits
 // freely outside a data-aware fold (a relation folder present), since a compile-time
 // value's type was settled by the analyzer, and while folding a refinement predicate
 // (the refining guard), whose own literals would otherwise recurse back through this
@@ -464,18 +453,25 @@ func graphApplyCallee(v *ir.Apply, ctx graphCtx) *ir.Constant {
 // a value the member cannot represent (out of its range, or rejected by its
 // refinement predicate) — the same refusal the expectation-driven tagging
 // makes, so a wrong constant is never tagged into a union the flow checks
-// cannot see through. A width settle or nominal adaption is the identity on
-// the value: the representation is unchanged, and whether the value satisfies
-// the target's range or predicate is the flow checks' diagnostic (folding the
-// raw value is what lets them read it) — also what keeps a refined type's own
-// predicate, whose comparisons adapt their literals to the type, from running
-// itself recursively.
+// cannot see through. A width settle or nominal adaption is the identity on a
+// compile-time value, whose range and predicate the analyzer already checked. A
+// data-dependent value (a relation aggregate the rows decide), though, the
+// analyzer could not check, so it is admitted here against the adapted-to type's
+// range and refinement — the one seam every narrowing flows through (an argument,
+// an annotated let, a return, a reassignment, a collection element, a record
+// field, an explicit conversion), so an out-of-range or predicate-violating
+// aggregate leaves the position unfoldable rather than passing as if it inhabited
+// the type. The refining guard (graphAdmitsTyped) keeps a refined type's own
+// predicate, whose comparisons adapt their literals to the type, from recursing.
 func executeAdapt(a *ir.Adapt, ctx graphCtx) *ir.Constant {
 	v := graphValue(a.Value, ctx)
 	if v == nil {
 		return nil
 	}
 	if types.UnionType(a.To) == nil {
+		if !graphAdmitsTyped(ctx, a.To, v) {
+			return nil
+		}
 		return v
 	}
 	// The member is the inner node's settled type — the write-back nests a
