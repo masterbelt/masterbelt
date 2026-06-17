@@ -270,9 +270,13 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 			return t
 		}
 		// A bare master name in value position is its relation — its members are the
-		// query operations (where, count, sum), the same reading the checker gives it.
-		// A constant or parameter of the same name shadows it (handled above first).
-		if def := lookupTypeName(doc, e.Name); def != nil && def.Master != nil {
+		// query operations (where, count, sum) — but only where the checker reads it
+		// as one: in a body (not a constant initializer, which keeps a master as the
+		// metatype since it cannot evaluate a relation) and unshadowed by a body-local
+		// or type parameter of the same name. A constant or parameter shadowing it is
+		// handled by the earlier cases.
+		if def := lookupTypeName(doc, e.Name); def != nil && def.Master != nil &&
+			relationReceiverInScope(doc, e.Name, trees, offset) {
 			return doc.RelationType(def)
 		}
 		return nil
@@ -291,6 +295,35 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 		return t
 	}
 	return nil
+}
+
+// relationReceiverInScope reports whether a bare master name reads as its relation at
+// offset, mirroring the checker's scope rules: only inside a body (a constant
+// initializer cannot evaluate a relation, so the checker keeps a master as the
+// metatype there) and only when no body-local or enclosing function type parameter of
+// the same name shadows it. Constants and parameters are handled by receiverTypeOf's
+// earlier cases.
+func relationReceiverInScope(doc view, name string, trees map[cst.Green]cst.Tree, offset int) bool {
+	body, ok := enclosingBody(doc, offset, trees)
+	if !ok {
+		return false
+	}
+	if _, shadowed := letTypeOf(body, name); shadowed {
+		return false
+	}
+	for _, fn := range doc.Module().Funcs {
+		if fn.Syntax == nil {
+			continue
+		}
+		if t, ok := trees[fn.Syntax.Syntax()]; ok && within(t, offset) {
+			for _, tp := range fn.TypeParams {
+				if tp.Name == name {
+					return false
+				}
+			}
+		}
+	}
+	return true
 }
 
 // enclosingMethodOwner returns the type definition whose impl method body spans

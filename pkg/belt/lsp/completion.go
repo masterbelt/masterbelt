@@ -113,7 +113,30 @@ func memberItems(doc view, offset int) ([]protocol.CompletionItem, bool) {
 	}
 	// The value-position members of the receiver's type (methods, getters, fields)
 	// and — for a master, whose name is also a type — its static fns, gathered above.
-	return append(valueMemberItems(doc, recv), typeItems...), true
+	// A static fn shadows a relation method of the same name (the checker resolves the
+	// static call first), so a relation method a static fn already provides is dropped.
+	value := dropShadowed(valueMemberItems(doc, recv), typeItems)
+	return append(value, typeItems...), true
+}
+
+// dropShadowed returns items without those whose label a shadowing item already
+// carries — the relation methods a master's static fns of the same name take
+// precedence over, so each name appears once, as the member the checker resolves.
+func dropShadowed(items, shadowing []protocol.CompletionItem) []protocol.CompletionItem {
+	if len(shadowing) == 0 {
+		return items
+	}
+	names := make(map[string]bool, len(shadowing))
+	for _, it := range shadowing {
+		names[it.Label] = true
+	}
+	out := items[:0]
+	for _, it := range items {
+		if !names[it.Label] {
+			out = append(out, it)
+		}
+	}
+	return out
 }
 
 // valueMemberItems is the value-position members of a receiver's type: its methods
