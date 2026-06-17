@@ -567,6 +567,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "The next level up — a self-returning method, so a chain keeps the type."
+          TypeParams: ~
           Params: ~
           Result: SelfType
           Body:
@@ -598,6 +599,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "This level a number of steps up. The base value lifts into the nominal" "type through the conversion: a Level derives sbyte's operators, but their" "self-typed operands stay nominal, so mixing in a bare sbyte is a type" "error — Level(steps) is the explicit lift."
+          TypeParams: ~
           Params:
             Param
               Name: "steps"
@@ -689,6 +691,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -705,6 +708,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -721,6 +725,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -737,6 +742,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -753,6 +759,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -769,6 +776,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -785,6 +793,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "Whether this element is Fire — a one-line body that folds to a bool."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "bool"
@@ -815,6 +824,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "Whether this element is not Fire — a method that calls another method."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "bool"
@@ -848,6 +858,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "A let- and if-bearing body, to exercise the full statement walker."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "nint"

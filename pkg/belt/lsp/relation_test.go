@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	protocol "github.com/owenrumney/go-lsp/lsp"
+
+	"github.com/masterbelt/masterbelt/internal/belttest"
 )
 
 // the master the relation-completion tests offer members of.
@@ -110,5 +112,91 @@ func TestHoverNoRelationInConst(t *testing.T) {
 	doc := testView(src)
 	if h := hover(doc, strings.Index(src, "Cards.count()")+len("Cards.")); h != nil {
 		t.Errorf("count in a const initializer is not a relation method; want no hover, got %q", h.Contents.Value)
+	}
+}
+
+// TestHoverChainedRelationMethod pins that a relation method on a chained relation
+// resolves: in Cards.where(...).count(), the receiver of count is the where call, so
+// its result type (relation<Cards>) must carry through for count to hover.
+func TestHoverChainedRelationMethod(t *testing.T) {
+	src := relationMaster + "fn probe(): nint {\n  return Cards.where(fn(c) -> c.cost > 0).count()\n}\n"
+	doc := testView(src)
+	h := hover(doc, strings.LastIndex(src, ".count()")+1)
+	if h == nil {
+		t.Fatal("no hover on the trailing count of a relation chain")
+	}
+	if !strings.Contains(h.Contents.Value, "count") {
+		t.Errorf("hover should name count: %q", h.Contents.Value)
+	}
+}
+
+// TestHoverRelationMethodInValidate pins that a master reads as its relation inside a
+// validate clause — the checker type-checks validate bodies with a body scope — so a
+// relation method there hovers.
+func TestHoverRelationMethodInValidate(t *testing.T) {
+	src := "master Items {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    each {\n      assert Items.count() > 0\n    }\n  }\n}\n"
+	doc := testView(src)
+	h := hover(doc, strings.Index(src, "Items.count()")+len("Items."))
+	if h == nil {
+		t.Fatal("a master reads as its relation in a validate clause; count should hover")
+	}
+}
+
+// TestHoverLetAfterUseDoesNotShadow pins that a let shadowing the master is only in
+// scope after its declaration: a Cards.count() before a later let Cards still reads as
+// the relation, so count hovers.
+func TestHoverLetAfterUseDoesNotShadow(t *testing.T) {
+	src := relationMaster + "fn probe(): nint {\n  let a = Cards.count()\n  let Cards = 5\n  return a + Cards\n}\n"
+	doc := testView(src)
+	h := hover(doc, strings.Index(src, "Cards.count()")+len("Cards."))
+	if h == nil {
+		t.Fatal("a let Cards after the use does not shadow it; count should hover as a relation method")
+	}
+	if !strings.Contains(h.Contents.Value, "count") {
+		t.Errorf("hover should name count: %q", h.Contents.Value)
+	}
+}
+
+// TestCompletionTypeParamShadowsMaster pins that a type parameter of the enclosing
+// generic type named like a master shadows it: inside an impl on Box<Cards>, Cards is
+// the type parameter, so its relation methods are not offered.
+func TestCompletionTypeParamShadowsMaster(t *testing.T) {
+	src := "master Cards {\n  record { id: int }\n  primary id\n}\n" +
+		"pub type Box<Cards> = { v: Cards } impl {\n" +
+		"  pub fn probe(): nint {\n    let x = Cards.\n    return 0\n  }\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "Cards.\n") + len("Cards.")
+	items := byLabel(completion(doc, off).Items)
+	for _, m := range []string{"where", "count", "sum"} {
+		if _, ok := items[m]; ok {
+			t.Errorf("the type parameter Cards shadows the master; %q must not be offered: %v", m, labels(items))
+		}
+	}
+}
+
+// qualifiedRelationMain is the file that queries an imported master's relation.
+const qualifiedRelationMain = "use deck from \"cards.belt\"\n" +
+	"fn probe(): nint {\n  return deck.Cards.count()\n}\n"
+
+// TestHoverQualifiedRelationMethod pins that a master reached through a namespace
+// import is its relation in the editor too: deck.Cards.count() hovers count as a
+// relation method, the qualified twin of the bare-master reading.
+func TestHoverQualifiedRelationMethod(t *testing.T) {
+	root := belttest.WriteFiles(t, map[string]string{
+		"masterbelt.toml": "entry = \"main.belt\"\n",
+		"cards.belt":      "pub master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n",
+		"main.belt":       qualifiedRelationMain,
+	})
+	s := NewServer()
+	uri := openOnDisk(t, s, root, "main.belt")
+	v := s.open[uri]
+	off := strings.Index(qualifiedRelationMain, "deck.Cards.count()") + len("deck.Cards.")
+	h := hover(v, off)
+	if h == nil {
+		t.Fatal("an imported master is its relation; count should hover as a relation method")
+	}
+	if !strings.Contains(h.Contents.Value, "count") {
+		t.Errorf("hover should name count: %q", h.Contents.Value)
 	}
 }

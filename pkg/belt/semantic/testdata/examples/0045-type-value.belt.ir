@@ -138,6 +138,7 @@ Module
           Kind: 1
           Effects: ~
           Doc: "Read as cell.scaled (no parens), like a field."
+          TypeParams: ~
           Params: ~
           Result: Named
             Def: "Level"

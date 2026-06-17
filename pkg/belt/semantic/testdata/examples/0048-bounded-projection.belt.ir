@@ -26,6 +26,7 @@ Module
           Kind: 1
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params: ~
           Result: SelfType
           Body:
@@ -89,6 +90,7 @@ Module
           Kind: 1
           Effects: ~
           Doc: "A readable member: every Levelled is read as `v.level` for its level."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "nint"
@@ -102,6 +104,7 @@ Module
           Kind: 1
           Effects: ~
           Doc: "A readable member typed self: read as `v.best`, a value of the same type."
+          TypeParams: ~
           Params: ~
           Result: SelfType
           Body: ~

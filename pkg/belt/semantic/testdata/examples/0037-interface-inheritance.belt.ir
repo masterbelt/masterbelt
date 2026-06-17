@@ -18,6 +18,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "Render the tag."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "string"
@@ -36,6 +37,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "The tag's rank."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "nint"
@@ -54,6 +56,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "Order tags by value."
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -109,6 +112,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "Render the value as a string."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "string"
@@ -142,6 +146,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "The value's rank."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "nint"
@@ -175,6 +180,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "The < operator."
+          TypeParams: ~
           Params:
             Param
               Name: "other"

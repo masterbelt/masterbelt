@@ -58,6 +58,7 @@ Module
           Kind: 0
           Effects: "nondet"
           Doc: "The current instant, shifted by this clock's offset."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "datetime"

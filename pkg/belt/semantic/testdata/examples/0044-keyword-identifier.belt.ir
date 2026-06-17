@@ -45,6 +45,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -61,6 +62,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -77,6 +79,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -93,6 +96,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -109,6 +113,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"
@@ -125,6 +130,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params:
             Param
               Name: "other"

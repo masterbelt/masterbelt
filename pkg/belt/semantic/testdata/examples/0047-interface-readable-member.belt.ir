@@ -22,6 +22,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "string"
@@ -65,6 +66,7 @@ Module
           Kind: 1
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "string"
@@ -86,6 +88,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "string"
@@ -124,6 +127,7 @@ Module
           Kind: 1
           Effects: ~
           Doc: "A readable member: every Greetable is read as `g.name` for its string name."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "string"
@@ -137,6 +141,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "A method: called as `g.greeting()`."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "string"

@@ -363,6 +363,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "-1, 0, or 1 by sign."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "int"

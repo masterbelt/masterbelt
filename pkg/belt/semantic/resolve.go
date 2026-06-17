@@ -1881,6 +1881,12 @@ func resolveMethod(r *infer.TypeResolver, reg *builtin.Registry, self ir.Type, m
 		// scope and back-fill it, so a parameter naming it carries the bound. The
 		// two-pass settle lets a bound project off another parameter (T: Box<U.x>).
 		infer.SettleBounds(r, m.TypeParams, mscope)
+		// Record the method's explicit type parameters (name plus resolved bound) on
+		// the resolved method, so a consumer that needs them — an editor's scope check
+		// telling a master name from a same-named parameter — has them without the
+		// declaration; the free names, inferred holes rather than declared parameters,
+		// are not recorded.
+		method.TypeParams = infer.ResolveFuncTypeParams(r, m.TypeParams, mscope)
 	}
 
 	params := make(map[string]bool, len(m.Params))

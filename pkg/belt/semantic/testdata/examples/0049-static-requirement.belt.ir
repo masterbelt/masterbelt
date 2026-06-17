@@ -22,6 +22,7 @@ Module
           Kind: 3
           Effects: ~
           Doc: ~
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "nint"
@@ -57,6 +58,7 @@ Module
           Kind: 3
           Effects: ~
           Doc: "A required static fn: every HasDefault type supplies `defaultValue()`," "called through the type rather than a value."
+          TypeParams: ~
           Params: ~
           Result: Builtin
             Name: "nint"

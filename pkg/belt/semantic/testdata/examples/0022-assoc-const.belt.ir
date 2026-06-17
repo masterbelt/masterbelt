@@ -206,6 +206,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "The next level."
+          TypeParams: ~
           Params: ~
           Result: SelfType
           Body:

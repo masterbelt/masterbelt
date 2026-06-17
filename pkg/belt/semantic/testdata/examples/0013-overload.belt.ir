@@ -248,6 +248,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "The score with points merged in."
+          TypeParams: ~
           Params:
             Param
               Name: "points"
@@ -279,6 +280,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "Whether an active run with this score counts."
+          TypeParams: ~
           Params:
             Param
               Name: "active"
@@ -343,6 +345,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "The next level."
+          TypeParams: ~
           Params: ~
           Result: SelfType
           Body:
@@ -374,6 +377,7 @@ Module
           Kind: 0
           Effects: ~
           Doc: "The level a number of steps up."
+          TypeParams: ~
           Params:
             Param
               Name: "steps"
