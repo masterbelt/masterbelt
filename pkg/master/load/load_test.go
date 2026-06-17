@@ -246,6 +246,64 @@ func TestValidateAllStaticUnfilteredCountIgnoresCells(t *testing.T) {
 	}
 }
 
+// TestValidateAllStaticScalarLetAroundAggregate pins that a scalar local around a
+// relation aggregate folds: let one = 1; return self.count() + one is the row count
+// plus one, the evaluator binding the scalar and the relation folder running the
+// count. Over two rows, sizePlus() == 3 passes.
+func TestValidateAllStaticScalarLetAroundAggregate(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int } impl {\n    pub static fn sizePlus(): nint {\n      let one = 1\n      return self.count() + one\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.sizePlus() == 3\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id\n1\n2\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("sizePlus() == 3 over 2 rows: table_validation_failed = %d, want 0 (count 2 + 1)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllStaticDelegation pins that a static fn delegating to another that
+// queries the relation folds: size2() returns Cards.size(), which returns
+// self.count(); the evaluator folds the delegation and the inner count runs.
+func TestValidateAllStaticDelegation(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int } impl {\n" +
+		"    pub static fn size(): nint {\n      return self.count()\n    }\n" +
+		"    pub static fn size2(): nint {\n      return Cards.size()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.size2() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id\n1\n2\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("Cards.size2() == 2 (delegating to size to count): table_validation_failed = %d, want 0", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllRelationInConditional pins that a relation aggregate inside a
+// conditional folds: the evaluator takes the live branch and the relation folder
+// runs the count there.
+func TestValidateAllRelationInConditional(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int } impl {\n    pub static fn size(): nint {\n      return self.count()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert true ? Cards.size() == 2 : false\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id\n1\n2\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("ternary over Cards.size() == 2: table_validation_failed = %d, want 0", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllStaticRefinedResultViolation pins that a static fn whose driven
+// aggregate violates its refined result type's predicate is not folded to a passing
+// value: a sum of 0 does not satisfy Positive (self > 0), so Cards.s() must not be
+// driven to 0 and pass — the violating result leaves the check undriven and it fails
+// safe. types.Fits alone would miss this; the refinement predicate is evaluated.
+func TestValidateAllStaticRefinedResultViolation(t *testing.T) {
+	const belt = "type Positive = int where self > 0\n" +
+		"master Cards {\n  record { id: int, cost: int } impl {\n    pub static fn s(): Positive {\n      return self.sum(fn(c) -> c.cost)\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.s() == 0\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,0\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("Positive Cards.s() == 0: table_validation_failed = %d, want 1 (0 violates self > 0)", countTableFailures(diags))
+	}
+}
+
 func TestLoadTypedRows(t *testing.T) {
 	loaded, diags := run(t, skillBelt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,name,power\n1,Fireball,30\n2,Heal,12\n",
