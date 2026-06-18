@@ -112,45 +112,68 @@ func substituteWhereScalars(arg ir.Value, ctx graphCtx) ir.Value {
 }
 
 // substituteScalarRefs folds only a captured scalar reference a predicate names — a
-// parameter or a let — to the constant it holds, leaving every other node in place:
-// a column read, an arithmetic expression, and crucially a nested relation aggregate
-// over the rows. Folding a bare reference and nothing more keeps a row-dependent
-// subexpression — a correlated aggregate that reads the outer query binding — from
-// collapsing to a constant under the relation folder this fold carries; such a query
-// rides along for the driver to decline, failing safe. The data-independent
-// arithmetic a substituted literal leaves behind (min + 1) is still folded by the
-// driver's own foldOperands, which runs without a relation folder.
+// parameter or a let — to the constant it holds, recursing through the expression
+// nodes that may wrap one (an operator or helper call, a conversion, a ternary, a
+// closure application) but leaving every leaf that is not such a reference in place:
+// a column read, a literal, and crucially a nested relation aggregate over the rows.
+// Folding a bare reference and nothing more keeps a row-dependent subexpression — a
+// correlated aggregate that reads the outer query binding — from collapsing to a
+// constant under the relation folder this fold carries; such a query rides along for
+// the driver to decline, failing safe. A nested lambda (a FuncLiteral) is left whole
+// for the same reason. The data-independent expression a substituted literal leaves
+// behind (min + 1, inc(min), int(min)) is folded by the driver's own foldOperands,
+// which runs without a relation folder.
 func substituteScalarRefs(v ir.Value, ctx graphCtx) ir.Value {
-	switch n := v.(type) {
+	switch v.(type) {
 	case *ir.ParamRef, *ir.LocalRef:
 		if lit := graphConstantToValue(graphValue(v, ctx)); lit != nil {
 			return lit
 		}
 		return v
+	default:
+		return substituteWrappedScalars(v, ctx)
+	}
+}
+
+// substituteWrappedScalars recurses substituteScalarRefs through the expression nodes
+// that may wrap a captured scalar operand — an operator or helper call, a closure
+// application, a conversion, a ternary, a column receiver, a coercion — rebuilding the
+// node with its children substituted. A node it does not recognise (a literal, a
+// nested lambda, a relation base) is returned whole, so a nested aggregate is left for
+// the driver to decline.
+func substituteWrappedScalars(v ir.Value, ctx graphCtx) ir.Value {
+	switch n := v.(type) {
 	case *ir.Call:
 		out := *n
 		out.Receiver = substituteScalarRefs(n.Receiver, ctx)
-		out.Args = make([]ir.Value, len(n.Args))
-		for i, a := range n.Args {
-			out.Args[i] = substituteScalarRefs(a, ctx)
-		}
+		out.Args = substituteScalarArgs(n.Args, ctx)
 		return &out
-	case *ir.FieldAccess:
+	case *ir.FuncCall:
 		out := *n
-		out.Receiver = substituteScalarRefs(n.Receiver, ctx)
+		out.Args = substituteScalarArgs(n.Args, ctx)
+		return &out
+	case *ir.StaticCall:
+		out := *n
+		out.Args = substituteScalarArgs(n.Args, ctx)
+		return &out
+	case *ir.Apply:
+		out := *n
+		out.Callee = substituteScalarRefs(n.Callee, ctx)
+		out.Args = substituteScalarArgs(n.Args, ctx)
 		return &out
 	case *ir.Conversion:
 		out := *n
-		out.Args = make([]ir.Value, len(n.Args))
-		for i, a := range n.Args {
-			out.Args[i] = substituteScalarRefs(a, ctx)
-		}
+		out.Args = substituteScalarArgs(n.Args, ctx)
 		return &out
 	case *ir.Ternary:
 		out := *n
 		out.Cond = substituteScalarRefs(n.Cond, ctx)
 		out.Then = substituteScalarRefs(n.Then, ctx)
 		out.Else = substituteScalarRefs(n.Else, ctx)
+		return &out
+	case *ir.FieldAccess:
+		out := *n
+		out.Receiver = substituteScalarRefs(n.Receiver, ctx)
 		return &out
 	case *ir.Adapt:
 		out := *n
@@ -159,6 +182,15 @@ func substituteScalarRefs(v ir.Value, ctx graphCtx) ir.Value {
 	default:
 		return v
 	}
+}
+
+// substituteScalarArgs folds the captured scalar references in a node's argument list.
+func substituteScalarArgs(args []ir.Value, ctx graphCtx) []ir.Value {
+	out := make([]ir.Value, len(args))
+	for i, a := range args {
+		out[i] = substituteScalarRefs(a, ctx)
+	}
+	return out
 }
 
 // localsExcluding returns a copy of locals without the given names — a where lambda's

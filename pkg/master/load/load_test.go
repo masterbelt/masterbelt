@@ -553,6 +553,28 @@ func TestValidateAllTernaryCaptureSubstitutes(t *testing.T) {
 	}
 }
 
+// TestValidateAllHelperWrappedCaptureSubstitutes pins that a capture inside a pure
+// helper call is reached: above(min) filters c.cost > inc(min), so the captured min
+// is substituted inside the FuncCall and the data-independent inc(min) folds to the
+// threshold, rather than the reference surviving and the query being declined. The
+// parameter flows: above(9) keeps the rows above inc(9)=10, above(29) those above 30.
+func TestValidateAllHelperWrappedCaptureSubstitutes(t *testing.T) {
+	mk := func(arg, cmp string) string {
+		return "fn inc(n: int): int { return n + 1 }\n" +
+			"master Cards {\n  record { id: int, cost: int } impl {\n" +
+			"    pub static fn above(min: int): nint { return self.where(fn(c) -> c.cost > inc(min)).count() }\n  }\n  primary id\n" +
+			"  validate {\n    all {\n      assert Cards.above(" + arg + ") " + cmp + "\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	}
+	bases := map[string]string{"csv": "data"}
+	data := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, mk("9", "== 2"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("above(9) with inc(min): table_validation_failed = %d, want 0 (rows above inc(9)=10 are 30,100)", countTableFailures(diags))
+	}
+	if _, diags := run(t, mk("29", "== 1"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("above(29) with inc(min): table_validation_failed = %d, want 0 (one row above inc(29)=30)", countTableFailures(diags))
+	}
+}
+
 // TestValidateAllConversionWrappedCaptureSubstitutes pins that a capture wrapped in an
 // explicit conversion is reached: above(min) filters c.cost > int(min), so the scalar
 // inside the conversion is substituted and the data-independent conversion folds,
