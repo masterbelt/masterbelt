@@ -455,6 +455,196 @@ func TestValidateAllRelationShadowedByLoopVar(t *testing.T) {
 	}
 }
 
+// TestValidateAllStaticParamFiltersRelation pins that a static fn's parameter
+// substitutes into a where predicate it is captured in: average(min) filters the
+// rows to cost > min before averaging, so the parameter's value reaches the driver
+// as a bound literal. Over costs 10/30/100, average(20) is 65 (the rows above 20)
+// and average(0) is 46 (all rows) — different answers prove the parameter filters
+// rather than being ignored.
+func TestValidateAllStaticParamFiltersRelation(t *testing.T) {
+	mk := func(arg, cmp string) string {
+		return "master Cards {\n  record { id: int, cost: int } impl {\n" +
+			"    pub static fn average(min: int): int {\n" +
+			"      let m = self.where(fn(c) -> c.cost > min)\n" +
+			"      return m.sum(fn(c) -> c.cost) / m.count()\n" +
+			"    }\n  }\n  primary id\n" +
+			"  validate {\n    all {\n      assert Cards.average(" + arg + ") " + cmp + "\n    }\n  }\n" +
+			"  source { csv \"cards.csv\" }\n}\n"
+	}
+	bases := map[string]string{"csv": "data"}
+	data := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, mk("20", "== 65"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("average(20) == 65: table_validation_failed = %d, want 0 (rows above 20 are 30,100 → 65)", countTableFailures(diags))
+	}
+	if _, diags := run(t, mk("0", "== 46"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("average(0) == 46: table_validation_failed = %d, want 0 (all rows → 140/3 = 46)", countTableFailures(diags))
+	}
+	if _, diags := run(t, mk("20", "== 46"), bases, data); countTableFailures(diags) != 1 {
+		t.Errorf("average(20) == 46: table_validation_failed = %d, want 1 (the parameter must filter, so it is 65 not 46)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllCapturedLetFiltersRelation pins that a let bound in the same body
+// substitutes into a where predicate that captures it: let min = 20; ... cost > min
+// reaches the driver as a bound literal, so the filtered count is the rows above 20.
+func TestValidateAllCapturedLetFiltersRelation(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, cost: int } impl {\n" +
+		"    pub static fn above(): nint {\n      let min = 20\n      return self.where(fn(c) -> c.cost > min).count()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.above() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("captured let cost > min(20): table_validation_failed = %d, want 0 (two rows above 20)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllRelationLetCapturesScalarAtBinding pins that a relation let captures
+// its predicate's scalars at the binding, not at the later aggregate: min is 20 when m
+// is bound, then reassigned to 90 before m.count(), so the count is the rows above 20
+// (the value m was built with) and not above 90 — a closure captures its locals at
+// creation, and a saved relation must do the same.
+func TestValidateAllRelationLetCapturesScalarAtBinding(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, cost: int } impl {\n    pub static fn f(): nint {\n" +
+		"      let min = 20\n      let m = self.where(fn(c) -> c.cost > min)\n      min = 90\n      return m.count()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.f() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("relation captured at binding (min 20, then 90): table_validation_failed = %d, want 0 (count of cost > 20 is 2, not > 90)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllCorrelatedNestedAggregateDeclined pins that a nested relation
+// aggregate a predicate reads the outer query binding through is not folded to a
+// constant during scalar substitution: the inner count over c.cost is row-dependent,
+// so it must ride along for the driver to decline, and the check fails safe. Were the
+// whole subexpression folded, the inner correlated comparison would lower as a
+// same-table one (always false), collapsing the outer filter to c.id > 0 — counting
+// every row — so this asserts the count that wrong fold would produce and requires it
+// to be rejected instead.
+func TestValidateAllCorrelatedNestedAggregateDeclined(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, cost: int } impl {\n    pub static fn f(): nint {\n" +
+		"      return self.where(fn(c) -> c.id > int(self.where(fn(d) -> d.cost < c.cost).count())).count()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.f() == 3\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("correlated nested aggregate Cards.f() == 3: table_validation_failed = %d, want 1 (the row-dependent inner count must not fold to a constant)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllTernaryCaptureSubstitutes pins that a capture inside a ternary is
+// reached: above(useHigh) filters c.cost > (useHigh ? 50 : 20), so the captured bool
+// is substituted in the ternary's condition and the data-independent ternary folds to
+// the chosen threshold, rather than the reference surviving and being declined.
+func TestValidateAllTernaryCaptureSubstitutes(t *testing.T) {
+	mk := func(arg, cmp string) string {
+		return "master Cards {\n  record { id: int, cost: int } impl {\n" +
+			"    pub static fn above(useHigh: bool): nint { return self.where(fn(c) -> c.cost > (useHigh ? 50 : 20)).count() }\n  }\n  primary id\n" +
+			"  validate {\n    all {\n      assert Cards.above(" + arg + ") " + cmp + "\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	}
+	bases := map[string]string{"csv": "data"}
+	data := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, mk("true", "== 1"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("above(true) == 1: table_validation_failed = %d, want 0 (one row above 50)", countTableFailures(diags))
+	}
+	if _, diags := run(t, mk("false", "== 2"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("above(false) == 2: table_validation_failed = %d, want 0 (two rows above 20)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllHelperWrappedCaptureSubstitutes pins that a capture inside a pure
+// helper call is reached: above(min) filters c.cost > inc(min), so the captured min
+// is substituted inside the FuncCall and the data-independent inc(min) folds to the
+// threshold, rather than the reference surviving and the query being declined. The
+// parameter flows: above(9) keeps the rows above inc(9)=10, above(29) those above 30.
+func TestValidateAllHelperWrappedCaptureSubstitutes(t *testing.T) {
+	mk := func(arg, cmp string) string {
+		return "fn inc(n: int): int { return n + 1 }\n" +
+			"master Cards {\n  record { id: int, cost: int } impl {\n" +
+			"    pub static fn above(min: int): nint { return self.where(fn(c) -> c.cost > inc(min)).count() }\n  }\n  primary id\n" +
+			"  validate {\n    all {\n      assert Cards.above(" + arg + ") " + cmp + "\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	}
+	bases := map[string]string{"csv": "data"}
+	data := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, mk("9", "== 2"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("above(9) with inc(min): table_validation_failed = %d, want 0 (rows above inc(9)=10 are 30,100)", countTableFailures(diags))
+	}
+	if _, diags := run(t, mk("29", "== 1"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("above(29) with inc(min): table_validation_failed = %d, want 0 (one row above inc(29)=30)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllRefinedCaptureConversionChecked pins that folding a captured operand
+// still vets a refined conversion against its predicate: above(min) compares c.cost
+// against Positive(min), so above(5) drives (5 inhabits Positive) but above(-1) must
+// not — -1 violates self > 0, so the conversion is refused and the check fails safe
+// rather than folding to -1 and counting rows. The fold keeps the data-aware checks
+// even though it declines relation aggregates.
+func TestValidateAllRefinedCaptureConversionChecked(t *testing.T) {
+	mk := func(arg, cmp string) string {
+		return "type Positive = int where self > 0\n" +
+			"master Cards {\n  record { id: int, cost: int } impl {\n" +
+			"    pub static fn above(min: int): nint { return self.where(fn(c) -> c.cost > Positive(min)).count() }\n  }\n  primary id\n" +
+			"  validate {\n    all {\n      assert Cards.above(" + arg + ") " + cmp + "\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	}
+	bases := map[string]string{"csv": "data"}
+	data := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, mk("5", "== 3"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("above(5) with Positive(5): table_validation_failed = %d, want 0 (all three rows exceed 5)", countTableFailures(diags))
+	}
+	if _, diags := run(t, mk("-1", "== 3"), bases, data); countTableFailures(diags) != 1 {
+		t.Errorf("above(-1) with Positive(-1): table_validation_failed = %d, want 1 (-1 violates self > 0, so the conversion is refused)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllNominalMethodCaptureSubstitutes pins that a capture used as the
+// receiver of a method on a nominal scalar is folded with its type intact: min is a
+// Threshold and the predicate compares c.cost against min.bump(), so the method folds
+// to a constant (the fold keeps the receiver's type, resolving the method) and the
+// threshold drives the filter, rather than the typed reference being replaced by a
+// bare literal that no longer resolves the method.
+func TestValidateAllNominalMethodCaptureSubstitutes(t *testing.T) {
+	const belt = "type Threshold = int impl { pub bump(): Threshold { return self } }\n" +
+		"master Cards {\n  record { id: int, cost: Threshold } impl {\n" +
+		"    pub static fn above(min: Threshold): nint { return self.where(fn(c) -> c.cost > min.bump()).count() }\n  }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.above(20) == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("above(20) with min.bump(): table_validation_failed = %d, want 0 (two rows above 20)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllConversionWrappedCaptureSubstitutes pins that a capture wrapped in an
+// explicit conversion is reached: above(min) filters c.cost > int(min), so the scalar
+// inside the conversion is substituted and the data-independent conversion folds,
+// rather than the reference surviving into the chain and being declined.
+func TestValidateAllConversionWrappedCaptureSubstitutes(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, cost: int } impl {\n" +
+		"    pub static fn above(min: int): nint { return self.where(fn(c) -> c.cost > int(min)).count() }\n  }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.above(20) == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("above(20) with int(min): table_validation_failed = %d, want 0 (two rows above 20)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllStringParamFiltersRelation pins that the substitution carries a
+// string parameter too: byName(target) filters a string column to the rows equal to
+// target, so the count is those rows.
+func TestValidateAllStringParamFiltersRelation(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, name: string } impl {\n" +
+		"    pub static fn named(target: string): nint {\n      return self.where(fn(c) -> c.name == target).count()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.named(\"a\") == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,name\n1,a\n2,b\n3,a\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("named(\"a\") == 2: table_validation_failed = %d, want 0 (two rows named a)", countTableFailures(diags))
+	}
+}
+
 func TestLoadTypedRows(t *testing.T) {
 	loaded, diags := run(t, skillBelt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,name,power\n1,Fireball,30\n2,Heal,12\n",
