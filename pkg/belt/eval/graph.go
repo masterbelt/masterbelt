@@ -196,10 +196,17 @@ func (ctx graphCtx) unfoldable(v ir.Value) *ir.Constant {
 
 // graphUnfoldableOrRelation folds a master relation in value position to a relation
 // constant carrying its chain — the base a where narrows and an aggregate hands to the
-// folder — and leaves an await or a relation count to unfoldable's narrower rule.
+// folder — but only in a data-aware fold (a relation folder present), since a relation
+// is meaningful only where the rows are. A pure compile-time fold leaves it unevaluable
+// instead, so a relation never becomes a serialized const value (whose chain, comptime-
+// only, would be lost on round-trip). An await or a relation count takes unfoldable's
+// narrower rule.
 func graphUnfoldableOrRelation(v ir.Value, ctx graphCtx) *ir.Constant {
 	if mr, ok := v.(*ir.MasterRelation); ok {
-		return ir.RelationConstant(mr)
+		if _, dataAware := ctx.env.(RelationFolder); dataAware {
+			return ir.RelationConstant(mr)
+		}
+		return nil
 	}
 	return ctx.unfoldable(v)
 }

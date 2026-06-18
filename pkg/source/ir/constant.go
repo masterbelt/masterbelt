@@ -185,6 +185,11 @@ func ConstantsEqual(a, b *Constant) bool {
 		return equalRanges(a, b)
 	case ConstType:
 		return typeValuesEqual(a.Reified, b.Reified)
+	case ConstRelation:
+		// A relation is a query, compared by identity — the same chain value is the
+		// same relation; two separately built chains are treated as distinct, the safe
+		// side for any dedup, which recomputes rather than coalescing two queries.
+		return a.Relation == b.Relation
 	case ConstCollection:
 		return equalCollections(a, b)
 	case ConstRecord:
