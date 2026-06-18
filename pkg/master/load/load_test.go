@@ -533,6 +533,41 @@ func TestValidateAllCorrelatedNestedAggregateDeclined(t *testing.T) {
 	}
 }
 
+// TestValidateAllNullCaptureLowersToIsNull pins that a null-valued capture
+// substitutes too: byId(null) compares c.id against null, which the driver lowers to
+// IS NULL — zero rows, since id is never null — rather than declining the query. The
+// same fn with a non-null argument filters by equality, so both drive.
+func TestValidateAllNullCaptureLowersToIsNull(t *testing.T) {
+	mk := func(arg, cmp string) string {
+		return "master Cards {\n  record { id: int, cost: int } impl {\n" +
+			"    pub static fn byId(target: int | null): nint { return self.where(fn(c) -> c.id == target).count() }\n  }\n  primary id\n" +
+			"  validate {\n    all {\n      assert Cards.byId(" + arg + ") " + cmp + "\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	}
+	bases := map[string]string{"csv": "data"}
+	data := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n"}
+	if _, diags := run(t, mk("null", "== 0"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("byId(null) == 0: table_validation_failed = %d, want 0 (c.id IS NULL matches no row)", countTableFailures(diags))
+	}
+	if _, diags := run(t, mk("1", "== 1"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("byId(1) == 1: table_validation_failed = %d, want 0 (c.id == 1 matches one row)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllConversionWrappedCaptureSubstitutes pins that a capture wrapped in an
+// explicit conversion is reached: above(min) filters c.cost > int(min), so the scalar
+// inside the conversion is substituted and the data-independent conversion folds,
+// rather than the reference surviving into the chain and being declined.
+func TestValidateAllConversionWrappedCaptureSubstitutes(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, cost: int } impl {\n" +
+		"    pub static fn above(min: int): nint { return self.where(fn(c) -> c.cost > int(min)).count() }\n  }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.above(20) == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("above(20) with int(min): table_validation_failed = %d, want 0 (two rows above 20)", countTableFailures(diags))
+	}
+}
+
 // TestValidateAllStringParamFiltersRelation pins that the substitution carries a
 // string parameter too: byName(target) filters a string column to the rows equal to
 // target, so the count is those rows.
