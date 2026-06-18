@@ -103,36 +103,43 @@ func substituteWhereScalars(arg ir.Value, ctx graphCtx) ir.Value {
 	foldCtx := ctx
 	foldCtx.locals = localsExcluding(ctx.locals, lit.Params)
 	newRet := *ret
-	newRet.Value = foldPredicateScalars(ret.Value, foldCtx)
+	newRet.Value = substituteScalarRefs(ret.Value, foldCtx)
 	newLit := *lit
 	newLit.Body = []ir.Stmt{&newRet}
 	return rewrap(&newLit)
 }
 
-// foldPredicateScalars replaces each data-independent subexpression of a predicate
-// with the constant it folds to under the current locals — the eval-side twin of the
-// driver's foldOperands, which sees only data-independent constants and not the
-// body's locals. A subexpression reading a column folds to nothing and is kept, its
-// children folded instead, so only the value side of a comparison collapses.
-func foldPredicateScalars(v ir.Value, ctx graphCtx) ir.Value {
-	if v == nil {
-		return nil
-	}
-	if lit := graphConstantToValue(graphValue(v, ctx)); lit != nil {
-		return lit
-	}
+// substituteScalarRefs folds only a captured scalar reference a predicate names — a
+// parameter or a let — to the constant it holds, leaving every other node in place:
+// a column read, an arithmetic expression, and crucially a nested relation aggregate
+// over the rows. Folding a bare reference and nothing more keeps a row-dependent
+// subexpression — a correlated aggregate that reads the outer query binding — from
+// collapsing to a constant under the relation folder this fold carries; such a query
+// rides along for the driver to decline, failing safe. The data-independent
+// arithmetic a substituted literal leaves behind (min + 1) is still folded by the
+// driver's own foldOperands, which runs without a relation folder.
+func substituteScalarRefs(v ir.Value, ctx graphCtx) ir.Value {
 	switch n := v.(type) {
+	case *ir.ParamRef, *ir.LocalRef:
+		if lit := graphConstantToValue(graphValue(v, ctx)); lit != nil {
+			return lit
+		}
+		return v
 	case *ir.Call:
 		out := *n
-		out.Receiver = foldPredicateScalars(n.Receiver, ctx)
+		out.Receiver = substituteScalarRefs(n.Receiver, ctx)
 		out.Args = make([]ir.Value, len(n.Args))
 		for i, a := range n.Args {
-			out.Args[i] = foldPredicateScalars(a, ctx)
+			out.Args[i] = substituteScalarRefs(a, ctx)
 		}
+		return &out
+	case *ir.FieldAccess:
+		out := *n
+		out.Receiver = substituteScalarRefs(n.Receiver, ctx)
 		return &out
 	case *ir.Adapt:
 		out := *n
-		out.Value = foldPredicateScalars(n.Value, ctx)
+		out.Value = substituteScalarRefs(n.Value, ctx)
 		return &out
 	default:
 		return v

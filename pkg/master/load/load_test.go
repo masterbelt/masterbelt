@@ -514,6 +514,25 @@ func TestValidateAllRelationLetCapturesScalarAtBinding(t *testing.T) {
 	}
 }
 
+// TestValidateAllCorrelatedNestedAggregateDeclined pins that a nested relation
+// aggregate a predicate reads the outer query binding through is not folded to a
+// constant during scalar substitution: the inner count over c.cost is row-dependent,
+// so it must ride along for the driver to decline, and the check fails safe. Were the
+// whole subexpression folded, the inner correlated comparison would lower as a
+// same-table one (always false), collapsing the outer filter to c.id > 0 — counting
+// every row — so this asserts the count that wrong fold would produce and requires it
+// to be rejected instead.
+func TestValidateAllCorrelatedNestedAggregateDeclined(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, cost: int } impl {\n    pub static fn f(): nint {\n" +
+		"      return self.where(fn(c) -> c.id > int(self.where(fn(d) -> d.cost < c.cost).count())).count()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.f() == 3\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("correlated nested aggregate Cards.f() == 3: table_validation_failed = %d, want 1 (the row-dependent inner count must not fold to a constant)", countTableFailures(diags))
+	}
+}
+
 // TestValidateAllStringParamFiltersRelation pins that the substitution carries a
 // string parameter too: byName(target) filters a string column to the rows equal to
 // target, so the count is those rows.
