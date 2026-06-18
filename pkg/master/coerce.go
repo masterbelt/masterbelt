@@ -154,10 +154,13 @@ func (k intType) fits(n *big.Int) bool {
 }
 
 // scalarSupported reports whether a field type is a scalar the format reads — a
-// primitive integer, bool, or string. A refined or aliased type is looked
-// through to its underlying primitive, so type Level = int where ... is a scalar.
-// A record, enum, collection, or foreign-key reference is not.
+// primitive integer, bool, or string, or an enum (read by member name). A refined or
+// aliased type is looked through to its underlying primitive, so type Level = int
+// where ... is a scalar. A record, collection, or foreign-key reference is not.
 func scalarSupported(t ir.Type) bool {
+	if enumDef(t) != nil {
+		return true
+	}
 	name, ok := underlyingBuiltin(t)
 	if !ok {
 		return false
@@ -168,6 +171,27 @@ func scalarSupported(t ir.Type) bool {
 	default:
 		_, ok := intFamily[name]
 		return ok
+	}
+}
+
+// enumDef returns the enum definition a type denotes — directly, or through a named
+// alias of an enum — or nil when the type is not an enum. The walk is bounded by a
+// visited set against a cyclic alias.
+func enumDef(t ir.Type) *ir.TypeDef {
+	seen := map[*ir.TypeDef]bool{}
+	for {
+		named, ok := t.(*ir.Named)
+		if !ok || named.Def == nil || seen[named.Def] {
+			return nil
+		}
+		if named.Def.Enum != nil {
+			return named.Def
+		}
+		seen[named.Def] = true
+		if named.Def.Body == nil {
+			return nil
+		}
+		t = named.Def.Body
 	}
 }
 
@@ -201,6 +225,9 @@ func coerceScalar(raw *ir.Constant, t ir.Type) (*ir.Constant, bool) {
 	if raw == nil || raw.Kind != ir.ConstString {
 		return nil, false
 	}
+	if def := enumDef(t); def != nil {
+		return coerceEnum(raw.Str, def)
+	}
 	name, ok := underlyingBuiltin(t)
 	if !ok {
 		return nil, false
@@ -228,6 +255,19 @@ func coerceScalar(raw *ir.Constant, t ir.Type) (*ir.Constant, bool) {
 		}
 		return ir.IntConstant(n), true
 	}
+}
+
+// coerceEnum reads a cell as an enum member by its name — the form a source spells a
+// member, common rather than its underlying 0 — yielding the member as an enum
+// constant so a per-row check compares it as the enum it is. A text matching no member
+// is a type mismatch, like an out-of-range integer.
+func coerceEnum(s string, def *ir.TypeDef) (*ir.Constant, bool) {
+	for i, m := range def.Enum.Members {
+		if m.Name == s {
+			return &ir.Constant{Kind: ir.ConstEnum, EnumDef: def, EnumIndex: i}, true
+		}
+	}
+	return nil, false
 }
 
 // typeName is the type's name as a diagnostic spells it (int, Level).

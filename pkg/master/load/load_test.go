@@ -645,6 +645,36 @@ func TestValidateAllStringParamFiltersRelation(t *testing.T) {
 	}
 }
 
+// TestValidateAllStaticEnumParamFiltersRelation pins the full average_cost canonical:
+// a static fn takes an enum parameter and filters its relation by it (c.rarity == r),
+// so the enum column loads (read by member name), the parameter substitutes, and the
+// engine counts and sums the matching rows. average_cost(common) is 20 (costs 10, 30)
+// and average_cost(rare) is 100 (cost 100) — distinct answers prove the enum parameter
+// filters rather than being ignored.
+func TestValidateAllStaticEnumParamFiltersRelation(t *testing.T) {
+	mk := func(arg, cmp string) string {
+		return "enum Rarity { common, rare }\n" +
+			"master Cards {\n  record { id: int, cost: int, rarity: Rarity } impl {\n" +
+			"    pub static fn average_cost(r: Rarity): int {\n" +
+			"      let m = self.where(fn(c) -> c.rarity == r)\n" +
+			"      return m.sum(fn(c) -> c.cost) / m.count()\n" +
+			"    }\n  }\n  primary id\n" +
+			"  validate {\n    all {\n      assert Cards.average_cost(" + arg + ") " + cmp + "\n    }\n  }\n" +
+			"  source { csv \"cards.csv\" }\n}\n"
+	}
+	bases := map[string]string{"csv": "data"}
+	data := map[string]string{"data/cards.csv": "id,cost,rarity\n1,10,common\n2,30,common\n3,100,rare\n"}
+	if _, diags := run(t, mk("Rarity.common", "== 20"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("average_cost(common) == 20: table_validation_failed = %d, want 0 (common costs 10,30 → 20)", countTableFailures(diags))
+	}
+	if _, diags := run(t, mk("Rarity.rare", "== 100"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("average_cost(rare) == 100: table_validation_failed = %d, want 0 (rare cost 100)", countTableFailures(diags))
+	}
+	if _, diags := run(t, mk("Rarity.common", "== 100"), bases, data); countTableFailures(diags) != 1 {
+		t.Errorf("average_cost(common) == 100: table_validation_failed = %d, want 1 (the enum parameter must filter, so it is 20 not 100)", countTableFailures(diags))
+	}
+}
+
 func TestLoadTypedRows(t *testing.T) {
 	loaded, diags := run(t, skillBelt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,name,power\n1,Fireball,30\n2,Heal,12\n",
