@@ -533,23 +533,23 @@ func TestValidateAllCorrelatedNestedAggregateDeclined(t *testing.T) {
 	}
 }
 
-// TestValidateAllNullCaptureLowersToIsNull pins that a null-valued capture
-// substitutes too: byId(null) compares c.id against null, which the driver lowers to
-// IS NULL — zero rows, since id is never null — rather than declining the query. The
-// same fn with a non-null argument filters by equality, so both drive.
-func TestValidateAllNullCaptureLowersToIsNull(t *testing.T) {
+// TestValidateAllTernaryCaptureSubstitutes pins that a capture inside a ternary is
+// reached: above(useHigh) filters c.cost > (useHigh ? 50 : 20), so the captured bool
+// is substituted in the ternary's condition and the data-independent ternary folds to
+// the chosen threshold, rather than the reference surviving and being declined.
+func TestValidateAllTernaryCaptureSubstitutes(t *testing.T) {
 	mk := func(arg, cmp string) string {
 		return "master Cards {\n  record { id: int, cost: int } impl {\n" +
-			"    pub static fn byId(target: int | null): nint { return self.where(fn(c) -> c.id == target).count() }\n  }\n  primary id\n" +
-			"  validate {\n    all {\n      assert Cards.byId(" + arg + ") " + cmp + "\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+			"    pub static fn above(useHigh: bool): nint { return self.where(fn(c) -> c.cost > (useHigh ? 50 : 20)).count() }\n  }\n  primary id\n" +
+			"  validate {\n    all {\n      assert Cards.above(" + arg + ") " + cmp + "\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
 	}
 	bases := map[string]string{"csv": "data"}
-	data := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n"}
-	if _, diags := run(t, mk("null", "== 0"), bases, data); countTableFailures(diags) != 0 {
-		t.Errorf("byId(null) == 0: table_validation_failed = %d, want 0 (c.id IS NULL matches no row)", countTableFailures(diags))
+	data := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, mk("true", "== 1"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("above(true) == 1: table_validation_failed = %d, want 0 (one row above 50)", countTableFailures(diags))
 	}
-	if _, diags := run(t, mk("1", "== 1"), bases, data); countTableFailures(diags) != 0 {
-		t.Errorf("byId(1) == 1: table_validation_failed = %d, want 0 (c.id == 1 matches one row)", countTableFailures(diags))
+	if _, diags := run(t, mk("false", "== 2"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("above(false) == 2: table_validation_failed = %d, want 0 (two rows above 20)", countTableFailures(diags))
 	}
 }
 

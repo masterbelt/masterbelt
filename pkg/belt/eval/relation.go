@@ -35,10 +35,11 @@ func graphRelationAggregate(v *ir.Call, ctx graphCtx) (*ir.Constant, bool) {
 }
 
 // graphConstantToValue renders a folded constant as the literal node the driver's
-// lowering binds — an integer, string, boolean, enum member, or null (which the
-// lowering turns into IS [NOT] NULL). It is nil for a constant the lowering does not
-// bind (a collection, record, function) and for a nil constant, leaving the original
-// node in place.
+// lowering binds — an integer, string, boolean, or enum member. It is nil for a
+// constant the lowering does not bind (a collection, record, function) and for a nil
+// constant, leaving the original node in place. A captured scalar carries the
+// column's own scalar type, since a comparison against a nullable or otherwise wider
+// capture does not type, so no null or union member reaches a column comparison here.
 func graphConstantToValue(c *ir.Constant) ir.Value {
 	if c == nil {
 		return nil
@@ -52,8 +53,6 @@ func graphConstantToValue(c *ir.Constant) ir.Value {
 		return &ir.BoolLiteral{Value: c.Bool}
 	case ir.ConstEnum:
 		return &ir.EnumMemberValue{Def: c.EnumDef, Index: c.EnumIndex}
-	case ir.ConstNull:
-		return &ir.NullValue{}
 	default:
 		return nil
 	}
@@ -146,6 +145,12 @@ func substituteScalarRefs(v ir.Value, ctx graphCtx) ir.Value {
 		for i, a := range n.Args {
 			out.Args[i] = substituteScalarRefs(a, ctx)
 		}
+		return &out
+	case *ir.Ternary:
+		out := *n
+		out.Cond = substituteScalarRefs(n.Cond, ctx)
+		out.Then = substituteScalarRefs(n.Then, ctx)
+		out.Else = substituteScalarRefs(n.Else, ctx)
 		return &out
 	case *ir.Adapt:
 		out := *n
