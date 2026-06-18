@@ -1,6 +1,7 @@
 package master
 
 import (
+	"math/big"
 	"strings"
 	"testing"
 
@@ -104,6 +105,33 @@ func TestCoerceUnsupportedFieldType(t *testing.T) {
 	d := singleDiag(t, diags, CodeUnsupportedFieldType)
 	if !strings.Contains(d.Message, "tags") {
 		t.Errorf("message = %q, want it to name the field", d.Message)
+	}
+}
+
+func TestCoerceEnumByMemberName(t *testing.T) {
+	// An enum field reads a cell by its member name, yielding the member as an enum
+	// constant (its identity preserved for a per-row check), and a text matching no
+	// member is a type mismatch, like an out-of-range integer.
+	rarity := &ir.TypeDef{Name: "Rarity", Enum: &ir.EnumDef{Base: "nint", Members: []ir.EnumMember{
+		{Name: "common", Value: ir.IntConstant(big.NewInt(0))},
+		{Name: "rare", Value: ir.IntConstant(big.NewInt(1))},
+	}}}
+	raw := Table{Columns: []string{"rarity"}, Rows: []Row{
+		{Cells: []Cell{rawCell("rare", 2, 1)}},
+		{Cells: []Cell{rawCell("epic", 3, 1)}},
+	}}
+	typed, diags := Coerce(raw, []ir.Field{{Name: "rarity", Type: &ir.Named{Def: rarity}}}, spec())
+
+	c := typed.Rows[0].Cells[0].Value
+	if c == nil || c.Kind != ir.ConstEnum || c.EnumDef != rarity || c.EnumIndex != 1 {
+		t.Errorf("rare cell = %v, want ConstEnum Rarity index 1", c)
+	}
+	d := singleDiag(t, diags, CodeCellTypeMismatch)
+	if !strings.Contains(d.Message, "epic") || !strings.Contains(d.Message, "Rarity") {
+		t.Errorf("message = %q, want it to name the bad value and the enum", d.Message)
+	}
+	if typed.Rows[1].Cells[0].Value != nil {
+		t.Errorf("epic cell = %v, want nil (not a member)", typed.Rows[1].Cells[0].Value)
 	}
 }
 

@@ -328,7 +328,18 @@ func wideColumns(typed master.Table) map[string]bool {
 // cellExceedsInt64 reports whether a cell holds an integer outside the int64 the
 // engine stores — the same bound the engine's own bind enforces.
 func cellExceedsInt64(v *ir.Constant) bool {
-	return v != nil && v.Kind == ir.ConstInt && v.Int != nil && !v.Int.IsInt64()
+	if v == nil {
+		return false
+	}
+	// An enum cell stores its member's underlying value, so a member with an
+	// out-of-range integer base is as unstorable as a bare integer cell.
+	if v.Kind == ir.ConstEnum {
+		if v.EnumDef == nil || v.EnumDef.Enum == nil || v.EnumIndex < 0 || v.EnumIndex >= len(v.EnumDef.Enum.Members) {
+			return false
+		}
+		return cellExceedsInt64(v.EnumDef.Enum.Members[v.EnumIndex].Value)
+	}
+	return v.Kind == ir.ConstInt && v.Int != nil && !v.Int.IsInt64()
 }
 
 // tableHasFields reports whether the coerced table carries a column for every

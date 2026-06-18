@@ -16,6 +16,7 @@ package sqlite
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -300,9 +301,21 @@ func constArg(c *ir.Constant) (any, error) {
 		return boolArg(c.Bool), nil
 	case ir.ConstString:
 		return c.Str, nil
+	case ir.ConstEnum:
+		return enumArg(c)
 	default:
 		return nil, fmt.Errorf("unsupported constant kind %v", c.Kind)
 	}
+}
+
+// enumArg stores an enum cell as its member's underlying value — the integer or
+// string the member stands for — the same value the lowering binds an enum member
+// comparison to, so a column compared against an enum matches the stored cell.
+func enumArg(c *ir.Constant) (any, error) {
+	if c.EnumDef == nil || c.EnumDef.Enum == nil || c.EnumIndex < 0 || c.EnumIndex >= len(c.EnumDef.Enum.Members) {
+		return nil, errors.New("malformed enum constant")
+	}
+	return constArg(c.EnumDef.Enum.Members[c.EnumIndex].Value)
 }
 
 // intArg narrows an arbitrary-precision integer to the int64 SQLite stores. A

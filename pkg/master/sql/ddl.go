@@ -58,13 +58,42 @@ func InsertInto(table string, fields []ir.Field, d Dialect) string {
 // storageType is a field's SQLite storage class: a string to TEXT, every other
 // scalar — the integer family and bool — to INTEGER, since SQLite has no boolean
 // type and stores a bool as 0/1. A refined or aliased type looks through to its
-// underlying primitive, so type Level = int where ... stores as INTEGER. This is
-// the type convention the lowering and the loader already share.
+// underlying primitive, so type Level = int where ... stores as INTEGER. An enum
+// column stores its members' underlying values, so it takes its base's class — a
+// string-backed enum to TEXT, so its values compare as text and not as numbers. This
+// is the type convention the lowering and the loader already share.
 func storageType(t ir.Type) string {
+	if base, ok := enumBase(t); ok {
+		if base == "string" {
+			return "TEXT"
+		}
+		return "INTEGER"
+	}
 	if underlyingName(t) == "string" {
 		return "TEXT"
 	}
 	return "INTEGER"
+}
+
+// enumBase returns an enum type's base-type name — through a named alias of an enum —
+// or false when the type is not an enum. A visited set bounds the walk against a
+// cyclic alias.
+func enumBase(t ir.Type) (string, bool) {
+	seen := map[*ir.TypeDef]bool{}
+	for {
+		named, ok := t.(*ir.Named)
+		if !ok || named.Def == nil || seen[named.Def] {
+			return "", false
+		}
+		if named.Def.Enum != nil {
+			return named.Def.Enum.Base, true
+		}
+		seen[named.Def] = true
+		if named.Def.Body == nil {
+			return "", false
+		}
+		t = named.Def.Body
+	}
 }
 
 // underlyingName unwraps a type to the primitive name at its base, through a named

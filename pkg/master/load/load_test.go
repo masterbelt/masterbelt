@@ -645,6 +645,68 @@ func TestValidateAllStringParamFiltersRelation(t *testing.T) {
 	}
 }
 
+// TestValidateAllWideEnumColumnIgnored pins that an enum column whose member value is
+// beyond SQLite's range does not disable aggregates over the other columns, the enum
+// twin of the wide-integer-column rule: an unused enum with an overwide member is left
+// out of the engine, so sum over an int column still drives.
+func TestValidateAllWideEnumColumnIgnored(t *testing.T) {
+	const belt = "enum Big { huge = 9223372036854775808 }\n" +
+		"master Cards {\n  record { id: int, cost: int, b: Big } impl {\n" +
+		"    pub static fn s(): nint { return self.where(fn(c) -> c.cost > 0).sum(fn(c) -> c.cost) }\n  }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.s() == 30\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost,b\n1,10,huge\n2,20,huge\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("sum(cost) == 30 with a wide enum column: table_validation_failed = %d, want 0 (the overwide enum column must not disable the aggregate)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllStringEnumStoresAsText pins that a string-backed enum column stores
+// as text, so its values compare lexicographically as the language defines, not as
+// numbers: with codes "2" and "10", a filter for codes below "10" matches none ("2"
+// orders after "10" as text), whereas numeric storage would wrongly match "2".
+func TestValidateAllStringEnumStoresAsText(t *testing.T) {
+	const belt = "enum Code: string { lo = \"2\", hi = \"10\" }\n" +
+		"master Cards {\n  record { id: int, code: Code } impl {\n" +
+		"    pub static fn below(): nint { return self.where(fn(c) -> c.code < Code.hi).count() }\n  }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.below() == 0\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,code\n1,lo\n2,hi\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("below() == 0 for a string enum: table_validation_failed = %d, want 0 (\"2\" orders after \"10\" as text, so none is below)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllStaticEnumParamFiltersRelation pins the full average_cost canonical:
+// a static fn takes an enum parameter and filters its relation by it (c.rarity == r),
+// so the enum column loads (read by member name), the parameter substitutes, and the
+// engine counts and sums the matching rows. average_cost(common) is 20 (costs 10, 30)
+// and average_cost(rare) is 100 (cost 100) — distinct answers prove the enum parameter
+// filters rather than being ignored.
+func TestValidateAllStaticEnumParamFiltersRelation(t *testing.T) {
+	mk := func(arg, cmp string) string {
+		return "enum Rarity { common, rare }\n" +
+			"master Cards {\n  record { id: int, cost: int, rarity: Rarity } impl {\n" +
+			"    pub static fn average_cost(r: Rarity): int {\n" +
+			"      let m = self.where(fn(c) -> c.rarity == r)\n" +
+			"      return m.sum(fn(c) -> c.cost) / m.count()\n" +
+			"    }\n  }\n  primary id\n" +
+			"  validate {\n    all {\n      assert Cards.average_cost(" + arg + ") " + cmp + "\n    }\n  }\n" +
+			"  source { csv \"cards.csv\" }\n}\n"
+	}
+	bases := map[string]string{"csv": "data"}
+	data := map[string]string{"data/cards.csv": "id,cost,rarity\n1,10,common\n2,30,common\n3,100,rare\n"}
+	if _, diags := run(t, mk("Rarity.common", "== 20"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("average_cost(common) == 20: table_validation_failed = %d, want 0 (common costs 10,30 → 20)", countTableFailures(diags))
+	}
+	if _, diags := run(t, mk("Rarity.rare", "== 100"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("average_cost(rare) == 100: table_validation_failed = %d, want 0 (rare cost 100)", countTableFailures(diags))
+	}
+	if _, diags := run(t, mk("Rarity.common", "== 100"), bases, data); countTableFailures(diags) != 1 {
+		t.Errorf("average_cost(common) == 100: table_validation_failed = %d, want 1 (the enum parameter must filter, so it is 20 not 100)", countTableFailures(diags))
+	}
+}
+
 func TestLoadTypedRows(t *testing.T) {
 	loaded, diags := run(t, skillBelt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,name,power\n1,Fireball,30\n2,Heal,12\n",
