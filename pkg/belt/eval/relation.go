@@ -81,11 +81,19 @@ func substituteChainScalars(chain ir.Value, ctx graphCtx) ir.Value {
 	}
 }
 
+// noFolderEnv carries the driver's environment but not its relation folder, so a fold
+// run under it resolves an ordinary constant — a captured scalar, a helper, a method
+// on a nominal scalar — while a relation aggregate among the operands finds no folder
+// and stays unevaluable. It is what lets a predicate's value side collapse without a
+// correlated aggregate over the rows collapsing with it.
+type noFolderEnv struct{ GraphEnv }
+
 // substituteWhereScalars rewrites a where lambda's predicate, folding the captured
-// scalars its column comparisons read against. The fold runs with the lambda's own
-// parameters removed from scope, so the column binding (the c of fn(c) -> ...) stays
-// unevaluable — only an outer parameter or let resolves — and a column read is never
-// mistaken for a value to collapse.
+// scalars its column comparisons read against to the constants they hold. The fold
+// runs with the lambda's own parameters out of scope (so a column binding stays
+// unevaluable) and without the relation folder (so a nested relation aggregate does
+// not collapse), the two conditions that keep only the value side of a comparison from
+// folding while a column read or a correlated aggregate rides along.
 func substituteWhereScalars(arg ir.Value, ctx graphCtx) ir.Value {
 	rewrap := func(v ir.Value) ir.Value { return v }
 	inner := arg
@@ -103,6 +111,7 @@ func substituteWhereScalars(arg ir.Value, ctx graphCtx) ir.Value {
 		return arg
 	}
 	foldCtx := ctx
+	foldCtx.env = noFolderEnv{ctx.env}
 	foldCtx.locals = localsExcluding(ctx.locals, lit.Params)
 	newRet := *ret
 	newRet.Value = substituteScalarRefs(ret.Value, foldCtx)
@@ -111,69 +120,26 @@ func substituteWhereScalars(arg ir.Value, ctx graphCtx) ir.Value {
 	return rewrap(&newLit)
 }
 
-// substituteScalarRefs folds only a captured scalar reference a predicate names — a
-// parameter or a let — to the constant it holds, recursing through the expression
-// nodes that may wrap one (an operator or helper call, a conversion, a ternary, a
-// closure application) but leaving every leaf that is not such a reference in place:
-// a column read, a literal, and crucially a nested relation aggregate over the rows.
-// Folding a bare reference and nothing more keeps a row-dependent subexpression — a
-// correlated aggregate that reads the outer query binding — from collapsing to a
-// constant under the relation folder this fold carries; such a query rides along for
-// the driver to decline, failing safe. A nested lambda (a FuncLiteral) is left whole
-// for the same reason. The data-independent expression a substituted literal leaves
-// behind (min + 1, inc(min), int(min)) is folded by the driver's own foldOperands,
-// which runs without a relation folder.
+// substituteScalarRefs replaces each subexpression of a predicate that folds to a
+// renderable constant under the body's locals — a captured parameter or let, and any
+// data-independent expression over one (min + 1, inc(min), int(min), min.bump(),
+// useHigh ? a : b) — with that literal. The fold carries no relation folder (foldCtx
+// installs noFolderEnv), so a nested relation aggregate over the rows folds to nothing
+// and is left whole for the driver to decline, never collapsing to a value computed
+// without the outer query binding. A column read folds to nothing too, so a comparison
+// is recursed into and only its value side collapses; anything else is left as is.
 func substituteScalarRefs(v ir.Value, ctx graphCtx) ir.Value {
-	switch v.(type) {
-	case *ir.ParamRef, *ir.LocalRef:
-		if lit := graphConstantToValue(graphValue(v, ctx)); lit != nil {
-			return lit
-		}
-		return v
-	default:
-		return substituteWrappedScalars(v, ctx)
+	if lit := graphConstantToValue(graphValue(v, ctx)); lit != nil {
+		return lit
 	}
-}
-
-// substituteWrappedScalars recurses substituteScalarRefs through the expression nodes
-// that may wrap a captured scalar operand — an operator or helper call, a closure
-// application, a conversion, a ternary, a column receiver, a coercion — rebuilding the
-// node with its children substituted. A node it does not recognise (a literal, a
-// nested lambda, a relation base) is returned whole, so a nested aggregate is left for
-// the driver to decline.
-func substituteWrappedScalars(v ir.Value, ctx graphCtx) ir.Value {
 	switch n := v.(type) {
 	case *ir.Call:
 		out := *n
 		out.Receiver = substituteScalarRefs(n.Receiver, ctx)
-		out.Args = substituteScalarArgs(n.Args, ctx)
-		return &out
-	case *ir.FuncCall:
-		out := *n
-		out.Args = substituteScalarArgs(n.Args, ctx)
-		return &out
-	case *ir.StaticCall:
-		out := *n
-		out.Args = substituteScalarArgs(n.Args, ctx)
-		return &out
-	case *ir.Apply:
-		out := *n
-		out.Callee = substituteScalarRefs(n.Callee, ctx)
-		out.Args = substituteScalarArgs(n.Args, ctx)
-		return &out
-	case *ir.Conversion:
-		out := *n
-		out.Args = substituteScalarArgs(n.Args, ctx)
-		return &out
-	case *ir.Ternary:
-		out := *n
-		out.Cond = substituteScalarRefs(n.Cond, ctx)
-		out.Then = substituteScalarRefs(n.Then, ctx)
-		out.Else = substituteScalarRefs(n.Else, ctx)
-		return &out
-	case *ir.FieldAccess:
-		out := *n
-		out.Receiver = substituteScalarRefs(n.Receiver, ctx)
+		out.Args = make([]ir.Value, len(n.Args))
+		for i, a := range n.Args {
+			out.Args[i] = substituteScalarRefs(a, ctx)
+		}
 		return &out
 	case *ir.Adapt:
 		out := *n
@@ -182,15 +148,6 @@ func substituteWrappedScalars(v ir.Value, ctx graphCtx) ir.Value {
 	default:
 		return v
 	}
-}
-
-// substituteScalarArgs folds the captured scalar references in a node's argument list.
-func substituteScalarArgs(args []ir.Value, ctx graphCtx) []ir.Value {
-	out := make([]ir.Value, len(args))
-	for i, a := range args {
-		out[i] = substituteScalarRefs(a, ctx)
-	}
-	return out
 }
 
 // localsExcluding returns a copy of locals without the given names — a where lambda's

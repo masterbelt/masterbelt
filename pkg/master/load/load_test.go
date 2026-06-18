@@ -575,6 +575,24 @@ func TestValidateAllHelperWrappedCaptureSubstitutes(t *testing.T) {
 	}
 }
 
+// TestValidateAllNominalMethodCaptureSubstitutes pins that a capture used as the
+// receiver of a method on a nominal scalar is folded with its type intact: min is a
+// Threshold and the predicate compares c.cost against min.bump(), so the method folds
+// to a constant (the fold keeps the receiver's type, resolving the method) and the
+// threshold drives the filter, rather than the typed reference being replaced by a
+// bare literal that no longer resolves the method.
+func TestValidateAllNominalMethodCaptureSubstitutes(t *testing.T) {
+	const belt = "type Threshold = int impl { pub bump(): Threshold { return self } }\n" +
+		"master Cards {\n  record { id: int, cost: Threshold } impl {\n" +
+		"    pub static fn above(min: Threshold): nint { return self.where(fn(c) -> c.cost > min.bump()).count() }\n  }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.above(20) == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("above(20) with min.bump(): table_validation_failed = %d, want 0 (two rows above 20)", countTableFailures(diags))
+	}
+}
+
 // TestValidateAllConversionWrappedCaptureSubstitutes pins that a capture wrapped in an
 // explicit conversion is reached: above(min) filters c.cost > int(min), so the scalar
 // inside the conversion is substituted and the data-independent conversion folds,
