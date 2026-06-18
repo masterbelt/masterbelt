@@ -455,6 +455,63 @@ func TestValidateAllRelationShadowedByLoopVar(t *testing.T) {
 	}
 }
 
+// TestValidateAllStaticParamFiltersRelation pins that a static fn's parameter
+// substitutes into a where predicate it is captured in: average(min) filters the
+// rows to cost > min before averaging, so the parameter's value reaches the driver
+// as a bound literal. Over costs 10/30/100, average(20) is 65 (the rows above 20)
+// and average(0) is 46 (all rows) — different answers prove the parameter filters
+// rather than being ignored.
+func TestValidateAllStaticParamFiltersRelation(t *testing.T) {
+	mk := func(arg, cmp string) string {
+		return "master Cards {\n  record { id: int, cost: int } impl {\n" +
+			"    pub static fn average(min: int): int {\n" +
+			"      let m = self.where(fn(c) -> c.cost > min)\n" +
+			"      return m.sum(fn(c) -> c.cost) / m.count()\n" +
+			"    }\n  }\n  primary id\n" +
+			"  validate {\n    all {\n      assert Cards.average(" + arg + ") " + cmp + "\n    }\n  }\n" +
+			"  source { csv \"cards.csv\" }\n}\n"
+	}
+	bases := map[string]string{"csv": "data"}
+	data := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, mk("20", "== 65"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("average(20) == 65: table_validation_failed = %d, want 0 (rows above 20 are 30,100 → 65)", countTableFailures(diags))
+	}
+	if _, diags := run(t, mk("0", "== 46"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("average(0) == 46: table_validation_failed = %d, want 0 (all rows → 140/3 = 46)", countTableFailures(diags))
+	}
+	if _, diags := run(t, mk("20", "== 46"), bases, data); countTableFailures(diags) != 1 {
+		t.Errorf("average(20) == 46: table_validation_failed = %d, want 1 (the parameter must filter, so it is 65 not 46)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllCapturedLetFiltersRelation pins that a let bound in the same body
+// substitutes into a where predicate that captures it: let min = 20; ... cost > min
+// reaches the driver as a bound literal, so the filtered count is the rows above 20.
+func TestValidateAllCapturedLetFiltersRelation(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, cost: int } impl {\n" +
+		"    pub static fn above(): nint {\n      let min = 20\n      return self.where(fn(c) -> c.cost > min).count()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.above() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("captured let cost > min(20): table_validation_failed = %d, want 0 (two rows above 20)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllStringParamFiltersRelation pins that the substitution carries a
+// string parameter too: byName(target) filters a string column to the rows equal to
+// target, so the count is those rows.
+func TestValidateAllStringParamFiltersRelation(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, name: string } impl {\n" +
+		"    pub static fn named(target: string): nint {\n      return self.where(fn(c) -> c.name == target).count()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.named(\"a\") == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,name\n1,a\n2,b\n3,a\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("named(\"a\") == 2: table_validation_failed = %d, want 0 (two rows named a)", countTableFailures(diags))
+	}
+}
+
 func TestLoadTypedRows(t *testing.T) {
 	loaded, diags := run(t, skillBelt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,name,power\n1,Fireball,30\n2,Heal,12\n",

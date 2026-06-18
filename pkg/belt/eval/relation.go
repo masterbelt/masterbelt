@@ -25,7 +25,135 @@ func graphRelationAggregate(v *ir.Call, ctx graphCtx) (*ir.Constant, bool) {
 	if !rootsAtRelation(chain) {
 		return nil, false
 	}
+	// A where predicate may compare a column against a captured scalar — a static fn
+	// parameter (c.rarity == r) or a let in the same body (c.cost > min) — which the
+	// driver, having only the chain and no body locals, cannot resolve. Fold those
+	// scalars to their constants here, where the locals are in scope, so the chain the
+	// driver lowers carries literals it can bind.
+	chain = substituteChainScalars(chain, ctx)
 	return rf.FoldRelationAggregate(chain)
+}
+
+// graphConstantToValue renders a folded constant as the literal node the driver's
+// lowering binds — an integer, string, boolean, or enum member. It is nil for a
+// constant the lowering does not bind (a collection, record, function) and for a nil
+// constant, leaving the original node in place.
+func graphConstantToValue(c *ir.Constant) ir.Value {
+	if c == nil {
+		return nil
+	}
+	switch c.Kind {
+	case ir.ConstInt:
+		return &ir.IntLiteral{Text: c.Int.String()}
+	case ir.ConstString:
+		return &ir.StringLiteral{Value: c.Str}
+	case ir.ConstBool:
+		return &ir.BoolLiteral{Value: c.Bool}
+	case ir.ConstEnum:
+		return &ir.EnumMemberValue{Def: c.EnumDef, Index: c.EnumIndex}
+	default:
+		return nil
+	}
+}
+
+// substituteChainScalars folds the captured scalars a relation chain's where
+// predicates compare columns against — a static fn parameter or a same-body let — to
+// the constants they hold under the current locals, so the driver, which binds only
+// literals, can lower them. Only the value side of a comparison collapses; the column
+// reads stay unevaluable and ride along.
+func substituteChainScalars(chain ir.Value, ctx graphCtx) ir.Value {
+	switch v := chain.(type) {
+	case *ir.Call:
+		out := *v
+		out.Receiver = substituteChainScalars(v.Receiver, ctx)
+		if v.Method == "where" && len(v.Args) == 1 {
+			out.Args = []ir.Value{substituteWhereScalars(v.Args[0], ctx)}
+		}
+		return &out
+	case *ir.Adapt:
+		out := *v
+		out.Value = substituteChainScalars(v.Value, ctx)
+		return &out
+	default:
+		return chain
+	}
+}
+
+// substituteWhereScalars rewrites a where lambda's predicate, folding the captured
+// scalars its column comparisons read against. The fold runs with the lambda's own
+// parameters removed from scope, so the column binding (the c of fn(c) -> ...) stays
+// unevaluable — only an outer parameter or let resolves — and a column read is never
+// mistaken for a value to collapse.
+func substituteWhereScalars(arg ir.Value, ctx graphCtx) ir.Value {
+	rewrap := func(v ir.Value) ir.Value { return v }
+	inner := arg
+	if a, ok := arg.(*ir.Adapt); ok {
+		base := *a
+		inner = a.Value
+		rewrap = func(v ir.Value) ir.Value { b := base; b.Value = v; return &b }
+	}
+	lit, ok := inner.(*ir.FuncLiteral)
+	if !ok || len(lit.Body) != 1 {
+		return arg
+	}
+	ret, ok := lit.Body[0].(*ir.Return)
+	if !ok || ret.Value == nil {
+		return arg
+	}
+	foldCtx := ctx
+	foldCtx.locals = localsExcluding(ctx.locals, lit.Params)
+	newRet := *ret
+	newRet.Value = foldPredicateScalars(ret.Value, foldCtx)
+	newLit := *lit
+	newLit.Body = []ir.Stmt{&newRet}
+	return rewrap(&newLit)
+}
+
+// foldPredicateScalars replaces each data-independent subexpression of a predicate
+// with the constant it folds to under the current locals — the eval-side twin of the
+// driver's foldOperands, which sees only data-independent constants and not the
+// body's locals. A subexpression reading a column folds to nothing and is kept, its
+// children folded instead, so only the value side of a comparison collapses.
+func foldPredicateScalars(v ir.Value, ctx graphCtx) ir.Value {
+	if v == nil {
+		return nil
+	}
+	if lit := graphConstantToValue(graphValue(v, ctx)); lit != nil {
+		return lit
+	}
+	switch n := v.(type) {
+	case *ir.Call:
+		out := *n
+		out.Receiver = foldPredicateScalars(n.Receiver, ctx)
+		out.Args = make([]ir.Value, len(n.Args))
+		for i, a := range n.Args {
+			out.Args[i] = foldPredicateScalars(a, ctx)
+		}
+		return &out
+	case *ir.Adapt:
+		out := *n
+		out.Value = foldPredicateScalars(n.Value, ctx)
+		return &out
+	default:
+		return v
+	}
+}
+
+// localsExcluding returns a copy of locals without the given names — a where lambda's
+// own parameters, removed so the column binding they name stays unevaluable while an
+// outer scalar resolves. The map is returned unchanged when there is nothing to copy.
+func localsExcluding(locals map[string]*ir.Constant, names []string) map[string]*ir.Constant {
+	if len(locals) == 0 || len(names) == 0 {
+		return locals
+	}
+	out := make(map[string]*ir.Constant, len(locals))
+	for k, v := range locals {
+		out[k] = v
+	}
+	for _, n := range names {
+		delete(out, n)
+	}
+	return out
 }
 
 // inlineRelation rebuilds a relation chain's receiver spine with each let-bound
