@@ -64,12 +64,9 @@ func graphApplyBody(c graphCallable, self *ir.Constant, vals []*ir.Constant, sub
 		// so a count reached through a helper (apply(fn(): bool { return count < 3 }))
 		// folds to the table's row count rather than nil.
 		relationCount: ctx.relationCount,
-		// A fresh relation-local scope per body: the called routine's let-bound
-		// relations are its own, not the caller's.
-		relationLocals: map[string]ir.Value{},
-		resultColl:     CollKindOf(c.result),
-		resultType:     c.result,
-		subst:          subst,
+		resultColl:    CollKindOf(c.result),
+		resultType:    c.result,
+		subst:         subst,
 	})
 }
 
@@ -210,20 +207,23 @@ func graphCheckedStaticResult(result *ir.Constant, sel *ir.Method, subst map[str
 // value-kind rule), then the receiver's native intrinsic — the same resolution
 // order the AST folder keeps.
 func graphCall(v *ir.Call, ctx graphCtx) *ir.Constant {
-	// An aggregate over a master relation (count/sum) cannot fold here — its receiver
-	// is a relation, which the evaluator has no value for — so it is handed to the
-	// data layer's relation folder, which runs it against the loaded rows. A non-
-	// relation call, or one the folder declines (a different master, an unsupported
-	// predicate), falls through to the ordinary method fold.
-	if c, ok := graphRelationAggregate(v, ctx); ok {
-		return c
-	}
 	recv := graphValue(v.Receiver, ctx)
 	if c, ok := graphShortCircuit(recv, v.Method, v.Args, ctx); ok {
 		return c
 	}
 	if recv == nil {
 		return nil
+	}
+	// A built-in method on a relation value narrows it (where, to a new relation) or
+	// aggregates it (count/sum, run against the loaded rows by the data layer's
+	// folder). A user method on a relation alias (type CardRel = relation<M> impl {...})
+	// is dispatched the ordinary way instead — including one that shadows a built-in
+	// name, which the checker resolves to the override, so the built-in only runs when
+	// no user method was resolved.
+	if recv.Kind == ir.ConstRelation && !relationOwnsUserMethod(ctx, v, recv) {
+		if c, ok := graphRelationMethod(v, recv, ctx); ok {
+			return c
+		}
 	}
 	args := make([]*ir.Constant, len(v.Args))
 	for i, a := range v.Args {

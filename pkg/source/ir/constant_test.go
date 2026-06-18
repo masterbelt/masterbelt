@@ -217,3 +217,30 @@ func TestRangeConstant(t *testing.T) {
 		t.Error("a range must not equal an integer")
 	}
 }
+
+// TestConstantsEqualRelation pins that comparing relation values does not panic and
+// uses chain identity: relations sharing a chain are equal, separately built ones are
+// not. (Comparing relations is rejected by the analyzer, but the evaluator still folds
+// such an expression on the way to its diagnostics, so equality must not panic.)
+func TestConstantsEqualRelation(t *testing.T) {
+	m := &TypeDef{Name: "Cards"}
+	chain := &MasterRelation{Master: m}
+	a := RelationConstant(chain)
+	same := RelationConstant(chain)                       // same chain, distinct constant
+	other := RelationConstant(&MasterRelation{Master: m}) // a separately built chain
+	if !ConstantsEqual(a, same) {
+		t.Error("relations sharing a chain should be equal")
+	}
+	if ConstantsEqual(a, other) {
+		t.Error("relations with separately built chains should not be equal")
+	}
+}
+
+// TestConstantStringRelation pins that rendering a relation value yields a safe
+// placeholder rather than dereferencing the nil integer the default case would. (A
+// data-aware fold can produce one, and a diagnostic or dump may render it.)
+func TestConstantStringRelation(t *testing.T) {
+	if got := RelationConstant(&MasterRelation{Master: &TypeDef{Name: "Cards"}}).String(); got != "<relation>" {
+		t.Errorf("relation String() = %q, want %q", got, "<relation>")
+	}
+}

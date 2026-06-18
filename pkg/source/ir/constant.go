@@ -44,6 +44,7 @@ const (
 	ConstNull                        // the null value (no payload — the single inhabitant of the null type)
 	ConstRange                       // an inclusive integer range (Constant.Start / Constant.End)
 	ConstType                        // a compile-time type value (Constant.Reified)
+	ConstRelation                    // a master relation query (Constant.Relation), comptime-only
 )
 
 // Constant is the evaluated value of a constant expression: an arbitrary-
@@ -120,6 +121,14 @@ type Constant struct {
 	// the fold and is gone before codegen — so this is the one constant kind with
 	// no runtime form.
 	Reified Type
+
+	// Relation is the query chain a relation value carries (valid when Kind ==
+	// ConstRelation): a master relation narrowed by zero or more where calls, the
+	// self-contained value form a relation flows as through lets, parameters,
+	// captures, and reassignment. An aggregate (count/sum) over it hands the chain to
+	// the data layer's folder. Like a type value it is comptime-only — a query has no
+	// runtime representation — so it never reaches codegen and is not serialized.
+	Relation Value `tree:"-"`
 }
 
 // ConstantsEqual reports whether two folded constants are structurally equal —
@@ -176,6 +185,11 @@ func ConstantsEqual(a, b *Constant) bool {
 		return equalRanges(a, b)
 	case ConstType:
 		return typeValuesEqual(a.Reified, b.Reified)
+	case ConstRelation:
+		// A relation is a query, compared by identity — the same chain value is the
+		// same relation; two separately built chains are treated as distinct, the safe
+		// side for any dedup, which recomputes rather than coalescing two queries.
+		return a.Relation == b.Relation
 	case ConstCollection:
 		return equalCollections(a, b)
 	case ConstRecord:
@@ -454,6 +468,13 @@ func FuncConstant(fn *FuncLiteral, captured map[string]*Constant) *Constant {
 	return &Constant{Kind: ConstFunc, Fn: fn, Captured: captured}
 }
 
+// RelationConstant builds a relation value from its query chain — a master relation
+// narrowed by zero or more where calls. The chain is the self-contained value a
+// relation flows as; an aggregate over it is run by the data layer's folder.
+func RelationConstant(chain Value) *Constant {
+	return &Constant{Kind: ConstRelation, Relation: chain}
+}
+
 // funcIdentity is the identity a function value compares by: the literal's
 // syntax pointer when it has one, else the IR node itself. See ConstantsEqual's
 // ConstFunc case.
@@ -560,6 +581,10 @@ func (c *Constant) String() string {
 			return "type"
 		}
 		return c.Reified.String()
+	case ConstRelation:
+		// A query has no value spelling; a placeholder keeps a dump or diagnostic from
+		// reading the nil integer the default would.
+		return "<relation>"
 	default:
 		return c.Int.String()
 	}

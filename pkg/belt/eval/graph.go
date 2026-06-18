@@ -176,13 +176,6 @@ type graphCtx struct {
 	// outside that path (a refinement or per-row fold), where a relation count
 	// cannot be evaluated and stays unfoldable.
 	relationCount *ir.Constant
-	// relationLocals binds each let-bound relation in scope to its chain value — a
-	// let m = self.where(...) records the where chain here rather than folding to a
-	// (non-existent) constant, so a query reached through the local (m.count()) is
-	// inlined back to the full chain before the relation folder runs it. It is set
-	// per routine body (a static fn's lets are its own) and nil where no relation can
-	// be bound (a refinement or per-row fold), leaving relation chains unfoldable.
-	relationLocals map[string]ir.Value
 	// refining is set while folding a refined type's own predicate, so the data-aware
 	// admission check (graphAdmitsTyped) does not run on the predicate's literals — they
 	// would otherwise recurse back into the same refinement check. See graphMemberAdmits.
@@ -199,6 +192,23 @@ func (ctx graphCtx) unfoldable(v ir.Value) *ir.Constant {
 		return ctx.relationCount
 	}
 	return nil
+}
+
+// graphUnfoldableOrRelation folds a master relation in value position to a relation
+// constant carrying its chain — the base a where narrows and an aggregate hands to the
+// folder — but only in a data-aware fold (a relation folder present), since a relation
+// is meaningful only where the rows are. A pure compile-time fold leaves it unevaluable
+// instead, so a relation never becomes a serialized const value (whose chain, comptime-
+// only, would be lost on round-trip). An await or a relation count takes unfoldable's
+// narrower rule.
+func graphUnfoldableOrRelation(v ir.Value, ctx graphCtx) *ir.Constant {
+	if mr, ok := v.(*ir.MasterRelation); ok {
+		if _, dataAware := ctx.env.(RelationFolder); dataAware {
+			return ir.RelationConstant(mr)
+		}
+		return nil
+	}
+	return ctx.unfoldable(v)
 }
 
 // noteBudget mirrors evalCtx.noteBudget for the graph context.
@@ -317,7 +327,7 @@ func graphValueRaw(v ir.Value, ctx graphCtx) *ir.Constant {
 	case *ir.Conversion:
 		return graphConvert(v, sub)
 	case *ir.Await, *ir.RelationCount, *ir.MasterRelation:
-		return ctx.unfoldable(v)
+		return graphUnfoldableOrRelation(v, ctx)
 	case *ir.Apply:
 		return graphApplyCallee(v, sub)
 	case *ir.Call:

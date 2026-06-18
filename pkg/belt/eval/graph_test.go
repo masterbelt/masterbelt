@@ -332,3 +332,13 @@ func TestGraphEmptyCollectionChannels(t *testing.T) {
 	// The mapness-independent reads still fold.
 	wantInt(t, Graph(call(&ir.CollectionLiteral{}, "len"), env), 0)
 }
+
+// TestGraphRelationNeedsFolder pins that a master relation in value position folds to
+// a value only in a data-aware fold: without a relation folder (a plain env) it stays
+// unevaluable, so a relation never becomes a serialized const whose chain would be
+// lost on round-trip. The data-aware fold, where a relation folder is present, is
+// covered by the master loader's tests.
+func TestGraphRelationNeedsFolder(t *testing.T) {
+	env := newStubEnv()
+	wantNil(t, Graph(&ir.MasterRelation{Master: &ir.TypeDef{Name: "Cards"}}, env))
+}
