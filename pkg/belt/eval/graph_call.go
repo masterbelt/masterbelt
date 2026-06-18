@@ -10,6 +10,7 @@ package eval
 
 import (
 	"github.com/masterbelt/masterbelt/pkg/belt/builtin"
+	"github.com/masterbelt/masterbelt/pkg/belt/types"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
@@ -63,9 +64,12 @@ func graphApplyBody(c graphCallable, self *ir.Constant, vals []*ir.Constant, sub
 		// so a count reached through a helper (apply(fn(): bool { return count < 3 }))
 		// folds to the table's row count rather than nil.
 		relationCount: ctx.relationCount,
-		resultColl:    CollKindOf(c.result),
-		resultType:    c.result,
-		subst:         subst,
+		// A fresh relation-local scope per body: the called routine's let-bound
+		// relations are its own, not the caller's.
+		relationLocals: map[string]ir.Value{},
+		resultColl:     CollKindOf(c.result),
+		resultType:     c.result,
+		subst:          subst,
 	})
 }
 
@@ -176,7 +180,29 @@ func graphStaticCall(v *ir.StaticCall, ctx graphCtx) *ir.Constant {
 			return nil
 		}
 	}
-	return graphApplyBody(graphMethodCallable(sel, v.Def), nil, vals, v.Subst, ctx)
+	result := graphApplyBody(graphMethodCallable(sel, v.Def), nil, vals, v.Subst, ctx)
+	return graphCheckedStaticResult(result, sel, v.Subst, ctx)
+}
+
+// graphCheckedStaticResult verifies a data-dependent static return against the
+// declared result type. A relation aggregate the rows decide bypasses the analyzer's
+// result-type check (its value was unknown at analysis), so when the fold is
+// data-aware (a relation folder present) the result must inhabit the declared type:
+// an aggregate that overflows or violates the result's refinement leaves the call
+// unfoldable, failing safe. A pure compile-time fold's returns were already checked
+// by the analyzer, so the guard is scoped to the data layer's fold.
+func graphCheckedStaticResult(result *ir.Constant, sel *ir.Method, subst map[string]ir.Type, ctx graphCtx) *ir.Constant {
+	if _, dataAware := ctx.env.(RelationFolder); result == nil || !dataAware {
+		return result
+	}
+	want := sel.Result
+	if len(subst) > 0 {
+		want = types.Substitute(want, subst)
+	}
+	if want != nil && want != ir.Invalid && !graphMemberAdmits(ctx, want, result) {
+		return nil
+	}
+	return result
 }
 
 // graphCall folds a method call node: short-circuiting connectives first, then
@@ -184,6 +210,14 @@ func graphStaticCall(v *ir.StaticCall, ctx graphCtx) *ir.Constant {
 // value-kind rule), then the receiver's native intrinsic — the same resolution
 // order the AST folder keeps.
 func graphCall(v *ir.Call, ctx graphCtx) *ir.Constant {
+	// An aggregate over a master relation (count/sum) cannot fold here — its receiver
+	// is a relation, which the evaluator has no value for — so it is handed to the
+	// data layer's relation folder, which runs it against the loaded rows. A non-
+	// relation call, or one the folder declines (a different master, an unsupported
+	// predicate), falls through to the ordinary method fold.
+	if c, ok := graphRelationAggregate(v, ctx); ok {
+		return c
+	}
 	recv := graphValue(v.Receiver, ctx)
 	if c, ok := graphShortCircuit(recv, v.Method, v.Args, ctx); ok {
 		return c

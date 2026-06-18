@@ -67,7 +67,7 @@ func graphApply(ctx graphCtx, fn *ir.Constant, args []*ir.Constant) *ir.Constant
 // block's assignment reaches an outer local; block scoping is restored on
 // return (graphBlockScope), so a shadowing let does not leak.
 func graphBody(body []ir.Stmt, ctx graphCtx) *ir.Constant {
-	scope := newGraphScope(ctx.locals)
+	scope := newGraphScope(ctx.locals, ctx.relationLocals)
 	defer scope.restore()
 	v, out := graphStmts(body, ctx, scope)
 	if out == graphReturned {
@@ -89,7 +89,7 @@ const (
 // graphBranch runs a branch body in its own block scope and classifies how it
 // ended — the graph twin of branchOutcome.
 func graphBranch(body []ir.Stmt, ctx graphCtx) (*ir.Constant, graphOutcome) {
-	scope := newGraphScope(ctx.locals)
+	scope := newGraphScope(ctx.locals, ctx.relationLocals)
 	defer scope.restore()
 	return graphStmts(body, ctx, scope)
 }
@@ -183,9 +183,23 @@ func graphLet(s *ir.Let, ctx graphCtx, scope *graphScope) bool {
 	if s.Value == nil {
 		return false
 	}
+	// A let that binds a relation (let m = self.where(...)) has no constant value —
+	// the relation folds against rows, not here — so its chain is recorded for a
+	// later use to inline rather than folded to nil (which would fail the let). A let
+	// binding a scalar aggregate (a count) or any other value folds the ordinary way.
+	if s.Name != "" && ctx.relationLocals != nil && isRelationExpr(s.Value, ctx.relationLocals) {
+		scope.bindRelation(s.Name, inlineRelation(s.Value, ctx.relationLocals))
+		return true
+	}
 	letCtx := graphExpectingType(ctx, s.Type)
 	v := graphValue(s.Value, letCtx)
-	return v != nil && s.Name != "" && scope.bind(s.Name, v)
+	if v == nil || s.Name == "" || !scope.bind(s.Name, v) {
+		return false
+	}
+	// A scalar let shadowing an outer relation local hides that relation for the
+	// block, so a later use of the name reads this value rather than the relation.
+	scope.hideRelation(s.Name)
+	return true
 }
 
 // graphAssign folds an assignment: a property write (the synthetic setter
@@ -478,25 +492,38 @@ func graphForRange(s *ir.For, iter *ir.Constant, ctx graphCtx) (*ir.Constant, gr
 // fresh block scope, so it does not leak past the iteration while an
 // assignment to an outer local persists.
 func graphIteration(s *ir.For, elem *ir.Constant, ctx graphCtx) (*ir.Constant, graphOutcome) {
-	scope := newGraphScope(ctx.locals)
+	scope := newGraphScope(ctx.locals, ctx.relationLocals)
 	defer scope.restore()
-	if s.Var != "" && elem != nil {
-		scope.bind(s.Var, elem)
+	if s.Var != "" {
+		// The loop variable shadows any relation local of the same name for the body,
+		// so a use of it reads the iteration value rather than inlining the outer
+		// relation chain (which graphCall would otherwise try first).
+		scope.hideRelation(s.Var)
+		if elem != nil {
+			scope.bind(s.Var, elem)
+		}
 	}
 	return graphStmts(s.Body, ctx, scope)
 }
 
 // graphScope records the let bindings a block introduces so they can be undone
 // when the block ends — blockScope without the AST folder's static-def
-// tracking (the graph carries its types on the nodes).
+// tracking (the graph carries its types on the nodes). A relation-valued let
+// (let m = self.where(...)) binds into a separate map of inlined chains rather
+// than a constant, tracked here in lock-step so a shadowing relation let in a
+// nested block is restored on exit and does not leak past its block.
 type graphScope struct {
 	locals  map[string]*ir.Constant
 	shadows map[string]*ir.Constant
 	added   map[string]bool
+
+	relations  map[string]ir.Value
+	relShadows map[string]ir.Value
+	relAdded   map[string]bool
 }
 
-func newGraphScope(locals map[string]*ir.Constant) *graphScope {
-	return &graphScope{locals: locals}
+func newGraphScope(locals map[string]*ir.Constant, relations map[string]ir.Value) *graphScope {
+	return &graphScope{locals: locals, relations: relations}
 }
 
 func (s *graphScope) bind(name string, v *ir.Constant) bool {
@@ -533,12 +560,70 @@ func (s *graphScope) recorded(name string) bool {
 	return s.added[name]
 }
 
+// bindRelation records a relation-valued local (an inlined chain) into the block
+// scope, saving any outer binding it shadows so the block's exit restores it.
+func (s *graphScope) bindRelation(name string, chain ir.Value) {
+	if s.relations == nil {
+		return
+	}
+	s.recordRelation(name)
+	s.relations[name] = chain
+}
+
+// hideRelation removes a relation-valued local for the block's lifetime when a
+// scalar let shadows it, so a use of the name inside the block reads the scalar
+// rather than inlining the now-shadowed relation. The outer binding is saved and
+// restored on exit.
+func (s *graphScope) hideRelation(name string) {
+	if s.relations == nil {
+		return
+	}
+	if _, ok := s.relations[name]; !ok {
+		return
+	}
+	s.recordRelation(name)
+	delete(s.relations, name)
+}
+
+// recordRelation notes how restore must treat a relation binding: a shadowed
+// outer one is saved, a fresh one is marked for deletion — relAdded/relShadows
+// twin of record.
+func (s *graphScope) recordRelation(name string) {
+	if s.relRecorded(name) {
+		return
+	}
+	if prior, ok := s.relations[name]; ok {
+		if s.relShadows == nil {
+			s.relShadows = map[string]ir.Value{}
+		}
+		s.relShadows[name] = prior
+		return
+	}
+	if s.relAdded == nil {
+		s.relAdded = map[string]bool{}
+	}
+	s.relAdded[name] = true
+}
+
+func (s *graphScope) relRecorded(name string) bool {
+	if _, ok := s.relShadows[name]; ok {
+		return true
+	}
+	return s.relAdded[name]
+}
+
 func (s *graphScope) restore() {
 	for name, prior := range s.shadows {
 		s.locals[name] = prior
 	}
 	for name := range s.added {
 		delete(s.locals, name)
+	}
+	for name, prior := range s.relShadows {
+		s.relations[name] = prior
+	}
+	for name := range s.relAdded {
+		delete(s.relations, name)
 	}
 }
 

@@ -37,6 +37,21 @@ type GraphEnv interface {
 	Registry() *builtin.Registry
 }
 
+// RelationFolder folds a relation aggregate — a count() or sum() over a master's
+// relation — against loaded data. The belt evaluator interprets the body a query
+// sits in (a static fn's lets and arithmetic, a helper, a conditional) but cannot
+// run the query itself (it has no rows, and the one-way layer rule keeps it from the
+// query driver), so when it reaches such an aggregate it delegates here. A
+// GraphEnv that carries loaded rows implements this; one without it (a pure
+// compile-time fold) does not, and the aggregate stays unfoldable as before.
+type RelationFolder interface {
+	// FoldRelationAggregate folds a count()/sum() over a master relation — the
+	// self-contained chain value, with any let-bound relation already inlined — to its
+	// integer value over the loaded rows, or ok=false when it is not such an aggregate
+	// or cannot be run (a different master, a predicate the driver cannot express).
+	FoldRelationAggregate(chain ir.Value) (*ir.Constant, bool)
+}
+
 // Graph folds a value graph to its constant value, or nil when it cannot be
 // evaluated.
 func Graph(v ir.Value, env GraphEnv) *ir.Constant {
@@ -161,6 +176,17 @@ type graphCtx struct {
 	// outside that path (a refinement or per-row fold), where a relation count
 	// cannot be evaluated and stays unfoldable.
 	relationCount *ir.Constant
+	// relationLocals binds each let-bound relation in scope to its chain value — a
+	// let m = self.where(...) records the where chain here rather than folding to a
+	// (non-existent) constant, so a query reached through the local (m.count()) is
+	// inlined back to the full chain before the relation folder runs it. It is set
+	// per routine body (a static fn's lets are its own) and nil where no relation can
+	// be bound (a refinement or per-row fold), leaving relation chains unfoldable.
+	relationLocals map[string]ir.Value
+	// refining is set while folding a refined type's own predicate, so the data-aware
+	// admission check (graphAdmitsTyped) does not run on the predicate's literals — they
+	// would otherwise recurse back into the same refinement check. See graphMemberAdmits.
+	refining bool
 }
 
 // unfoldable folds the values the evaluator does not reduce on its own: an await
@@ -205,6 +231,25 @@ func graphValue(v ir.Value, ctx graphCtx) *ir.Constant {
 		return ir.Tagged(c, tag)
 	}
 	return c
+}
+
+// graphAdmitsTyped reports whether a data-dependent value inhabits a non-union type
+// it is adapted into — an integer's range and a refined type's predicate. It admits
+// freely outside a data-aware fold (a relation folder present), since a compile-time
+// value's type was settled by the analyzer, and while folding a refinement predicate
+// (the refining guard), whose own literals would otherwise recurse back through this
+// check. A union target is settled by member tagging, not here.
+func graphAdmitsTyped(ctx graphCtx, want ir.Type, c *ir.Constant) bool {
+	if want == nil || want == ir.Invalid || ctx.refining {
+		return true
+	}
+	if _, dataAware := ctx.env.(RelationFolder); !dataAware {
+		return true
+	}
+	if types.UnionType(want) != nil {
+		return true
+	}
+	return graphMemberAdmits(ctx, want, c)
 }
 
 // graphValueRaw folds one value node. The expectation channels are consumed at
@@ -408,18 +453,25 @@ func graphApplyCallee(v *ir.Apply, ctx graphCtx) *ir.Constant {
 // a value the member cannot represent (out of its range, or rejected by its
 // refinement predicate) — the same refusal the expectation-driven tagging
 // makes, so a wrong constant is never tagged into a union the flow checks
-// cannot see through. A width settle or nominal adaption is the identity on
-// the value: the representation is unchanged, and whether the value satisfies
-// the target's range or predicate is the flow checks' diagnostic (folding the
-// raw value is what lets them read it) — also what keeps a refined type's own
-// predicate, whose comparisons adapt their literals to the type, from running
-// itself recursively.
+// cannot see through. A width settle or nominal adaption is the identity on a
+// compile-time value, whose range and predicate the analyzer already checked. A
+// data-dependent value (a relation aggregate the rows decide), though, the
+// analyzer could not check, so it is admitted here against the adapted-to type's
+// range and refinement — the one seam every narrowing flows through (an argument,
+// an annotated let, a return, a reassignment, a collection element, a record
+// field, an explicit conversion), so an out-of-range or predicate-violating
+// aggregate leaves the position unfoldable rather than passing as if it inhabited
+// the type. The refining guard (graphAdmitsTyped) keeps a refined type's own
+// predicate, whose comparisons adapt their literals to the type, from recursing.
 func executeAdapt(a *ir.Adapt, ctx graphCtx) *ir.Constant {
 	v := graphValue(a.Value, ctx)
 	if v == nil {
 		return nil
 	}
 	if types.UnionType(a.To) == nil {
+		if !graphAdmitsTyped(ctx, a.To, v) {
+			return nil
+		}
 		return v
 	}
 	// The member is the inner node's settled type — the write-back nests a
@@ -451,7 +503,9 @@ func graphMemberAdmits(ctx graphCtx, member ir.Type, v *ir.Constant) bool {
 		return false
 	}
 	if def := refinedMemberDef(member); def != nil {
-		p := GraphPredicate(def.Where, v, def, ctx.env)
+		// The predicate folds with refining set, so a data-dependent value flowing
+		// into the refined type's own literals does not re-enter this check.
+		p := graphValue(def.Where, graphCtx{env: ctx.env, self: v, selfDef: def, refining: true})
 		if p != nil && p.Kind == ir.ConstBool && !p.Bool {
 			return false
 		}

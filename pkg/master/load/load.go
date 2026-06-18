@@ -25,6 +25,7 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/belt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/master"
+	"github.com/masterbelt/masterbelt/pkg/master/sqlite"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -138,7 +139,7 @@ func readMaster(def *ir.TypeDef, doc *abstract.Document, env eval.GraphEnv, root
 		refineDiags, refined := checkRefinements(typed, fields, spec, env)
 		diags = append(diags, refineDiags...)
 		diags = append(diags, checkRowValidations(typed, fields, refined, def, doc, spec, env)...)
-		diags = append(diags, checkAllValidations(typed, def, doc, spec, env)...)
+		diags = append(diags, checkAllValidations(typed, fields, def, doc, spec, env)...)
 		diags = append(diags, checkDuplicatePrimaryKeys(typed, def, spec)...)
 
 		loaded = append(loaded, Loaded{Master: def.Name, Display: spec.Display, Table: typed})
@@ -234,22 +235,100 @@ func checkRowValidations(typed master.Table, fields []ir.Field, refined map[int]
 // the check (a filtered count, where the engine runs the predicate, is a later
 // slice). A check that does not fold to a definite true fails, the fail-safe a
 // data check wants, anchored at its assert and naming the source as path.
-func checkAllValidations(typed master.Table, def *ir.TypeDef, doc *abstract.Document, spec master.SourceSpec, env eval.GraphEnv) []diagnostic.Diagnostic {
+func checkAllValidations(typed master.Table, fields []ir.Field, def *ir.TypeDef, doc *abstract.Document, spec master.SourceSpec, env eval.GraphEnv) []diagnostic.Diagnostic {
 	if len(def.Master.AllChecks) == 0 {
 		return nil
 	}
-	rows := ir.IntConstant(big.NewInt(int64(len(typed.Rows))))
+	rowCount := int64(len(typed.Rows))
+	rows := ir.IntConstant(big.NewInt(rowCount))
+	// A check may compose a relation query the bare row count cannot answer (a
+	// where-narrowed count or sum, reached through a master static fn): the engine
+	// runs it against the loaded rows. It is built once for the table's checks; a
+	// table that fails to load leaves the engine nil, so a filtered query is undriven
+	// (the check then fails safe) while an unfiltered count still reads the row count.
+	var eng *sqlite.Engine
+	storedFields, storedTable := int64SafeColumns(fields, typed)
+	if e, err := sqlite.Load(storedFields, storedTable); err == nil {
+		eng = e
+		defer func() { _ = eng.Close() }()
+	}
+	// The check folds through an environment carrying the relation folder, so the
+	// evaluator interprets the body (the static fn's lets and arithmetic, a helper, a
+	// conditional) and runs any count/sum over the relation against the rows. A query
+	// the folder declines leaves that aggregate unfoldable, so the check fails safe.
+	foldEnv := relationEnv{GraphEnv: env, fold: relationFold{eng: eng, rows: rowCount, master: def, env: env}}
 	var diags []diagnostic.Diagnostic
 	for _, check := range def.Master.AllChecks {
 		// A check passes only when it folds to a definite true with the count in
 		// hand; a definite false, or a check that does not fold to a bool, fails it.
-		v := eval.GraphTableCheck(check.Cond, rows, def, env)
+		v := eval.GraphTableCheck(check.Cond, rows, def, foldEnv)
 		if v == nil || v.Kind != ir.ConstBool || !v.Bool {
 			offset, width := assertSpan(doc, check.Syntax)
 			diags = append(diags, master.TableValidationFailed(offset, width, spec.Display))
 		}
 	}
 	return diags
+}
+
+// int64SafeColumns restricts the fields and table to the columns the in-memory
+// engine can store. The engine is int64-backed, so a column holding an integer
+// beyond SQLite's 64-bit range would fail the whole load and leave every aggregate
+// undriven — even a query that never reads it. Dropping only the offending columns
+// keeps a query over the others runnable; a query that does reach a dropped column
+// then references a column the table lacks and errors, so that aggregate folds to
+// nothing and the check fails safe rather than reading a truncated value. The rows
+// are unchanged in number, so an unfiltered count still sees every row.
+func int64SafeColumns(fields []ir.Field, typed master.Table) ([]ir.Field, master.Table) {
+	drop := wideColumns(typed)
+	if len(drop) == 0 {
+		return fields, typed
+	}
+	keepIdx := make([]int, 0, len(typed.Columns))
+	cols := make([]string, 0, len(typed.Columns))
+	for i, name := range typed.Columns {
+		if !drop[name] {
+			keepIdx = append(keepIdx, i)
+			cols = append(cols, name)
+		}
+	}
+	rows := make([]master.Row, len(typed.Rows))
+	for r, row := range typed.Rows {
+		cells := make([]master.Cell, 0, len(keepIdx))
+		for _, i := range keepIdx {
+			if i < len(row.Cells) {
+				cells = append(cells, row.Cells[i])
+			}
+		}
+		rows[r] = master.Row{Cells: cells}
+	}
+	kept := make([]ir.Field, 0, len(fields))
+	for _, f := range fields {
+		if !drop[f.Name] {
+			kept = append(kept, f)
+		}
+	}
+	return kept, master.Table{Columns: cols, Rows: rows}
+}
+
+// wideColumns is the set of column names holding an integer beyond SQLite's 64-bit
+// range — the columns int64SafeColumns must leave out of the engine.
+func wideColumns(typed master.Table) map[string]bool {
+	drop := map[string]bool{}
+	for col, name := range typed.Columns {
+		for _, row := range typed.Rows {
+			if col < len(row.Cells) && cellExceedsInt64(row.Cells[col].Value) {
+				drop[name] = true
+				break
+			}
+		}
+	}
+	return drop
+}
+
+// cellExceedsInt64 reports whether a cell holds an integer outside the int64 the
+// engine stores — the same bound the engine's own bind enforces.
+func cellExceedsInt64(v *ir.Constant) bool {
+	return v != nil && v.Kind == ir.ConstInt && v.Int != nil && !v.Int.IsInt64()
 }
 
 // tableHasFields reports whether the coerced table carries a column for every

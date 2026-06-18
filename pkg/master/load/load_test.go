@@ -142,6 +142,319 @@ func TestValidateAllCountThroughHelper(t *testing.T) {
 	}
 }
 
+// TestValidateAllStaticRelationAggregate pins the let-bearing relation path: a
+// master static fn reads self as the relation, narrows it through a let-bound
+// where, and aggregates over the binding (sum over count). A per-table check that
+// calls it folds against the loaded rows — the driver runs the where-narrowed sum
+// and count in the engine and the arithmetic folds over the results. costs 10 and
+// 30 give sum 40 over count 2, an average of 20.
+func TestValidateAllStaticRelationAggregate(t *testing.T) {
+	mk := func(cmp string) string {
+		return "master Cards {\n" +
+			"  record { id: int, cost: int } impl {\n" +
+			"    pub static fn avg_cost(): nint {\n" +
+			"      let m = self.where(fn(c) -> c.cost > 0)\n" +
+			"      return m.sum(fn(c) -> c.cost) / m.count()\n" +
+			"    }\n  }\n" +
+			"  primary id\n" +
+			"  validate {\n    all {\n      assert Cards.avg_cost() " + cmp + "\n    }\n  }\n" +
+			"  source { csv \"cards.csv\" }\n}\n"
+	}
+	bases := map[string]string{"csv": "data"}
+	data := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n"}
+
+	if _, diags := run(t, mk("== 20"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("avg_cost == 20: table_validation_failed = %d, want 0 (sum 40 over count 2 = 20)", countTableFailures(diags))
+	}
+	if _, diags := run(t, mk("== 99"), bases, data); countTableFailures(diags) != 1 {
+		t.Errorf("avg_cost == 99: table_validation_failed = %d, want 1 (the average is 20, not 99)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllStaticRelationCrossMaster pins that a static fn returning another
+// master's relation is not folded against this master's engine: A's check calls a fn
+// returning B.count(), and the engine holds only A's rows, so driving it there would
+// answer with A's count. The cross-master query is left undriven and the check fails
+// safe (B has 2 rows, so == 1 is false either way — the point is it is not wrongly
+// passed by counting A's single row).
+func TestValidateAllStaticRelationCrossMaster(t *testing.T) {
+	const belt = "master B {\n  record { id: int }\n  primary id\n  source { csv \"b.csv\" }\n}\n" +
+		"master A {\n  record { id: int } impl {\n    pub static fn bcount(): nint {\n      return B.count()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert A.bcount() == 1\n    }\n  }\n  source { csv \"a.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/a.csv": "id\n1\n", "data/b.csv": "id\n1\n2\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("cross-master A.bcount() == 1: table_validation_failed = %d, want 1 (B has 2 rows; A's count must not pass it)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllStaticRelationResultOverflow pins that a static fn whose declared
+// result type cannot hold the aggregate is not folded to an in-range value: a sum of
+// 300 does not inhabit sbyte, so Cards.s() must not be driven to 300 and pass — the
+// overflowing result leaves the check undriven and it fails safe.
+func TestValidateAllStaticRelationResultOverflow(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, cost: int } impl {\n" +
+		"    pub static fn s(): sbyte {\n      return self.sum(fn(c) -> c.cost)\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.s() == 300\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,100\n2,100\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("sbyte overflow Cards.s() == 300: table_validation_failed = %d, want 1 (300 does not fit sbyte)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllStaticRelationThroughHelper pins that a relation query reached
+// through a top-level helper call is still driven: eq(Cards.size(), 2) drives the
+// argument (the row count) so the helper folds, rather than leaving the bare relation
+// for the evaluator to choke on.
+func TestValidateAllStaticRelationThroughHelper(t *testing.T) {
+	const belt = "fn eq(a: nint, b: nint): bool {\n  return a == b\n}\n" +
+		"master Cards {\n  record { id: int } impl {\n    pub static fn size(): nint {\n      return self.count()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert eq(Cards.size(), 2)\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id\n1\n2\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("eq(Cards.size(), 2) over 2 rows: table_validation_failed = %d, want 0 (the count drives through the helper)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllStaticScalarBody pins that a master static fn with no relation
+// query keeps its ordinary fold: a scalar let and arithmetic (let x = 3; return
+// x + 1) is left to the evaluator, not broken by the relation driver dropping the
+// binding.
+func TestValidateAllStaticScalarBody(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int } impl {\n    pub static fn f(): nint {\n      let x = 3\n      return x + 1\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.f() == 4\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id\n1\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("scalar Cards.f() == 4: table_validation_failed = %d, want 0 (let x = 3; return x + 1)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllStaticUnfilteredCountIgnoresCells pins that a static fn's unfiltered
+// count reads the row count, not the loaded cells: an out-of-range nint cell fails
+// the engine load, but Cards.size() (self.count(), no where) still counts the one row
+// so == 1 passes — the same independence the bare count check has.
+func TestValidateAllStaticUnfilteredCountIgnoresCells(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, n: nint } impl {\n    pub static fn size(): nint {\n      return self.count()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.size() == 1\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,n\n1,999999999999999999999999999\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("unfiltered Cards.size() == 1 with an out-of-range cell: table_validation_failed = %d, want 0 (count reads the row count)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllStaticScalarLetAroundAggregate pins that a scalar local around a
+// relation aggregate folds: let one = 1; return self.count() + one is the row count
+// plus one, the evaluator binding the scalar and the relation folder running the
+// count. Over two rows, sizePlus() == 3 passes.
+func TestValidateAllStaticScalarLetAroundAggregate(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int } impl {\n    pub static fn sizePlus(): nint {\n      let one = 1\n      return self.count() + one\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.sizePlus() == 3\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id\n1\n2\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("sizePlus() == 3 over 2 rows: table_validation_failed = %d, want 0 (count 2 + 1)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllStaticDelegation pins that a static fn delegating to another that
+// queries the relation folds: size2() returns Cards.size(), which returns
+// self.count(); the evaluator folds the delegation and the inner count runs.
+func TestValidateAllStaticDelegation(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int } impl {\n" +
+		"    pub static fn size(): nint {\n      return self.count()\n    }\n" +
+		"    pub static fn size2(): nint {\n      return Cards.size()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.size2() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id\n1\n2\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("Cards.size2() == 2 (delegating to size to count): table_validation_failed = %d, want 0", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllRelationInConditional pins that a relation aggregate inside a
+// conditional folds: the evaluator takes the live branch and the relation folder
+// runs the count there.
+func TestValidateAllRelationInConditional(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int } impl {\n    pub static fn size(): nint {\n      return self.count()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert true ? Cards.size() == 2 : false\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id\n1\n2\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("ternary over Cards.size() == 2: table_validation_failed = %d, want 0", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllStaticRefinedResultViolation pins that a static fn whose driven
+// aggregate violates its refined result type's predicate is not folded to a passing
+// value: a sum of 0 does not satisfy Positive (self > 0), so Cards.s() must not be
+// driven to 0 and pass — the violating result leaves the check undriven and it fails
+// safe. types.Fits alone would miss this; the refinement predicate is evaluated.
+func TestValidateAllStaticRefinedResultViolation(t *testing.T) {
+	const belt = "type Positive = int where self > 0\n" +
+		"master Cards {\n  record { id: int, cost: int } impl {\n    pub static fn s(): Positive {\n      return self.sum(fn(c) -> c.cost)\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.s() == 0\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,0\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("Positive Cards.s() == 0: table_validation_failed = %d, want 1 (0 violates self > 0)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllRelationLetShadowedInBlock pins that a relation local shadowed by
+// a nested block does not leak past the block: the inner block rebinds m to a
+// narrower filter, but after the block the outer m must still be the filter it was
+// bound to. Over ids 5, 15, 25, the outer m (id > 0) counts all three while a leaked
+// inner m (id > 10) would count two, so == 3 passes only when the block's binding is
+// restored on exit.
+func TestValidateAllRelationLetShadowedInBlock(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int } impl {\n    pub static fn outer(): nint {\n" +
+		"      let m = self.where(fn(c) -> c.id > 0)\n" +
+		"      if true {\n        let m = self.where(fn(c) -> c.id > 10)\n      }\n" +
+		"      return m.count()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.outer() == 3\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id\n5\n15\n25\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("shadowed relation let Cards.outer() == 3: table_validation_failed = %d, want 0 (the outer m counts all three; the inner block must not leak)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllAggregateIntoNarrowParam pins that a relation aggregate flowing
+// into a non-union sized position the analyzer could not check — a typed parameter —
+// is range-checked against the rows' value: a sum of 300 does not inhabit sbyte, so
+// fits(self.sum(...)) must not pass on a 300 smuggled past the annotation. The
+// overflowing argument leaves the call unfoldable and the check fails safe. The
+// aggregate sits in a static fn (the slice's reachable shape — a bare relation query
+// in the check condition is rejected by the analyzer until a later slice drives it).
+func TestValidateAllAggregateIntoNarrowParam(t *testing.T) {
+	const belt = "fn fits(x: sbyte): bool {\n  return true\n}\n" +
+		"master Cards {\n  record { id: int, cost: int } impl {\n    pub static fn ok(): bool {\n      return fits(self.sum(fn(c) -> c.cost))\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.ok()\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,100\n2,100\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("fits(self.sum) with sum 300 into sbyte: table_validation_failed = %d, want 1 (300 does not fit sbyte)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllAggregateIntoNarrowLet pins the same range check at an annotated
+// let: let x: sbyte = self.sum(...) over a sum of 300 must not bind 300, so the body
+// is left unfoldable and the check fails safe rather than reading the out-of-range
+// value back as if it fit.
+func TestValidateAllAggregateIntoNarrowLet(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, cost: int } impl {\n    pub static fn ok(): bool {\n" +
+		"      let x: sbyte = self.sum(fn(c) -> c.cost)\n      return x >= 0\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.ok()\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,100\n2,100\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("let x: sbyte = sum 300: table_validation_failed = %d, want 1 (300 does not fit sbyte)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllAggregateIgnoresUnrelatedWideColumn pins that a column holding an
+// integer beyond SQLite's range does not disable an aggregate over the other
+// columns: sum(cost) is driven and passes despite a wide big cell, while a query that
+// reaches the dropped column itself (sum(big)) finds no such column and fails safe.
+func TestValidateAllAggregateIgnoresUnrelatedWideColumn(t *testing.T) {
+	mk := func(sel, cmp string) string {
+		return "master Cards {\n  record { id: int, cost: int, big: nint } impl {\n" +
+			"    pub static fn s(): nint {\n      return self.sum(fn(c) -> c." + sel + ")\n    }\n  }\n  primary id\n" +
+			"  validate {\n    all {\n      assert Cards.s() " + cmp + "\n    }\n  }\n" +
+			"  source { csv \"cards.csv\" }\n}\n"
+	}
+	bases := map[string]string{"csv": "data"}
+	data := map[string]string{"data/cards.csv": "id,cost,big\n1,10,999999999999999999999999999\n2,20,1\n"}
+	if _, diags := run(t, mk("cost", "== 30"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("sum(cost) == 30 with a wide big cell: table_validation_failed = %d, want 0 (the unrelated wide column must not disable the aggregate)", countTableFailures(diags))
+	}
+	if _, diags := run(t, mk("big", "== 0"), bases, data); countTableFailures(diags) != 1 {
+		t.Errorf("sum(big) == 0 over the dropped column: table_validation_failed = %d, want 1 (a query reaching the wide column fails safe)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllAggregateIntoRefinedParam pins that a relation aggregate flowing
+// into a non-union refined type is checked against its predicate, not only its
+// width: a sum of 0 does not satisfy Positive (self > 0), so takes(Cards.sum(...))
+// must not pass on a 0 admitted only by the integer range. The violating argument
+// leaves the call unfoldable and the check fails safe.
+func TestValidateAllAggregateIntoRefinedParam(t *testing.T) {
+	const belt = "type Positive = int where self > 0\n" +
+		"fn takes(x: Positive): bool {\n  return true\n}\n" +
+		"master Cards {\n  record { id: int, cost: int } impl {\n    pub static fn ok(): bool {\n      return takes(self.sum(fn(c) -> c.cost))\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.ok()\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,0\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("takes(self.sum) with sum 0 into Positive: table_validation_failed = %d, want 1 (0 violates self > 0)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllAggregateIntoReassignment pins that a data-dependent aggregate
+// reassigned into a sized local is range-checked against the local's type, not bound
+// raw: a sum of 300 reassigned into an sbyte local must not pass. The narrowing's
+// adaption refuses the out-of-range value, leaving the body unfoldable and the check
+// failing safe.
+func TestValidateAllAggregateIntoReassignment(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, cost: int } impl {\n    pub static fn ok(): bool {\n" +
+		"      let x: sbyte = 1\n      x = self.sum(fn(c) -> c.cost)\n      return x >= 0\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.ok()\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,100\n2,100\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("reassign sum 300 into sbyte: table_validation_failed = %d, want 1 (300 does not fit sbyte)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllAggregateIntoCollectionElement pins that an aggregate nested in a
+// collection literal is checked against the element type: a sum of 300 in a
+// list<sbyte> must not pass. The element's adaption refuses the out-of-range value.
+func TestValidateAllAggregateIntoCollectionElement(t *testing.T) {
+	const belt = "fn takes(xs: list<sbyte>): bool {\n  return true\n}\n" +
+		"master Cards {\n  record { id: int, cost: int } impl {\n    pub static fn ok(): bool {\n      return takes([self.sum(fn(c) -> c.cost)])\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.ok()\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,100\n2,100\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("sum 300 as a list<sbyte> element: table_validation_failed = %d, want 1 (300 does not fit sbyte)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllAggregateIntoRefinedConversion pins that an explicit conversion of an
+// aggregate to a refined type is checked against its predicate: Positive(sum) over a
+// sum of 0 must not pass, since 0 violates self > 0. The conversion's adaption refuses
+// the predicate-violating value.
+func TestValidateAllAggregateIntoRefinedConversion(t *testing.T) {
+	const belt = "type Positive = int where self > 0\n" +
+		"master Cards {\n  record { id: int, cost: int } impl {\n    pub static fn ok(): bool {\n      return Positive(self.sum(fn(c) -> c.cost)) >= 0\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.ok()\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,0\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 1 {
+		t.Errorf("Positive(self.sum 0): table_validation_failed = %d, want 1 (0 violates self > 0)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllRelationShadowedByLoopVar pins that a for-loop variable reusing the
+// name of a relation local reads the iteration value, not the outer relation: m starts
+// as a relation over three rows, the loop rebinds m to a two-element list, and
+// m.count() in the body must be the list count (2), not the relation's row count (3).
+func TestValidateAllRelationShadowedByLoopVar(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int } impl {\n    pub static fn f(): nint {\n" +
+		"      let m = self.where(fn(c) -> c.id > 0)\n" +
+		"      for m of [[1, 2]] {\n        return m.count()\n      }\n      return 0\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.f() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id\n5\n15\n25\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("loop var shadowing relation m, Cards.f() == 2: table_validation_failed = %d, want 0 (the loop value counts 2, not the relation's 3)", countTableFailures(diags))
+	}
+}
+
 func TestLoadTypedRows(t *testing.T) {
 	loaded, diags := run(t, skillBelt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,name,power\n1,Fireball,30\n2,Heal,12\n",
