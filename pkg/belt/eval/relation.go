@@ -1,37 +1,47 @@
-// This file is the evaluator's seam to the master query driver. The evaluator
-// interprets the body a relation query sits in — a static fn's lets and
-// arithmetic, a helper call, a conditional — but cannot run the query itself: it
-// has no rows, and the one-way layer rule keeps it from the master driver. So when
-// it reaches an aggregate over a master relation (count/sum), it inlines any
-// let-bound relation back into the chain and hands the self-contained chain to the
-// RelationFolder the environment carries (a data-aware env supplies one; a pure
-// compile-time fold does not, leaving the aggregate unfoldable). A let that binds a
-// relation records its chain here rather than folding to a non-existent constant,
-// so a query reached through the local is reconstructed before the folder runs it.
+// This file is the evaluator's seam to the master query driver. A master relation is
+// a first-class value (ir.ConstRelation carrying its query chain), so it flows through
+// the evaluator's ordinary plumbing — a let, a parameter, a closure capture, a
+// reassignment. A where narrows that value to a new relation; an aggregate (count/sum)
+// hands the chain to the RelationFolder the environment carries (a data-aware env
+// supplies one; a pure compile-time fold does not, leaving the aggregate unfoldable),
+// which runs it against the loaded rows. The evaluator itself has no rows, and the
+// one-way layer rule keeps it from the master driver.
 
 package eval
 
 import "github.com/masterbelt/masterbelt/pkg/source/ir"
 
-// graphRelationAggregate folds a relation aggregate (a count()/sum() over a master
-// relation, possibly let-bound) to the constant it yields over the loaded rows, or
-// ok=false when v is not such an aggregate or the environment carries no folder.
-func graphRelationAggregate(v *ir.Call, ctx graphCtx) (*ir.Constant, bool) {
-	rf, ok := ctx.env.(RelationFolder)
-	if !ok {
-		return nil, false
+// graphRelationMethod folds a method whose receiver is a relation value. A where
+// narrows the chain to a new relation, folding the captured scalars its predicate
+// compares against now — at the where, where the locals are in scope — so a later
+// reassignment of a captured let does not change this relation. A count or sum hands
+// the chain to the data layer's folder, which runs it against the loaded rows; the
+// folder declines (nil) when it cannot run the query — a different master, an
+// unsupported predicate, no rows loaded — so the aggregate is left unfolded and a
+// check over it fails safe. A method the fold does not recognize, or an aggregate with
+// no folder in scope, yields nil.
+func graphRelationMethod(v *ir.Call, recv *ir.Constant, ctx graphCtx) *ir.Constant {
+	switch v.Method {
+	case "where":
+		if len(v.Args) != 1 {
+			return nil
+		}
+		out := *v
+		out.Receiver = recv.Relation
+		out.Args = []ir.Value{substituteWhereScalars(v.Args[0], ctx)}
+		return ir.RelationConstant(&out)
+	case "count", "sum":
+		rf, ok := ctx.env.(RelationFolder)
+		if !ok {
+			return nil
+		}
+		out := *v
+		out.Receiver = recv.Relation
+		c, _ := rf.FoldRelationAggregate(&out)
+		return c
+	default:
+		return nil
 	}
-	chain := inlineRelation(v, ctx.relationLocals)
-	if !rootsAtRelation(chain) {
-		return nil, false
-	}
-	// A where predicate may compare a column against a captured scalar — a static fn
-	// parameter (c.rarity == r) or a let in the same body (c.cost > min) — which the
-	// driver, having only the chain and no body locals, cannot resolve. Fold those
-	// scalars to their constants here, where the locals are in scope, so the chain the
-	// driver lowers carries literals it can bind.
-	chain = substituteChainScalars(chain, ctx)
-	return rf.FoldRelationAggregate(chain)
 }
 
 // graphConstantToValue renders a folded constant as the literal node the driver's
@@ -55,29 +65,6 @@ func graphConstantToValue(c *ir.Constant) ir.Value {
 		return &ir.EnumMemberValue{Def: c.EnumDef, Index: c.EnumIndex}
 	default:
 		return nil
-	}
-}
-
-// substituteChainScalars folds the captured scalars a relation chain's where
-// predicates compare columns against — a static fn parameter or a same-body let — to
-// the constants they hold under the current locals, so the driver, which binds only
-// literals, can lower them. Only the value side of a comparison collapses; the column
-// reads stay unevaluable and ride along.
-func substituteChainScalars(chain ir.Value, ctx graphCtx) ir.Value {
-	switch v := chain.(type) {
-	case *ir.Call:
-		out := *v
-		out.Receiver = substituteChainScalars(v.Receiver, ctx)
-		if v.Method == "where" && len(v.Args) == 1 {
-			out.Args = []ir.Value{substituteWhereScalars(v.Args[0], ctx)}
-		}
-		return &out
-	case *ir.Adapt:
-		out := *v
-		out.Value = substituteChainScalars(v.Value, ctx)
-		return &out
-	default:
-		return chain
 	}
 }
 
@@ -182,66 +169,4 @@ func localsExcluding(locals map[string]*ir.Constant, names []string) map[string]
 		delete(out, n)
 	}
 	return out
-}
-
-// inlineRelation rebuilds a relation chain's receiver spine with each let-bound
-// relation inlined — a LocalRef the chain narrows through (matching in
-// matching.count()) is replaced by the relation it binds (self.where(...)) — so the
-// driver, which walks only where over the master relation and does not follow a
-// local, sees the whole chain. Only the spine is rebuilt; the where predicates and
-// the sum selector ride along untouched. A value not part of a chain is unchanged.
-func inlineRelation(v ir.Value, locals map[string]ir.Value) ir.Value {
-	switch v := v.(type) {
-	case *ir.Call:
-		return &ir.Call{Receiver: inlineRelation(v.Receiver, locals), Method: v.Method, Args: v.Args, Setter: v.Setter, Resolved: v.Resolved, Subst: v.Subst, Type: v.Type, Syntax: v.Syntax}
-	case *ir.LocalRef:
-		if rv, ok := locals[v.Name]; ok {
-			return inlineRelation(rv, locals)
-		}
-		return v
-	case *ir.Adapt:
-		return inlineRelation(v.Value, locals)
-	default:
-		return v
-	}
-}
-
-// rootsAtRelation reports whether a value's receiver spine bottoms at a master
-// relation — through where narrowings and Adapt wrappers — so it is a query over
-// the relation rather than an ordinary value. The local inlining has already run,
-// so a bare LocalRef here is not a relation.
-func rootsAtRelation(v ir.Value) bool {
-	for {
-		switch r := v.(type) {
-		case *ir.MasterRelation:
-			return true
-		case *ir.Call:
-			v = r.Receiver
-		case *ir.Adapt:
-			v = r.Value
-		default:
-			return false
-		}
-	}
-}
-
-// isRelationExpr reports whether v is the master relation itself — a where narrowing
-// over it, or a let that binds one (followed through locals) — and not an aggregate
-// (count/sum) over it. A let binding such a value records the chain in relationLocals
-// so a use of it can be inlined; a let binding an aggregate (a scalar count) or any
-// other value folds the ordinary way.
-func isRelationExpr(v ir.Value, locals map[string]ir.Value) bool {
-	switch v := v.(type) {
-	case *ir.MasterRelation:
-		return true
-	case *ir.Call:
-		return v.Method == "where" && isRelationExpr(v.Receiver, locals)
-	case *ir.LocalRef:
-		if rv, ok := locals[v.Name]; ok {
-			return isRelationExpr(rv, locals)
-		}
-	case *ir.Adapt:
-		return isRelationExpr(v.Value, locals)
-	}
-	return false
 }

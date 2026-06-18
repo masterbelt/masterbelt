@@ -4876,6 +4876,7 @@ var treeExcluded = map[string][]string{
 	"Call":              {"Syntax"},
 	"CollectionLiteral": {"Syntax"},
 	"Const":             {"Syntax"},
+	"Constant":          {"Relation"},
 	"Conversion":        {"Syntax"},
 	"DatetimeLiteral":   {"Syntax"},
 	"DurationLiteral":   {"Syntax"},

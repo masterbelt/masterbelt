@@ -645,6 +645,51 @@ func TestValidateAllStringParamFiltersRelation(t *testing.T) {
 	}
 }
 
+// TestValidateAllRelationValuedParam pins that a relation flows as a value into a
+// helper: cnt takes a relation<Cards> and counts it, and f calls it with a narrowed
+// relation, so the count runs against the rows the argument selects.
+func TestValidateAllRelationValuedParam(t *testing.T) {
+	const belt = "fn cnt(r: relation<Cards>): nint {\n  return r.count()\n}\n" +
+		"master Cards {\n  record { id: int, cost: int } impl {\n" +
+		"    pub static fn f(): nint { return cnt(self.where(fn(c) -> c.cost > 20)) }\n  }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.f() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("cnt(self.where(cost > 20)) == 2: table_validation_failed = %d, want 0 (the relation argument counts two rows)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllRelationLocalReassignment pins that a relation local can be
+// reassigned: m starts as all rows above 0, is narrowed to those above 20, and the
+// final count reflects the reassigned relation (2), not the first (3).
+func TestValidateAllRelationLocalReassignment(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, cost: int } impl {\n    pub static fn f(): nint {\n" +
+		"      let m = self.where(fn(c) -> c.cost > 0)\n" +
+		"      m = m.where(fn(c) -> c.cost > 20)\n" +
+		"      return m.count()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.f() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("reassigned relation m.count() == 2: table_validation_failed = %d, want 0 (the narrowed relation counts two, not the original three)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllRelationCapturedByClosure pins that a closure captures a relation
+// local: m is narrowed before the closure, and the closure's count runs against it.
+func TestValidateAllRelationCapturedByClosure(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, cost: int } impl {\n    pub static fn f(): nint {\n" +
+		"      let m = self.where(fn(c) -> c.cost > 20)\n" +
+		"      return (fn(): nint { return m.count() })()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.f() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("closure capturing relation m, m.count() == 2: table_validation_failed = %d, want 0 (the captured relation counts two)", countTableFailures(diags))
+	}
+}
+
 // TestValidateAllWideEnumColumnIgnored pins that an enum column whose member value is
 // beyond SQLite's range does not disable aggregates over the other columns, the enum
 // twin of the wide-integer-column rule: an unused enum with an overwide member is left

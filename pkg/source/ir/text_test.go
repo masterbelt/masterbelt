@@ -87,6 +87,9 @@ func TestExplicitExclusions(t *testing.T) {
 		// graph (Assert.CondGraph, AssocConst.ValueGraph, EnumMember.ValueGraph).
 		"CondGraph":  true,
 		"ValueGraph": true,
+		// A relation value's query chain (Constant.Relation): comptime-only, like a
+		// type value's Reified, so it has no serialized form.
+		"Relation": true,
 	}
 	for name, fields := range treeExcluded {
 		for _, field := range fields {
