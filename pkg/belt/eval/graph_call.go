@@ -216,10 +216,11 @@ func graphCall(v *ir.Call, ctx graphCtx) *ir.Constant {
 	}
 	// A built-in method on a relation value narrows it (where, to a new relation) or
 	// aggregates it (count/sum, run against the loaded rows by the data layer's
-	// folder). A method the relation does not own — a user method on a relation alias
-	// (type CardRel = relation<M> impl {...}) — falls through to ordinary dispatch with
-	// the relation value as self.
-	if recv.Kind == ir.ConstRelation {
+	// folder). A user method on a relation alias (type CardRel = relation<M> impl {...})
+	// is dispatched the ordinary way instead — including one that shadows a built-in
+	// name, which the checker resolves to the override, so the built-in only runs when
+	// no user method was resolved.
+	if recv.Kind == ir.ConstRelation && !relationOwnsUserMethod(ctx, v, recv) {
 		if c, ok := graphRelationMethod(v, recv, ctx); ok {
 			return c
 		}

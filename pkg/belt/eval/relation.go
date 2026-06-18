@@ -11,6 +11,22 @@ package eval
 
 import "github.com/masterbelt/masterbelt/pkg/source/ir"
 
+// relationOwnsUserMethod reports whether the relation value's static type declares its
+// own body-bearing method of the call's name — a relation alias (type CardRel =
+// relation<M> impl {...}) that overrides a built-in name (count, sum, where) or adds a
+// new one. The checker resolves such a call to the override, so the built-in relation
+// method must step aside and let ordinary user-method dispatch run it; a plain relation,
+// whose static type owns no such method, keeps the built-in. The relation receiver does
+// not carry a resolved method on the call node, so the override is found by its name on
+// the receiver's definition rather than read off the call.
+func relationOwnsUserMethod(ctx graphCtx, v *ir.Call, recv *ir.Constant) bool {
+	def := graphReceiverDef(ctx, v.Receiver, recv)
+	if def == nil {
+		return false
+	}
+	return len(bodyMethods(ctx.env.Registry(), def, v.Method)) > 0
+}
+
 // graphRelationMethod folds a built-in method whose receiver is a relation value,
 // reporting handled=false for one it does not own (a user method on a relation alias,
 // which the caller dispatches the ordinary way). A where narrows the chain to a new
