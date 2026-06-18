@@ -235,3 +235,12 @@ func TestConstantsEqualRelation(t *testing.T) {
 		t.Error("relations with separately built chains should not be equal")
 	}
 }
+
+// TestConstantStringRelation pins that rendering a relation value yields a safe
+// placeholder rather than dereferencing the nil integer the default case would. (A
+// data-aware fold can produce one, and a diagnostic or dump may render it.)
+func TestConstantStringRelation(t *testing.T) {
+	if got := RelationConstant(&MasterRelation{Master: &TypeDef{Name: "Cards"}}).String(); got != "<relation>" {
+		t.Errorf("relation String() = %q, want %q", got, "<relation>")
+	}
+}

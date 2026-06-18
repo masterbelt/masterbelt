@@ -11,36 +11,36 @@ package eval
 
 import "github.com/masterbelt/masterbelt/pkg/source/ir"
 
-// graphRelationMethod folds a method whose receiver is a relation value. A where
-// narrows the chain to a new relation, folding the captured scalars its predicate
-// compares against now — at the where, where the locals are in scope — so a later
-// reassignment of a captured let does not change this relation. A count or sum hands
-// the chain to the data layer's folder, which runs it against the loaded rows; the
-// folder declines (nil) when it cannot run the query — a different master, an
-// unsupported predicate, no rows loaded — so the aggregate is left unfolded and a
-// check over it fails safe. A method the fold does not recognize, or an aggregate with
-// no folder in scope, yields nil.
-func graphRelationMethod(v *ir.Call, recv *ir.Constant, ctx graphCtx) *ir.Constant {
+// graphRelationMethod folds a built-in method whose receiver is a relation value,
+// reporting handled=false for one it does not own (a user method on a relation alias,
+// which the caller dispatches the ordinary way). A where narrows the chain to a new
+// relation, folding the captured scalars its predicate compares against now — at the
+// where, where the locals are in scope — so a later reassignment of a captured let
+// does not change this relation. A count or sum hands the chain to the data layer's
+// folder, which runs it against the loaded rows; the folder declines (nil) when it
+// cannot run the query — a different master, an unsupported predicate, no rows loaded —
+// so the aggregate is left unfolded and a check over it fails safe.
+func graphRelationMethod(v *ir.Call, recv *ir.Constant, ctx graphCtx) (*ir.Constant, bool) {
 	switch v.Method {
 	case "where":
 		if len(v.Args) != 1 {
-			return nil
+			return nil, true
 		}
 		out := *v
 		out.Receiver = recv.Relation
 		out.Args = []ir.Value{substituteWhereScalars(v.Args[0], ctx)}
-		return ir.RelationConstant(&out)
+		return ir.RelationConstant(&out), true
 	case "count", "sum":
 		rf, ok := ctx.env.(RelationFolder)
 		if !ok {
-			return nil
+			return nil, true
 		}
 		out := *v
 		out.Receiver = recv.Relation
 		c, _ := rf.FoldRelationAggregate(&out)
-		return c
+		return c, true
 	default:
-		return nil
+		return nil, false
 	}
 }
 

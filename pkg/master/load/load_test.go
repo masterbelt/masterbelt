@@ -690,6 +690,22 @@ func TestValidateAllRelationCapturedByClosure(t *testing.T) {
 	}
 }
 
+// TestValidateAllRelationAliasMethod pins that a user method on a nominal relation
+// alias dispatches on the relation value: CardRel aliases relation<Cards> with a cnt
+// method, and a relation bound at that type runs cnt against the rows. A built-in
+// relation method the alias does not own falls through to ordinary dispatch.
+func TestValidateAllRelationAliasMethod(t *testing.T) {
+	const belt = "type CardRel = relation<Cards> impl { pub cnt(): nint { return self.count() } }\n" +
+		"master Cards {\n  record { id: int } impl {\n    pub static fn f(): nint {\n" +
+		"      let r: CardRel = self.where(fn(c) -> c.id > 1)\n      return r.cnt()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.f() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id\n1\n2\n3\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("relation alias method r.cnt() == 2: table_validation_failed = %d, want 0 (the alias method counts two rows)", countTableFailures(diags))
+	}
+}
+
 // TestValidateAllWideEnumColumnIgnored pins that an enum column whose member value is
 // beyond SQLite's range does not disable aggregates over the other columns, the enum
 // twin of the wide-integer-column rule: an unused enum with an overwide member is left

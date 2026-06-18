@@ -97,6 +97,27 @@ func compareEnumValues(a, b *ir.Constant) (int, bool) {
 // primitive (a record, a union, an unresolved body) backs no scalar kind. It is
 // the guard that keeps a def read from an annotation from applying to a value of
 // the wrong kind.
+// relationType reports whether a type is a master relation — the relation<M>
+// application, reached through any nominal aliases of it — the type a ConstRelation
+// value carries. A visited set bounds the alias walk.
+func relationType(t ir.Type) bool {
+	seen := map[*ir.TypeDef]bool{}
+	for {
+		switch tt := t.(type) {
+		case *ir.App:
+			return tt.Def != nil && tt.Def.Name == builtin.NameRelation
+		case *ir.Named:
+			if tt.Def == nil || tt.Def.Body == nil || seen[tt.Def] {
+				return false
+			}
+			seen[tt.Def] = true
+			t = tt.Def.Body
+		default:
+			return false
+		}
+	}
+}
+
 func defBacksKind(reg *builtin.Registry, def *ir.TypeDef, kind ir.ConstKind) bool {
 	// A record-bodied def (a record type, or a nominal type over one) backs a
 	// record value: a method or getter on a record receiver reaches its body
@@ -113,6 +134,12 @@ func defBacksKind(reg *builtin.Registry, def *ir.TypeDef, kind ir.ConstKind) boo
 		// through an alias chain (record Row, type Row = Base), so it is unwrapped
 		// recursively rather than with the one-step recordOf.
 		return def.Master != nil && masterRowRecord(def.Master.Row) != nil
+	}
+	// A relation-bodied def (a nominal alias of relation<M>) backs a relation value,
+	// so a user method on the alias (type CardRel = relation<M> impl {...}) dispatches
+	// on the relation the same way a method on a wrapped int does.
+	if kind == ir.ConstRelation {
+		return relationType(&ir.Named{Def: def})
 	}
 	n := underlyingPrimitive(reg, def, map[*ir.TypeDef]bool{})
 	if n == nil {

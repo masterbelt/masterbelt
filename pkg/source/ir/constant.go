@@ -581,6 +581,10 @@ func (c *Constant) String() string {
 			return "type"
 		}
 		return c.Reified.String()
+	case ConstRelation:
+		// A query has no value spelling; a placeholder keeps a dump or diagnostic from
+		// reading the nil integer the default would.
+		return "<relation>"
 	default:
 		return c.Int.String()
 	}
