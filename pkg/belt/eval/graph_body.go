@@ -187,8 +187,13 @@ func graphLet(s *ir.Let, ctx graphCtx, scope *graphScope) bool {
 	// the relation folds against rows, not here — so its chain is recorded for a
 	// later use to inline rather than folded to nil (which would fail the let). A let
 	// binding a scalar aggregate (a count) or any other value folds the ordinary way.
+	// The predicate's captured scalars are folded here, where the binding occurs, so
+	// the chain holds the values the scalars had then — a later reassignment of a
+	// captured let does not retroactively change the relation, matching how a closure
+	// captures its locals at creation, not at use.
 	if s.Name != "" && ctx.relationLocals != nil && isRelationExpr(s.Value, ctx.relationLocals) {
-		scope.bindRelation(s.Name, inlineRelation(s.Value, ctx.relationLocals))
+		chain := inlineRelation(s.Value, ctx.relationLocals)
+		scope.bindRelation(s.Name, substituteChainScalars(chain, ctx))
 		return true
 	}
 	letCtx := graphExpectingType(ctx, s.Type)

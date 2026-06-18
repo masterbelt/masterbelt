@@ -498,6 +498,22 @@ func TestValidateAllCapturedLetFiltersRelation(t *testing.T) {
 	}
 }
 
+// TestValidateAllRelationLetCapturesScalarAtBinding pins that a relation let captures
+// its predicate's scalars at the binding, not at the later aggregate: min is 20 when m
+// is bound, then reassigned to 90 before m.count(), so the count is the rows above 20
+// (the value m was built with) and not above 90 — a closure captures its locals at
+// creation, and a saved relation must do the same.
+func TestValidateAllRelationLetCapturesScalarAtBinding(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, cost: int } impl {\n    pub static fn f(): nint {\n" +
+		"      let min = 20\n      let m = self.where(fn(c) -> c.cost > min)\n      min = 90\n      return m.count()\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.f() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("relation captured at binding (min 20, then 90): table_validation_failed = %d, want 0 (count of cost > 20 is 2, not > 90)", countTableFailures(diags))
+	}
+}
+
 // TestValidateAllStringParamFiltersRelation pins that the substitution carries a
 // string parameter too: byName(target) filters a string column to the rows equal to
 // target, so the count is those rows.
