@@ -575,6 +575,29 @@ func TestValidateAllHelperWrappedCaptureSubstitutes(t *testing.T) {
 	}
 }
 
+// TestValidateAllRefinedCaptureConversionChecked pins that folding a captured operand
+// still vets a refined conversion against its predicate: above(min) compares c.cost
+// against Positive(min), so above(5) drives (5 inhabits Positive) but above(-1) must
+// not — -1 violates self > 0, so the conversion is refused and the check fails safe
+// rather than folding to -1 and counting rows. The fold keeps the data-aware checks
+// even though it declines relation aggregates.
+func TestValidateAllRefinedCaptureConversionChecked(t *testing.T) {
+	mk := func(arg, cmp string) string {
+		return "type Positive = int where self > 0\n" +
+			"master Cards {\n  record { id: int, cost: int } impl {\n" +
+			"    pub static fn above(min: int): nint { return self.where(fn(c) -> c.cost > Positive(min)).count() }\n  }\n  primary id\n" +
+			"  validate {\n    all {\n      assert Cards.above(" + arg + ") " + cmp + "\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	}
+	bases := map[string]string{"csv": "data"}
+	data := map[string]string{"data/cards.csv": "id,cost\n1,10\n2,30\n3,100\n"}
+	if _, diags := run(t, mk("5", "== 3"), bases, data); countTableFailures(diags) != 0 {
+		t.Errorf("above(5) with Positive(5): table_validation_failed = %d, want 0 (all three rows exceed 5)", countTableFailures(diags))
+	}
+	if _, diags := run(t, mk("-1", "== 3"), bases, data); countTableFailures(diags) != 1 {
+		t.Errorf("above(-1) with Positive(-1): table_validation_failed = %d, want 1 (-1 violates self > 0, so the conversion is refused)", countTableFailures(diags))
+	}
+}
+
 // TestValidateAllNominalMethodCaptureSubstitutes pins that a capture used as the
 // receiver of a method on a nominal scalar is folded with its type intact: min is a
 // Threshold and the predicate compares c.cost against min.bump(), so the method folds

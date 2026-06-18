@@ -81,12 +81,20 @@ func substituteChainScalars(chain ir.Value, ctx graphCtx) ir.Value {
 	}
 }
 
-// noFolderEnv carries the driver's environment but not its relation folder, so a fold
-// run under it resolves an ordinary constant — a captured scalar, a helper, a method
-// on a nominal scalar — while a relation aggregate among the operands finds no folder
-// and stays unevaluable. It is what lets a predicate's value side collapse without a
-// correlated aggregate over the rows collapsing with it.
+// noFolderEnv carries the driver's environment and stays a RelationFolder — so the
+// data-aware range and refinement checks still run while folding a predicate's
+// captured operands — but its fold declines every relation aggregate. A fold run under
+// it resolves an ordinary constant (a captured scalar, a helper, a method on a nominal
+// scalar, a refined conversion that the admission check still vets) while a relation
+// aggregate among the operands stays unevaluable, so a predicate's value side collapses
+// without a correlated aggregate over the rows collapsing with it.
 type noFolderEnv struct{ GraphEnv }
+
+// FoldRelationAggregate declines every aggregate, so a nested relation query in a
+// predicate is left for the driver rather than folded without the outer query binding.
+// The type still satisfies RelationFolder, which keeps the data-aware admission checks
+// active during the predicate fold.
+func (noFolderEnv) FoldRelationAggregate(ir.Value) (*ir.Constant, bool) { return nil, false }
 
 // substituteWhereScalars rewrites a where lambda's predicate, folding the captured
 // scalars its column comparisons read against to the constants they hold. The fold
@@ -123,14 +131,23 @@ func substituteWhereScalars(arg ir.Value, ctx graphCtx) ir.Value {
 // substituteScalarRefs replaces each subexpression of a predicate that folds to a
 // renderable constant under the body's locals — a captured parameter or let, and any
 // data-independent expression over one (min + 1, inc(min), int(min), min.bump(),
-// useHigh ? a : b) — with that literal. The fold carries no relation folder (foldCtx
-// installs noFolderEnv), so a nested relation aggregate over the rows folds to nothing
-// and is left whole for the driver to decline, never collapsing to a value computed
-// without the outer query binding. A column read folds to nothing too, so a comparison
-// is recursed into and only its value side collapses; anything else is left as is.
+// useHigh ? a : b) — with that literal, but only when the value inhabits the
+// expression's own type. The admission check (graphMemberAdmits) refuses a refined
+// conversion the rows violate (Positive(min) for min = -1), which graphConvert folds
+// without checking, so an out-of-range or predicate-violating capture is left whole
+// for the driver to decline rather than counted. The fold carries a relation folder
+// that declines every aggregate (noFolderEnv), so a nested relation aggregate over the
+// rows folds to nothing and is left whole too, never collapsing to a value computed
+// without the outer query binding, while the data-aware admission still runs. A column
+// read folds to nothing, so a comparison is recursed into and only its value side
+// collapses; anything else is left as is.
 func substituteScalarRefs(v ir.Value, ctx graphCtx) ir.Value {
-	if lit := graphConstantToValue(graphValue(v, ctx)); lit != nil {
-		return lit
+	if c := graphValue(v, ctx); c != nil {
+		if t := ir.TypeOf(v); t == nil || t == ir.Invalid || graphMemberAdmits(ctx, t, c) {
+			if lit := graphConstantToValue(c); lit != nil {
+				return lit
+			}
+		}
 	}
 	switch n := v.(type) {
 	case *ir.Call:
