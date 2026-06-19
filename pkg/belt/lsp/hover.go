@@ -95,6 +95,12 @@ func definition(doc view, offset int) []protocol.Location {
 		}
 		return locs
 	}
+	// A member-access method call (Cards.zero(), x.inc()) resolves through the
+	// receiver's type, not a name in scope, so it is tried after the namespace and
+	// bare-name function paths the funcAt step covers.
+	if locs, ok := memberMethodDefinition(doc, offset, doc.Trees()); ok {
+		return locs
+	}
 	return nil
 }
 

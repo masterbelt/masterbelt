@@ -197,6 +197,79 @@ func memberHover(doc view, offset int, trees map[cst.Green]cst.Tree) *protocol.H
 	return nil
 }
 
+// memberMethodDefinition resolves a member-access method call — Cards.zero() (a
+// master's static fn), Cards.expensive() (a scope entry, desugared to one), x.inc()
+// (a value method), a getter or setter — to the declaration locations of the methods
+// it names. It is the go-to-definition twin of memberHover: it resolves the receiver's
+// type and the methods of that name the same way, then locates each method's
+// declaration (every overload, in its own file). A method built outside a source
+// declaration — a relation builtin assembled from the prelude, which carries no
+// navigable view — contributes no location, so a query method like count resolves to
+// nothing rather than a phantom position.
+func memberMethodDefinition(doc view, offset int, trees map[cst.Green]cst.Tree) ([]protocol.Location, bool) {
+	member, ok := memberAccessAt(doc, offset)
+	if !ok {
+		return nil, false
+	}
+	// A static fn or a scope entry (desugared to one) is reached through the type name
+	// — Cards.zero, Cards.expensive — not the receiver's value type, so it resolves
+	// through the type's static methods, the same path the static-fn hover takes. It is
+	// tried first so a static fn that shadows a relation method navigates to the fn.
+	if locs := methodDeclLocations(doc, staticMethodsAt(doc, member)); len(locs) > 0 {
+		return locs, true
+	}
+	// A value method (x.inc(), a getter, a setter) or a relation method resolves through
+	// the receiver's type, the same resolution memberHover uses.
+	recv := receiverTypeOf(doc, member.Receiver, trees, offset, doc.ExprTypes())
+	if recv == nil || recv == ir.Invalid {
+		return nil, false
+	}
+	ms, _, ok := doc.MethodCandidates(recv, member.Member.Name)
+	if !ok {
+		return nil, false
+	}
+	if locs := methodDeclLocations(doc, ms); len(locs) > 0 {
+		return locs, true
+	}
+	return nil, false
+}
+
+// staticMethodsAt returns the static-fn methods a member access names through a type
+// name — Cards.zero, Celsius.freezing — or nil when the receiver is not a bare type
+// name a value does not shadow. A scope entry is one of these, lowered to a static fn.
+func staticMethodsAt(doc view, member *ast.MemberExpr) []*ir.Method {
+	recv, ok := member.Receiver.(*ast.Identifier)
+	if !ok || doc.Resolve(recv) != nil {
+		return nil // a value shadowing the type name is a value access
+	}
+	def := lookupTypeName(doc, recv.Name)
+	if def == nil {
+		return nil
+	}
+	var statics []*ir.Method
+	for _, m := range def.Methods {
+		if m.Kind == ir.MethodStatic && m.Name == member.Member.Name {
+			statics = append(statics, m)
+		}
+	}
+	return statics
+}
+
+// methodDeclLocations maps methods to the locations of their declaration names,
+// every overload in its own file, skipping any method built outside a source
+// declaration — a relation builtin assembled from the prelude carries no navigable
+// view, so it contributes nothing rather than a phantom location.
+func methodDeclLocations(doc view, ms []*ir.Method) []protocol.Location {
+	var locs []protocol.Location
+	for _, m := range ms {
+		if m.Syntax == nil {
+			continue
+		}
+		locs = append(locs, declLocation(doc.viewOfType(m.Owner))(m.Syntax.Syntax())...)
+	}
+	return locs
+}
+
 // memberMethodHover builds the method card for a member access: a single
 // signature with its doc below, or — for an overloaded name — every signature
 // listed each under its own doc comment, reading like the impl block itself.
