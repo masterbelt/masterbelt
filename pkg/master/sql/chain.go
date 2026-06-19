@@ -84,6 +84,44 @@ func SumRelation(chain ir.Value, env eval.GraphEnv) (rel Relation, column string
 	return rel, col.Field, master, unsupported, ok
 }
 
+// MinRelation and MaxRelation recognize a relation extreme query — min/max(fn(c) ->
+// c.col) over a chain of where narrowings over a master relation — and return the
+// Relation, the column whose extreme to read, the master, and any where predicates
+// lowered to SQL. The driver reads the extreme by ordering the relation on the column
+// and reading the first row, so the column must order in plain SQL: the orderability of
+// the element type is the checker's bound (T: orderable), but a type carrying a custom
+// order is rejected here, the extreme twin of the order key's custom-order exclusion,
+// since SQL would order by the stored scalar rather than the type's order.
+func MinRelation(chain ir.Value, env eval.GraphEnv) (rel Relation, column string, master *ir.TypeDef, unsupported []Unsupported, ok bool) {
+	return extremeRelation(chain, "min", env)
+}
+
+// MaxRelation is the greatest-value twin of MinRelation.
+func MaxRelation(chain ir.Value, env eval.GraphEnv) (rel Relation, column string, master *ir.TypeDef, unsupported []Unsupported, ok bool) {
+	return extremeRelation(chain, "max", env)
+}
+
+func extremeRelation(chain ir.Value, method string, env eval.GraphEnv) (rel Relation, column string, master *ir.TypeDef, unsupported []Unsupported, ok bool) {
+	call, ok := asCall(chain, method)
+	if !ok || len(call.Args) != 1 {
+		return Relation{}, "", nil, nil, false
+	}
+	col, ok := selectorColumn(call.Args[0])
+	if !ok {
+		return Relation{}, "", nil, nil, false
+	}
+	// An extreme, like a count or sum, does not respect a limit, so a limited one is
+	// left to fail safe.
+	rel, master, unsupported, ok = relationChain(call.Receiver, env, false)
+	if !ok {
+		return Relation{}, "", nil, nil, false
+	}
+	if elem, _ := columnElem(col); !sqlOrderable(elem) {
+		unsupported = append(unsupported, Unsupported{Node: col, Reason: "min/max of a column with a custom order"})
+	}
+	return rel, col.Field, master, unsupported, ok
+}
+
 // relationChain walks the where-narrowing chain over a master relation that an
 // aggregate sits on — [where(fn(c)->pred)]* over MasterRelation — accumulating the
 // lowered filter. It is shared by every aggregate (count, sum), so they recognize
@@ -124,12 +162,12 @@ func relationChain(recv ir.Value, env eval.GraphEnv, rendersRows bool) (rel Rela
 				unsupported = append(unsupported, u...)
 				recv = r.Receiver
 				sawFilterOrOrder = true
-			case rendersRows && r.Method == "limit" && len(r.Args) == 1 && !sawFilterOrOrder:
-				n, ok := limitValue(r.Args[0])
+			case rendersRows && (r.Method == "limit" || r.Method == "offset") && len(r.Args) == 1 && !sawFilterOrOrder:
+				next, ok := applyWindow(rel, r.Args[0], r.Method == "offset")
 				if !ok {
 					return Relation{}, nil, nil, false
 				}
-				rel = rel.Limit(n)
+				rel = next
 				recv = r.Receiver
 			default:
 				return Relation{}, nil, nil, false
@@ -160,6 +198,22 @@ func applyOrder(rel Relation, call *ir.Call, rendersRows bool) (out Relation, un
 		unsupported = append(unsupported, Unsupported{Node: call.Args[0], Reason: "order by a column with a custom order"})
 	}
 	return rel.OrderBy(col, desc), unsupported, true
+}
+
+// applyWindow folds a limit or offset call into a relation, reading its row count. A
+// limit caps the rows, an offset skips them from the window's start; both window the
+// already-filtered, already-ordered relation, so the chain recognizer only reaches here
+// for the row-rendering consumer and after no further filter or order. ok is false when
+// the count is not a recognized literal.
+func applyWindow(rel Relation, arg ir.Value, isOffset bool) (Relation, bool) {
+	n, ok := limitValue(arg)
+	if !ok {
+		return rel, false
+	}
+	if isOffset {
+		return rel.Offset(n), true
+	}
+	return rel.Limit(n), true
 }
 
 // orderKey reads the column and direction an order selector names: fn(c) -> c.col.asc()

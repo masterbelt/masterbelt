@@ -3,6 +3,7 @@ package load_test
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -1046,6 +1047,107 @@ func TestValidateAllOrderBlockSelectorIgnoredByCount(t *testing.T) {
 	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,30\n3,20\n"}
 	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
 		t.Errorf("count over a relation ordered by a block-body selector: table_validation_failed = %d, want 0 (count ignores the order, so its selector need not parse)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllMinMaxExtreme pins that min and max read the least and greatest value
+// of a column over the rows: with powers 30, 5, 20 the min is 5 and the max is 30, and a
+// filter narrows the rows the extreme is over.
+func TestValidateAllMinMaxExtreme(t *testing.T) {
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,30\n2,5\n3,20\n"}
+	hdr := "master Cards {\n  record { id: int, power: int } impl {\n"
+	for _, c := range []struct {
+		name, fn string
+		want     int
+	}{
+		{"min", "self.min(fn(c) -> c.power)", 5},
+		{"max", "self.max(fn(c) -> c.power)", 30},
+		{"filtered min", "self.where(fn(c) -> c.power > 10).min(fn(c) -> c.power)", 20},
+	} {
+		belt := hdr + "    pub static fn x(): int { match " + c.fn +
+			" { int n -> { return n } null e -> { return -1 } } }\n  }\n" +
+			"  primary id\n  validate {\n    all {\n      assert Cards.x() == " + strconv.Itoa(c.want) + "\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+		if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+			t.Errorf("%s (%s == %d): table_validation_failed = %d, want 0", c.name, c.fn, c.want, countTableFailures(diags))
+		}
+	}
+}
+
+// TestValidateAllMinMaxEmptyIsNull pins that an extreme over no rows is null, not a
+// stray value: a filter no row passes leaves min with nothing, so the null arm runs.
+func TestValidateAllMinMaxEmptyIsNull(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, power: int } impl {\n" +
+		"    pub static fn x(): int { match self.where(fn(c) -> c.power > 1000).min(fn(c) -> c.power) { int n -> { return n } null e -> { return -1 } } }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.x() == -1\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,30\n2,5\n3,20\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("min over an empty relation must be null: table_validation_failed = %d, want 0 (the null arm returns -1)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllMinMaxRejectsWrong is the negative twin: an extreme assertion that does
+// not hold of the real rows must fail, proving the extreme is read rather than assumed —
+// the greatest power is 30, not 5.
+func TestValidateAllMinMaxRejectsWrong(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, power: int } impl {\n" +
+		"    pub static fn x(): int { match self.max(fn(c) -> c.power) { int n -> { return n } null e -> { return -1 } } }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.x() == 5\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,30\n2,5\n3,20\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) == 0 {
+		t.Error("max power == 5 must fail: the greatest power is 30, so a pass means the extreme was not read")
+	}
+}
+
+// TestValidateAllMinMaxCustomOrderFailsSafe pins that min/max declines a column whose
+// type carries a custom order, the extreme twin of order's custom-order rejection: the
+// extreme is read by SQL's native order, which would not honor the type's order, so the
+// check fails safe.
+func TestValidateAllMinMaxCustomOrderFailsSafe(t *testing.T) {
+	const belt = "type Rank = int impl { pub lt(o: Rank): bool { return self.int() < o.int() } }\n" +
+		"master Cards {\n  record { id: int, rank: Rank } impl {\n" +
+		"    pub static fn x(): int { match self.min(fn(c) -> c.rank) { Rank r -> { return r.int() } null e -> { return -1 } } }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.x() == 5\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,rank\n1,30\n2,5\n3,20\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) == 0 {
+		t.Error("min by a custom-ordered column must fail safe: SQL's native order does not carry the type's order")
+	}
+}
+
+// TestValidateAllOffsetWindow pins that offset skips the first rows in the relation's
+// order: offset(1) over three rows leaves two, and order then offset then limit pages —
+// ascending [5, 20, 30], skip one, take one, reads 20.
+func TestValidateAllOffsetWindow(t *testing.T) {
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,30\n2,5\n3,20\n"}
+	for _, c := range []struct {
+		name, body string
+	}{
+		{"skip count", "Cards.offset(1).to_list().len() == 2"},
+		{"order page", "Cards.order(fn(c) -> c.power.asc()).offset(1).limit(1).to_list()[0].power == 20"},
+		{"window order-independent", "Cards.order(fn(c) -> c.power.asc()).limit(1).offset(1).to_list()[0].power == 20"},
+	} {
+		belt := "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+			"  validate {\n    all {\n      assert " + c.body + "\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+		if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+			t.Errorf("%s (%s): table_validation_failed = %d, want 0", c.name, c.body, countTableFailures(diags))
+		}
+	}
+}
+
+// TestValidateAllOffsetBeforeAggregateFailsSafe pins that offset before a count fails
+// safe: offset is a window over the materialized rows, which a count discards, so a
+// counted offset is left unfoldable rather than counting a skipped window.
+func TestValidateAllOffsetBeforeAggregateFailsSafe(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.offset(1).count() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,30\n2,5\n3,20\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) == 0 {
+		t.Error("offset(1).count() must fail safe: count discards the window, so an offset count is unfoldable")
 	}
 }
 

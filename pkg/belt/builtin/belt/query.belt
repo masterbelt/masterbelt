@@ -100,6 +100,15 @@ pub type relation<M> = builtin<M> impl {
   /// empty relation sums to zero.
   pub extern fn sum<T: numeric>(selector: fn(c: columns<M>): column<M, T>): nint
 
+  /// The least value of an orderable column over the relation's rows — the column
+  /// the selector names, read from the row that sorts first by it. The result is
+  /// that column's type or null: an empty relation has no least value.
+  pub extern fn min<T: orderable>(selector: fn(c: columns<M>): column<M, T>): T | null
+
+  /// The greatest value of an orderable column over the relation's rows — the twin
+  /// of min, from the row that sorts last. Null for an empty relation.
+  pub extern fn max<T: orderable>(selector: fn(c: columns<M>): column<M, T>): T | null
+
   /// Order the relation's rows by the column the selector names — c.cost.asc or
   /// c.cost.desc — the sort the materialized rows (to_list) come back in. The result
   /// is a relation, so it composes; ordering again makes the later key primary and
@@ -109,6 +118,11 @@ pub type relation<M> = builtin<M> impl {
   /// Keep at most n of the relation's rows, in the relation's order. The result is
   /// a relation, so it composes — narrowed first, then limited, then materialized.
   pub extern fn limit(n: nint): relation<M>
+
+  /// Skip the first n of the relation's rows, in the relation's order — the window's
+  /// start, the companion of limit. The result is a relation, so it composes; offset
+  /// and limit set the window together (skip n, then take the limit), in either order.
+  pub extern fn offset(n: nint): relation<M>
 
   /// Materialize the relation's rows as a list, in the relation's order. Each
   /// element is a row of M — its fields read as values (r.cost), the value-mode
