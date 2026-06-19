@@ -372,3 +372,44 @@ func TestHoverQualifiedRelationMethod(t *testing.T) {
 		t.Errorf("hover should name count: %q", h.Contents.Value)
 	}
 }
+
+// TestCompletionQueryColumns pins that a query binding's member access — the c in a
+// where/order/sum lambda, typed columns<M> — completes the master's columns: each of
+// M's row fields, detailed as the column<M, fieldType> it reads as. It works in a scope
+// body and in a validate-all query alike, since both bind columns<M>; a bare master
+// relation has no such binding, so its members stay the relation methods.
+func TestCompletionQueryColumns(t *testing.T) {
+	for _, c := range []struct {
+		name, src, anchor string
+	}{
+		{
+			"scope body",
+			"master Cards {\n  record { id: int, cost: int }\n  scope {\n    pub expensive() -> where(fn(c) -> c.)\n  }\n  primary id\n}\n",
+			"c.)",
+		},
+		{
+			"validate all",
+			"master Cards {\n  record { id: int, cost: int }\n  primary id\n  validate { all { assert Cards.where(fn(c) -> c.).count() == 0 } }\n  source { csv \"c.csv\" }\n}\n",
+			"c.).count",
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			doc := testView(c.src)
+			off := strings.Index(c.src, c.anchor) + len("c.")
+			items := byLabel(completion(doc, off).Items)
+			for _, col := range []string{"id", "cost"} {
+				it, ok := items[col]
+				if !ok {
+					t.Errorf("c. should offer the column %q: %v", col, labels(items))
+					continue
+				}
+				if it.Kind == nil || *it.Kind != protocol.CompletionItemKindField {
+					t.Errorf("%s kind = %v, want Field", col, it.Kind)
+				}
+				if !strings.Contains(it.Detail, "column<Cards, int>") {
+					t.Errorf("%s detail = %q, want it to name column<Cards, int>", col, it.Detail)
+				}
+			}
+		})
+	}
+}
