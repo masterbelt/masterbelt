@@ -1194,6 +1194,24 @@ func TestValidateAllScopeRejectsWrong(t *testing.T) {
 	}
 }
 
+// TestValidateAllScopeHelperCallBody pins that a scope whose body is a bare call to a
+// helper function returning a relation drives — the scope is a transparent shorthand for
+// the static fn, so the body resolves to the helper, not to a (nonexistent) relation
+// method of that name. A scope body is the entry's expression verbatim, so a bare call
+// is a relation-method self-call only where such a method exists, never an unconditional
+// rewrite.
+func TestValidateAllScopeHelperCallBody(t *testing.T) {
+	const belt = "fn expensive_cards(): relation<Cards> { return Cards.where(fn(c) -> c.cost > 100) }\n" +
+		"master Cards {\n  record { id: int, cost: int }\n" +
+		"  scope {\n    pub expensive() -> expensive_cards()\n  }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.expensive().count() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,50\n2,150\n3,200\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("scope body calling a relation-returning helper: table_validation_failed = %d, want 0 (the scope is a transparent shorthand for the static fn)", countTableFailures(diags))
+	}
+}
+
 // TestValidateAllWideEnumColumnIgnored pins that an enum column whose member value is
 // beyond SQLite's range does not disable aggregates over the other columns, the enum
 // twin of the wide-integer-column rule: an unused enum with an overwide member is left

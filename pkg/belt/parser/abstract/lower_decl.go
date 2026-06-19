@@ -401,10 +401,12 @@ func lowerMasterScope(t cst.Tree, buf source.Buffer, master string) []*ast.Metho
 }
 
 // lowerScopeEntry desugars one scope entry — [pub] name(params) -> body — into a
-// static fn `[pub] static fn name(params): relation<master> { return body }`. The
-// body's leading relation-method call is rooted at self (the implicit master
-// relation), so `where(...)` reads as `self.where(...)`; an entry missing its name or
-// body is dropped (its malformed syntax already reported by the parser).
+// static fn `[pub] static fn name(params): relation<master> { return body }`. The body
+// is the entry's expression verbatim: a bare relation-method call (where(...), count())
+// resolves against the implicit self relation the same way it does in any static fn
+// body, while a bare helper call resolves to that function — so a scope is a transparent
+// shorthand for the static fn. An entry missing its name or body is dropped (its
+// malformed syntax already reported by the parser).
 func lowerScopeEntry(t cst.Tree, buf source.Buffer, master string) *ast.MethodDecl {
 	green, _ := t.Node()
 	var (
@@ -441,32 +443,8 @@ func lowerScopeEntry(t cst.Tree, buf source.Buffer, master string) *ast.MethodDe
 		return nil
 	}
 	result := ast.NewNamedType("", "relation", []ast.TypeExpr{ast.NewNamedType("", master, nil, nil, green)}, nil, green)
-	ret := ast.NewReturnStmt(rootHeadAtSelf(body, green), green)
+	ret := ast.NewReturnStmt(body, green)
 	return ast.NewMethodDecl(nil, public, false, ast.MethodStatic, nil, name, nil, params, result, []ast.Stmt{ret}, green)
-}
-
-// rootHeadAtSelf roots the head of a relation-method chain at self, so a scope body
-// written without an explicit receiver — where(...).order(...) — reads as
-// self.where(...).order(...). It rewrites the innermost call whose callee is a bare
-// name (the chain's head) to call that name as a member of self; a head that already
-// has a receiver (self.where, Other.where) is left unchanged, so an explicit receiver
-// is never overridden. green anchors the synthesized self and member nodes.
-func rootHeadAtSelf(e ast.Expr, green *cst.Node) ast.Expr {
-	switch n := e.(type) {
-	case *ast.CallExpr:
-		switch callee := n.Callee.(type) {
-		case *ast.Identifier:
-			n.Callee = ast.NewMemberExpr(ast.NewSelfExpr(green), callee, green)
-		case *ast.MemberExpr:
-			callee.Receiver = rootHeadAtSelf(callee.Receiver, green)
-		}
-		return n
-	case *ast.MemberExpr:
-		n.Receiver = rootHeadAtSelf(n.Receiver, green)
-		return n
-	default:
-		return e
-	}
 }
 
 // masterKeywordText returns the text of the context keyword a MasterKeyword node

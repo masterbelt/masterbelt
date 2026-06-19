@@ -76,10 +76,8 @@ File
           Body:
             ReturnStmt
               Value: CallExpr
-                Callee: MemberExpr
-                  Receiver: SelfExpr
-                  Member: Identifier
-                    Name: "where"
+                Callee: Identifier
+                  Name: "where"
                 Arguments:
                   FuncLit
                     Params:
@@ -131,10 +129,8 @@ File
           Body:
             ReturnStmt
               Value: CallExpr
-                Callee: MemberExpr
-                  Receiver: SelfExpr
-                  Member: Identifier
-                    Name: "where"
+                Callee: Identifier
+                  Name: "where"
                 Arguments:
                   FuncLit
                     Params:
@@ -187,10 +183,8 @@ File
               Value: CallExpr
                 Callee: MemberExpr
                   Receiver: CallExpr
-                    Callee: MemberExpr
-                      Receiver: SelfExpr
-                      Member: Identifier
-                        Name: "order"
+                    Callee: Identifier
+                      Name: "order"
                     Arguments:
                       FuncLit
                         Params:
