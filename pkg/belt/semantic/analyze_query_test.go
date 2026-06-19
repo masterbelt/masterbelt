@@ -546,6 +546,20 @@ func TestColumnOrderingMethodsRequireOrderable(t *testing.T) {
 	}
 }
 
+// TestColumnOrderingRequiresSelfOrder pins that a column's asc/desc needs a self-order
+// — an lt applicable to (T, T) — not merely an lt of some signature. Weird declares an
+// lt that takes a string, which shadows the inherited integer ordering, so Weird is not
+// ordered by its own values (Weird(1) < Weird(2) is a type error) and its column cannot
+// be sorted, even though an lt is present by name.
+func TestColumnOrderingRequiresSelfOrder(t *testing.T) {
+	src := "type Weird = int impl { pub lt(s: string): bool { return true } }\n" +
+		"master Cards {\n  record { id: int, w: Weird }\n  primary id\n}\n" +
+		"fn probe(c: columns<Cards>): ordering<Cards> {\n  return c.w.asc()\n}\n"
+	if _, diags := analyze(src); len(diags) == 0 {
+		t.Fatal("want a type error: a column whose lt is not applicable to its own type has no order")
+	}
+}
+
 // TestColumnEqualityRequiresComparable pins the equality half of the same rule: a
 // column whose element type is not comparable has no == either, just as the value
 // comparison would be invalid — so the comparison guard covers eql/neq, not only the

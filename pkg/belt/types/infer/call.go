@@ -281,12 +281,9 @@ var queryOrderingMethods = map[string]bool{"asc": true, "desc": true}
 // equality). An ordering is judged by the relational operator, since a value that can
 // be compared with < can be sorted.
 func queryColumnComparisonValid(reg *builtin.Registry, recv ir.Type, method string) bool {
-	op := method
-	switch {
-	case queryComparisonMethods[method]:
-	case queryOrderingMethods[method]:
-		op = "lt"
-	default:
+	isComparison := queryComparisonMethods[method]
+	isOrdering := queryOrderingMethods[method]
+	if !isComparison && !isOrdering {
 		return true
 	}
 	elem, ok := queryColumnElem(reg, recv)
@@ -298,7 +295,17 @@ func queryColumnComparisonValid(reg *builtin.Registry, recv ir.Type, method stri
 	// a value comparison on the non-null T. Unwrap the null member before asking for
 	// the operator, since a union itself has no method table.
 	elem = nonNullType(elem)
-	_, _, hasOp := types.Candidates(reg, elem, op)
+	if isOrdering {
+		// An ordering needs a self-order — an lt overload applicable to (T, T), not
+		// merely an lt of some signature. A type whose lt takes another type (lt(s:
+		// string) on an int-backed type, which shadows the inherited one) is not ordered
+		// by its own values, so SelectOverload finds no (T, T) match and its column has
+		// no sort. found alone is the method's mere presence by name, so the applicable
+		// matches are what decide.
+		matches, _ := types.SelectOverload(reg, elem, "lt", []ir.Type{elem})
+		return len(matches) > 0
+	}
+	_, _, hasOp := types.Candidates(reg, elem, method)
 	return hasOp
 }
 

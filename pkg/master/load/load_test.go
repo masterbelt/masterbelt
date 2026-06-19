@@ -1018,6 +1018,22 @@ func TestValidateAllOrderCustomOrderFailsSafe(t *testing.T) {
 	}
 }
 
+// TestValidateAllOrderIgnoredByCountWithCustomOrder pins that a count over an ordered
+// relation folds even when the order is by a custom-ordered column: count discards the
+// order, so the unsupportable sort key must not make the count fail — the order is only
+// required to be SQL-renderable when the rows are materialized, not when an aggregate
+// that ignores it consumes the relation.
+func TestValidateAllOrderIgnoredByCountWithCustomOrder(t *testing.T) {
+	const belt = "type Rank = int impl { pub lt(o: Rank): bool { return self.int() < o.int() } }\n" +
+		"master Cards {\n  record { id: int, rank: Rank }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.order(fn(c) -> c.rank.asc()).count() == 3\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,rank\n1,5\n2,30\n3,20\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("count over a custom-ordered relation: table_validation_failed = %d, want 0 (count ignores the order)", countTableFailures(diags))
+	}
+}
+
 // TestValidateAllWideEnumColumnIgnored pins that an enum column whose member value is
 // beyond SQLite's range does not disable aggregates over the other columns, the enum
 // twin of the wide-integer-column rule: an unused enum with an overwide member is left

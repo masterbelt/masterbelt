@@ -88,7 +88,7 @@ func SumRelation(chain ir.Value, env eval.GraphEnv) (rel Relation, column string
 // aggregate sits on — [where(fn(c)->pred)]* over MasterRelation — accumulating the
 // lowered filter. It is shared by every aggregate (count, sum), so they recognize
 // the same relation shape and lower the same where predicates.
-func relationChain(recv ir.Value, env eval.GraphEnv, allowLimit bool) (rel Relation, master *ir.TypeDef, unsupported []Unsupported, ok bool) {
+func relationChain(recv ir.Value, env eval.GraphEnv, rendersRows bool) (rel Relation, master *ir.TypeDef, unsupported []Unsupported, ok bool) {
 	rel = All()
 	// The walk runs outermost call first, and the flat render applies WHERE, then
 	// ORDER BY, then LIMIT — so a limit must be the outermost (last applied) operation.
@@ -121,15 +121,17 @@ func relationChain(recv ir.Value, env eval.GraphEnv, allowLimit bool) (rel Relat
 					return Relation{}, nil, nil, false
 				}
 				// A column whose type carries a custom order cannot be sorted by plain
-				// SQL — it would sort by the stored scalar, not the type's order — so the
-				// key is recorded but reported unsupported, and the consumer fails safe.
-				if !sqlOrderable(elem) {
+				// SQL — it would sort by the stored scalar, not the type's order. The order
+				// only affects the materialized rows, though: count and sum discard it, so
+				// the key is reported unsupported only when the rows are rendered (to_list),
+				// not when an aggregate that ignores the order consumes the relation.
+				if rendersRows && !sqlOrderable(elem) {
 					unsupported = append(unsupported, Unsupported{Node: r.Args[0], Reason: "order by a column with a custom order"})
 				}
 				rel = rel.OrderBy(col, desc)
 				recv = r.Receiver
 				sawFilterOrOrder = true
-			case allowLimit && r.Method == "limit" && len(r.Args) == 1 && !sawFilterOrOrder:
+			case rendersRows && r.Method == "limit" && len(r.Args) == 1 && !sawFilterOrOrder:
 				n, ok := limitValue(r.Args[0])
 				if !ok {
 					return Relation{}, nil, nil, false
