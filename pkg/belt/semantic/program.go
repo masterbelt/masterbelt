@@ -231,6 +231,17 @@ func (p *Program) ReceiverMethods(recv ir.Type) ([]*ir.Method, map[string]ir.Typ
 	return types.ReceiverMethods(p.db.reg, recv)
 }
 
+// QueryColumns returns the columns a query binding's columns<M> type offers — the
+// receiver of a query column access, the c in where(fn(c) -> ...) — each an ir.Field
+// typed as the column<M, FieldType> it reads as, and whether recv is the query binding
+// at all. It mirrors the checker's column rule (columnsFieldType): the columns builtin
+// matched by identity, not by name, so a file's own generic type columns<T> is not
+// mistaken for it, and the master's row read through the same recordOf, so a row form
+// that lifts no columns yields none. ok is false for any other type.
+func (p *Program) QueryColumns(recv ir.Type) ([]ir.Field, bool) {
+	return infer.QueryColumns(p.db.reg, recv)
+}
+
 // FileOf returns the file a constant of the last Refresh is declared in.
 func (p *Program) FileOf(c *ir.Const) (FileID, bool) {
 	if c == nil || c.Syntax == nil {

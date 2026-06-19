@@ -372,3 +372,134 @@ func TestHoverQualifiedRelationMethod(t *testing.T) {
 		t.Errorf("hover should name count: %q", h.Contents.Value)
 	}
 }
+
+// TestCompletionQueryColumns pins that a query binding's member access — the c in a
+// where/order/sum lambda, typed columns<M> — completes the master's columns: each of
+// M's row fields, detailed as the column<M, fieldType> it reads as. It works in a scope
+// body and in a validate-all query alike, since both bind columns<M>; a bare master
+// relation has no such binding, so its members stay the relation methods.
+func TestCompletionQueryColumns(t *testing.T) {
+	for _, c := range []struct {
+		name, src, anchor string
+	}{
+		{
+			"scope body",
+			"master Cards {\n  record { id: int, cost: int }\n  scope {\n    pub expensive() -> where(fn(c) -> c.)\n  }\n  primary id\n}\n",
+			"c.)",
+		},
+		{
+			"validate all",
+			"master Cards {\n  record { id: int, cost: int }\n  primary id\n  validate { all { assert Cards.where(fn(c) -> c.).count() == 0 } }\n  source { csv \"c.csv\" }\n}\n",
+			"c.).count",
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			doc := testView(c.src)
+			off := strings.Index(c.src, c.anchor) + len("c.")
+			items := byLabel(completion(doc, off).Items)
+			for _, col := range []string{"id", "cost"} {
+				it, ok := items[col]
+				if !ok {
+					t.Errorf("c. should offer the column %q: %v", col, labels(items))
+					continue
+				}
+				if it.Kind == nil || *it.Kind != protocol.CompletionItemKindField {
+					t.Errorf("%s kind = %v, want Field", col, it.Kind)
+				}
+				if !strings.Contains(it.Detail, "column<Cards, int>") {
+					t.Errorf("%s detail = %q, want it to name column<Cards, int>", col, it.Detail)
+				}
+			}
+		})
+	}
+}
+
+// TestCompletionQueryBindingShadowingType pins that a query binding whose name also
+// names a type wins the member access: in where(fn(Rarity) -> Rarity.) the parameter
+// Rarity (typed columns<Cards>) shadows the enum Rarity in value position, so its member
+// access offers the master's columns, not the enum's members — the columns check runs
+// before the receiver-as-type reading.
+func TestCompletionQueryBindingShadowingType(t *testing.T) {
+	src := "enum Rarity { common, legend }\n" +
+		"master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n" +
+		"fn probe(): nint {\n  return Cards.where(fn(Rarity) -> Rarity.).count()\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "Rarity.)") + len("Rarity.")
+	items := byLabel(completion(doc, off).Items)
+	for _, col := range []string{"id", "cost"} {
+		it, ok := items[col]
+		if !ok {
+			t.Errorf("the binding Rarity shadows the enum; Rarity. should offer the column %q: %v", col, labels(items))
+			continue
+		}
+		if it.Kind == nil || *it.Kind != protocol.CompletionItemKindField {
+			t.Errorf("%s kind = %v, want Field", col, it.Kind)
+		}
+	}
+	for _, m := range []string{"common", "legend"} {
+		if _, ok := items[m]; ok {
+			t.Errorf("the enum is shadowed by the binding; its member %q must not be offered: %v", m, labels(items))
+		}
+	}
+}
+
+// TestCompletionQueryBindingShadowingConst pins that a query binding whose name also
+// names a module constant wins its member access: in where(fn(c) -> c.) the parameter c
+// (typed columns<Cards>) shadows a top-level const c in value position, so its member
+// access offers the master's columns, not the constant's members — the lambda parameter
+// is resolved before the constant a same-named module binding would otherwise return.
+func TestCompletionQueryBindingShadowingConst(t *testing.T) {
+	src := "const c = 5\n" +
+		"master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n" +
+		"fn probe(): nint {\n  return Cards.where(fn(c) -> c.).count()\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "c.)") + len("c.")
+	items := byLabel(completion(doc, off).Items)
+	for _, col := range []string{"id", "cost"} {
+		it, ok := items[col]
+		if !ok {
+			t.Errorf("the binding c shadows the const; c. should offer the column %q: %v", col, labels(items))
+			continue
+		}
+		if it.Kind == nil || *it.Kind != protocol.CompletionItemKindField {
+			t.Errorf("%s kind = %v, want Field", col, it.Kind)
+		}
+	}
+}
+
+// TestCompletionQueryColumnsGenericAliasRow pins that the column completion mirrors the
+// checker's column rule, not a broader record expansion: a master whose row is a generic
+// record alias (record Box<int>) is a row form the checker does not lift columns from, so
+// a query binding over it offers no columns — never one a where/sum query could not use.
+func TestCompletionQueryColumnsGenericAliasRow(t *testing.T) {
+	src := "type Box<T> = { value: T }\n" +
+		"master Cards {\n  record Box<int>\n  primary value\n}\n" +
+		"fn probe(): nint {\n  return Cards.where(fn(c) -> c.).count()\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "c.)") + len("c.")
+	items := byLabel(completion(doc, off).Items)
+	if _, ok := items["value"]; ok {
+		t.Errorf("a generic record alias row lifts no columns; value must not be offered: %v", labels(items))
+	}
+}
+
+// TestCompletionUserColumnsNotMistaken pins that the column completion matches the
+// prelude columns builtin by identity, not by name: a file that declares its own
+// generic type columns<T> and accesses a member of it gets that type's real fields,
+// not a master's row columns, even when the argument is a master.
+func TestCompletionUserColumnsNotMistaken(t *testing.T) {
+	src := "type columns<T> = { mine: T }\n" +
+		"master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n" +
+		"fn probe(c: columns<Cards>): int {\n  return c.\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "c.\n") + len("c.")
+	items := byLabel(completion(doc, off).Items)
+	if _, ok := items["mine"]; !ok {
+		t.Errorf("a user columns<T> should offer its own field mine: %v", labels(items))
+	}
+	for _, col := range []string{"id", "cost"} {
+		if _, ok := items[col]; ok {
+			t.Errorf("a user columns<T> must not be mistaken for the query binding (offered master column %q): %v", col, labels(items))
+		}
+	}
+}

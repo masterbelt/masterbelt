@@ -97,6 +97,16 @@ func memberItems(doc view, offset int) ([]protocol.CompletionItem, bool) {
 	if !ok {
 		return nil, false
 	}
+	recv := receiverTypeOf(doc, member.Receiver, doc.Trees(), offset, doc.ExprTypes())
+	// A query binding (the c in where(fn(c) -> ...)) is a columns<M>: its members are
+	// the master's columns, named by its row fields, not real value members. They
+	// claim the position — a columns<M> has no value methods or fields of its own —
+	// and the check runs before the type-member reading so a binding whose name also
+	// names a type (fn(Rarity) where Rarity is an enum too) offers the columns, not
+	// the shadowed type's members the receiver-as-type path would otherwise return.
+	if cols, ok := columnsMemberItems(doc, recv); ok {
+		return cols, true
+	}
 	// A member access whose receiver names a type (Rarity., int8., Level.)
 	// offers the type's members — enum members and associated constants — each
 	// labelled with its value. A master is both a type (its static fns) and a
@@ -107,7 +117,6 @@ func memberItems(doc view, offset int) ([]protocol.CompletionItem, bool) {
 	if isType && !masterReceiver(doc, member.Receiver) {
 		return typeItems, true
 	}
-	recv := receiverTypeOf(doc, member.Receiver, doc.Trees(), offset, doc.ExprTypes())
 	if recv == nil || recv == ir.Invalid {
 		return typeItems, true
 	}
@@ -213,6 +222,32 @@ func valueMemberItems(doc view, recv ir.Type) []protocol.CompletionItem {
 		}
 	}
 	return items
+}
+
+// columnsMemberItems offers the columns of a query binding: a member access on a
+// columns<M> receiver (the c in where(fn(c) -> ...)) names M's row fields, each read as
+// the column<M, fieldType> the field's value type lifts to in query mode — so the
+// completion is the master's fields, the columns a predicate compares. It defers to
+// QueryColumns for the exact set, the same columns the checker resolves: the columns
+// builtin matched by identity, so a user type that shadows the columns name is not
+// mistaken for it (that and any other receiver report false, leaving the ordinary
+// value-member path to it), and a master row form that lifts no columns claims the
+// position with none rather than letting a column a query cannot use through.
+func columnsMemberItems(doc view, recv ir.Type) ([]protocol.CompletionItem, bool) {
+	cols, ok := doc.QueryColumns(recv)
+	if !ok {
+		return nil, false
+	}
+	kind := protocol.CompletionItemKindField
+	items := make([]protocol.CompletionItem, 0, len(cols))
+	for _, c := range cols {
+		items = append(items, protocol.CompletionItem{
+			Label:  c.Name,
+			Kind:   &kind,
+			Detail: ": " + c.Type.String(),
+		})
+	}
+	return items, true
 }
 
 // masterReceiver reports whether a member access's receiver is a bare master name —
