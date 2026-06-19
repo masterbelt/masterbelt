@@ -116,19 +116,12 @@ func relationChain(recv ir.Value, env eval.GraphEnv, rendersRows bool) (rel Rela
 				recv = r.Receiver
 				sawFilterOrOrder = true
 			case r.Method == "order" && len(r.Args) == 1:
-				col, desc, elem, ok := orderKey(r.Args[0])
-				if !ok {
+				next, u, good := applyOrder(rel, r, rendersRows)
+				if !good {
 					return Relation{}, nil, nil, false
 				}
-				// A column whose type carries a custom order cannot be sorted by plain
-				// SQL — it would sort by the stored scalar, not the type's order. The order
-				// only affects the materialized rows, though: count and sum discard it, so
-				// the key is reported unsupported only when the rows are rendered (to_list),
-				// not when an aggregate that ignores the order consumes the relation.
-				if rendersRows && !sqlOrderable(elem) {
-					unsupported = append(unsupported, Unsupported{Node: r.Args[0], Reason: "order by a column with a custom order"})
-				}
-				rel = rel.OrderBy(col, desc)
+				rel = next
+				unsupported = append(unsupported, u...)
 				recv = r.Receiver
 				sawFilterOrOrder = true
 			case rendersRows && r.Method == "limit" && len(r.Args) == 1 && !sawFilterOrOrder:
@@ -145,6 +138,28 @@ func relationChain(recv ir.Value, env eval.GraphEnv, rendersRows bool) (rel Rela
 			return Relation{}, nil, nil, false
 		}
 	}
+}
+
+// applyOrder folds an order call into a relation. The order only affects the
+// materialized rows; count and sum discard it, so when the rows are not rendered the
+// selector is not parsed at all and the relation is returned unchanged — an order whose
+// selector is not the recognized inline shape (a block-body lambda) does not reject the
+// aggregate that ignores it. When the rows are rendered, the sort key is read and a
+// column whose type carries a custom order — which plain SQL would sort by the stored
+// scalar, not the type's order — is reported unsupported so the materialization fails
+// safe. good is false only when the key is needed but its selector is not recognized.
+func applyOrder(rel Relation, call *ir.Call, rendersRows bool) (out Relation, unsupported []Unsupported, good bool) {
+	if !rendersRows {
+		return rel, nil, true
+	}
+	col, desc, elem, ok := orderKey(call.Args[0])
+	if !ok {
+		return rel, nil, false
+	}
+	if !sqlOrderable(elem) {
+		unsupported = append(unsupported, Unsupported{Node: call.Args[0], Reason: "order by a column with a custom order"})
+	}
+	return rel.OrderBy(col, desc), unsupported, true
 }
 
 // orderKey reads the column and direction an order selector names: fn(c) -> c.col.asc()

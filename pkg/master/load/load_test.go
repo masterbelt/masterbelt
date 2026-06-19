@@ -1034,6 +1034,21 @@ func TestValidateAllOrderIgnoredByCountWithCustomOrder(t *testing.T) {
 	}
 }
 
+// TestValidateAllOrderBlockSelectorIgnoredByCount pins that count folds over a relation
+// ordered by a selector the driver does not parse — a block-body lambda rather than the
+// inline fn(c) -> c.col.asc() shape. Count discards the order, so its selector is not
+// parsed at all; only a materialization (to_list) needs the recognized shape. Without
+// this the unparsed order would reject the count even though the order is unused.
+func TestValidateAllOrderBlockSelectorIgnoredByCount(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.order(fn(c): ordering<Cards> { let x = c.power.desc(); return x }).count() == 3\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,30\n3,20\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("count over a relation ordered by a block-body selector: table_validation_failed = %d, want 0 (count ignores the order, so its selector need not parse)", countTableFailures(diags))
+	}
+}
+
 // TestValidateAllWideEnumColumnIgnored pins that an enum column whose member value is
 // beyond SQLite's range does not disable aggregates over the other columns, the enum
 // twin of the wide-integer-column rule: an unused enum with an overwide member is left
