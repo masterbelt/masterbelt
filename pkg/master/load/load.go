@@ -256,7 +256,7 @@ func checkAllValidations(typed master.Table, fields []ir.Field, def *ir.TypeDef,
 	// evaluator interprets the body (the static fn's lets and arithmetic, a helper, a
 	// conditional) and runs any count/sum over the relation against the rows. A query
 	// the folder declines leaves that aggregate unfoldable, so the check fails safe.
-	foldEnv := relationEnv{GraphEnv: env, fold: relationFold{eng: eng, rows: rowCount, master: def, env: env}}
+	foldEnv := relationEnv{GraphEnv: env, fold: relationFold{eng: eng, rows: rowCount, master: def, env: env, full: typed}}
 	var diags []diagnostic.Diagnostic
 	for _, check := range def.Master.AllChecks {
 		// A check passes only when it folds to a definite true with the count in

@@ -86,4 +86,14 @@ pub type relation<M> = builtin<M> impl {
   /// widening SQL gives a sum — so it inhabits a type wide enough to hold it. An
   /// empty relation sums to zero.
   pub extern fn sum<T: numeric>(selector: fn(c: columns<M>): column<M, T>): nint
+
+  /// Keep at most n of the relation's rows, in the relation's order. The result is
+  /// a relation, so it composes — narrowed first, then limited, then materialized.
+  pub extern fn limit(n: nint): relation<M>
+
+  /// Materialize the relation's rows as a list, in the relation's order. Each
+  /// element is a row of M — its fields read as values (r.cost), the value-mode
+  /// twin of the columns a where predicate binds — so a check can read the actual
+  /// rows the query selects.
+  pub extern fn to_list(): list<M>
 }
