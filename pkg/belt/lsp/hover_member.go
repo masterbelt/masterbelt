@@ -224,20 +224,21 @@ func memberMethodDefinition(doc view, offset int, trees map[cst.Green]cst.Tree) 
 		}
 		return nil, false
 	}
+	// A member write resolves to a setter — detected before the read so a write whose
+	// receiver type the checker does know (a parameter, self) is not mistaken for a
+	// getter read. The assignment target's type is read off the lowered setter call,
+	// which AssignTargetReceiverType returns only when the member access is one.
+	if recv, ok := doc.AssignTargetReceiverType(member); ok {
+		if locs := methodDeclLocations(doc, accessorMethods(doc, recv, member.Member.Name, ir.MethodSetter)); len(locs) > 0 {
+			return locs, true
+		}
+		return nil, false
+	}
 	// A member read that is not a call resolves to a getter through the receiver's type;
 	// a plain field read has no getter, so it navigates nowhere rather than to a
 	// same-named setter or method.
 	if recv := receiverTypeOf(doc, member.Receiver, trees, offset, doc.ExprTypes()); recv != nil && recv != ir.Invalid {
 		if locs := methodDeclLocations(doc, accessorMethods(doc, recv, member.Member.Name, ir.MethodGetter)); len(locs) > 0 {
-			return locs, true
-		}
-		return nil, false
-	}
-	// A member write resolves to a setter. The checker does not type an assignment
-	// target's receiver (c.fahrenheit = v), so its type is read off the lowered setter
-	// call — the one member access whose receiver receiverTypeOf cannot settle.
-	if recv, ok := doc.AssignTargetReceiverType(member); ok {
-		if locs := methodDeclLocations(doc, accessorMethods(doc, recv, member.Member.Name, ir.MethodSetter)); len(locs) > 0 {
 			return locs, true
 		}
 	}
@@ -285,12 +286,31 @@ func accessorMethods(doc view, recv ir.Type, name string, kind ir.MethodKind) []
 func methodDeclLocations(doc view, ms []*ir.Method) []protocol.Location {
 	var locs []protocol.Location
 	for _, m := range ms {
-		if m.Syntax == nil {
-			continue
+		if node := methodDeclNode(m); node != nil {
+			locs = append(locs, declLocation(doc.viewOfType(m.Owner))(node)...)
 		}
-		locs = append(locs, declLocation(doc.viewOfType(m.Owner))(m.Syntax.Syntax())...)
 	}
 	return locs
+}
+
+// methodDeclNode returns the CST declaration node to navigate to for a method: its
+// own MethodDecl, or — for an interface requirement, which carries no MethodDecl —
+// the InterfaceMember it was declared as, recovered from the owning interface by
+// name. It is nil for a method built outside a source declaration (a prelude
+// builtin), which has neither.
+func methodDeclNode(m *ir.Method) *cst.Node {
+	if m.Syntax != nil {
+		return m.Syntax.Syntax()
+	}
+	if m.Owner == nil || m.Owner.InterfaceSyntax == nil {
+		return nil
+	}
+	for _, mem := range m.Owner.InterfaceSyntax.Members {
+		if mem.Name == m.Name {
+			return mem.Syntax()
+		}
+	}
+	return nil
 }
 
 // memberMethodHover builds the method card for a member access: a single

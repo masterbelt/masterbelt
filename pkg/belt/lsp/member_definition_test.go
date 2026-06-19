@@ -109,6 +109,66 @@ func TestDefinitionSetterInLambda(t *testing.T) {
 	}
 }
 
+// TestDefinitionMemberCallInEnumMember pins that a method call in an enum member's
+// initializer navigates: the editor's expression walk reaches enum member
+// initializers, so inc in a = Counter(1).inc() resolves to its declaration.
+func TestDefinitionMemberCallInEnumMember(t *testing.T) {
+	src := "pub type Counter = int impl {\n  pub fn inc(): self {\n    return self\n  }\n}\n" +
+		"enum E {\n  a = Counter(1).inc()\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "Counter(1).inc()") + len("Counter(1).")
+	locs := definition(doc, off)
+	want := strings.Index(src, "pub fn inc") + len("pub fn ")
+	if len(locs) != 1 || fromPosition(doc.Buffer(), locs[0].Range.Start) != want {
+		t.Errorf("a method call in an enum member initializer should navigate to inc at %d; got %+v", want, locs)
+	}
+}
+
+// TestDefinitionMemberCallInRefinement pins that a method call in a refinement
+// predicate navigates: the editor's expression walk reaches a type's where clause, so
+// positive in where self.positive() resolves to its declaration.
+func TestDefinitionMemberCallInRefinement(t *testing.T) {
+	src := "pub type Lvl = sbyte where self.positive() impl {\n  pub fn positive(): bool {\n    return self > 0\n  }\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "self.positive()") + len("self.")
+	locs := definition(doc, off)
+	want := strings.Index(src, "pub fn positive") + len("pub fn ")
+	if len(locs) != 1 || fromPosition(doc.Buffer(), locs[0].Range.Start) != want {
+		t.Errorf("a method call in a refinement predicate should navigate to positive at %d; got %+v", want, locs)
+	}
+}
+
+// TestDefinitionInterfaceRequirement pins that a call of an interface requirement
+// navigates to the requirement's declaration in the interface: x.f() where x: I and
+// interface I { f(): nint } resolves to f, recovered from the interface member even
+// though a required method carries no method-declaration backpointer.
+func TestDefinitionInterfaceRequirement(t *testing.T) {
+	src := "pub interface I {\n  f(): nint\n}\n" +
+		"pub fn g(x: I): nint {\n  return x.f()\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "x.f()") + len("x.")
+	locs := definition(doc, off)
+	want := strings.Index(src, "f(): nint")
+	if len(locs) != 1 || fromPosition(doc.Buffer(), locs[0].Range.Start) != want {
+		t.Errorf("an interface requirement call should navigate to the requirement f at %d; got %+v", want, locs)
+	}
+}
+
+// TestDefinitionSetterWriteOnTypedReceiver pins that a setter write whose receiver type
+// the checker already knows (a parameter) resolves to the setter, not the getter: the
+// write is detected before the getter read, so go-to-definition on the assignment
+// target finds the setter even when a getter of the same name exists.
+func TestDefinitionSetterWriteOnTypedReceiver(t *testing.T) {
+	src := accessorType + "fn f(c: Celsius): Celsius {\n  c.fahrenheit = 212\n  return c\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "c.fahrenheit = 212") + len("c.")
+	locs := definition(doc, off)
+	want := strings.Index(src, "pub set fahrenheit") + len("pub set ")
+	if len(locs) != 1 || fromPosition(doc.Buffer(), locs[0].Range.Start) != want {
+		t.Errorf("a setter write on a typed receiver should navigate to the setter at %d, not the getter; got %+v", want, locs)
+	}
+}
+
 // TestDefinitionRelationBuiltinHasNoLocation pins that a relation builtin (count,
 // assembled from the prelude) has no navigable declaration: it resolves to zero
 // locations rather than a phantom position, since the prelude is in no workspace file.
