@@ -123,6 +123,10 @@ func (v view) ReceiverMethods(recv ir.Type) ([]*ir.Method, map[string]ir.Type, b
 	return v.ws.prog.ReceiverMethods(recv)
 }
 
+func (v view) QueryColumnsMaster(recv ir.Type) (ir.Type, bool) {
+	return v.ws.prog.QueryColumnsMaster(recv)
+}
+
 func (v view) FuncLitTypes() map[*ast.FuncLit]*ir.Func { return v.ws.prog.FuncLitTypes(v.id) }
 
 // ExprTypes is the type the checker settled for every expression node it typed

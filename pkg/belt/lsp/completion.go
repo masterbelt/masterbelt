@@ -8,7 +8,6 @@ import (
 
 	protocol "github.com/owenrumney/go-lsp/lsp"
 
-	"github.com/masterbelt/masterbelt/pkg/belt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/belt/types"
 	"github.com/masterbelt/masterbelt/pkg/project"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
@@ -115,7 +114,7 @@ func memberItems(doc view, offset int) ([]protocol.CompletionItem, bool) {
 	// A query binding (the c in where(fn(c) -> ...)) is a columns<M>: its members are
 	// the master's columns, named by its row fields, not real value members. They
 	// claim the position — a columns<M> has no value methods or fields of its own.
-	if cols, ok := columnsMemberItems(recv); ok {
+	if cols, ok := columnsMemberItems(doc, recv); ok {
 		return cols, true
 	}
 	// The value-position members of the receiver's type (methods, getters, fields)
@@ -225,16 +224,15 @@ func valueMemberItems(doc view, recv ir.Type) []protocol.CompletionItem {
 // columnsMemberItems offers the columns of a query binding: a member access on a
 // columns<M> receiver (the c in where(fn(c) -> ...)) names M's row fields, each read as
 // the column<M, fieldType> the field's value type lifts to in query mode — so the
-// completion is the master's fields, the columns a predicate compares. It reports false
-// for any other receiver, including a user type that shadows the columns name (matched
-// by the prelude builtin and a master argument, as the checker's columnsFieldType is),
+// completion is the master's fields, the columns a predicate compares. The columns
+// builtin is matched by identity (QueryColumnsMaster), so a user type that shadows the
+// columns name is not mistaken for it; that and any other receiver report false,
 // leaving the ordinary value-member path to it.
-func columnsMemberItems(recv ir.Type) ([]protocol.CompletionItem, bool) {
-	app, ok := recv.(*ir.App)
-	if !ok || app.Def == nil || app.Def.Name != builtin.NameColumns || len(app.Args) != 1 {
+func columnsMemberItems(doc view, recv ir.Type) ([]protocol.CompletionItem, bool) {
+	master, ok := doc.QueryColumnsMaster(recv)
+	if !ok {
 		return nil, false
 	}
-	master := app.Args[0]
 	if n, ok := master.(*ir.Named); !ok || n.Def == nil || n.Def.Master == nil {
 		return nil, false
 	}

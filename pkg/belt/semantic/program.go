@@ -231,6 +231,24 @@ func (p *Program) ReceiverMethods(recv ir.Type) ([]*ir.Method, map[string]ir.Typ
 	return types.ReceiverMethods(p.db.reg, recv)
 }
 
+// QueryColumnsMaster returns the master a query binding's columns<M> type names — the
+// receiver of a query column access, the c in where(fn(c) -> ...) — together with true.
+// The columns builtin is matched by identity against the registry's definition, not by
+// name, so a file that declares its own generic type columns<T> is not mistaken for the
+// query binding (the rule columnsFieldType resolves a column access by). ok is false for
+// any other type.
+func (p *Program) QueryColumnsMaster(recv ir.Type) (ir.Type, bool) {
+	app, ok := recv.(*ir.App)
+	if !ok || len(app.Args) != 1 {
+		return nil, false
+	}
+	def, ok := p.db.reg.Lookup(builtin.NameColumns)
+	if !ok || app.Def != def {
+		return nil, false
+	}
+	return app.Args[0], true
+}
+
 // FileOf returns the file a constant of the last Refresh is declared in.
 func (p *Program) FileOf(c *ir.Const) (FileID, bool) {
 	if c == nil || c.Syntax == nil {

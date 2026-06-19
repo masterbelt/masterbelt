@@ -413,3 +413,24 @@ func TestCompletionQueryColumns(t *testing.T) {
 		})
 	}
 }
+
+// TestCompletionUserColumnsNotMistaken pins that the column completion matches the
+// prelude columns builtin by identity, not by name: a file that declares its own
+// generic type columns<T> and accesses a member of it gets that type's real fields,
+// not a master's row columns, even when the argument is a master.
+func TestCompletionUserColumnsNotMistaken(t *testing.T) {
+	src := "type columns<T> = { mine: T }\n" +
+		"master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n" +
+		"fn probe(c: columns<Cards>): int {\n  return c.\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "c.\n") + len("c.")
+	items := byLabel(completion(doc, off).Items)
+	if _, ok := items["mine"]; !ok {
+		t.Errorf("a user columns<T> should offer its own field mine: %v", labels(items))
+	}
+	for _, col := range []string{"id", "cost"} {
+		if _, ok := items[col]; ok {
+			t.Errorf("a user columns<T> must not be mistaken for the query binding (offered master column %q): %v", col, labels(items))
+		}
+	}
+}
