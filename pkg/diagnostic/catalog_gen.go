@@ -575,14 +575,6 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "master " + f["master"].String() + " has no field " + f["key"].String() + " named by its primary key"
 		}
 	},
-	"belt.semantic.master_validate_all_relation_unsupported": func(loc Locale, f map[string]fmt.Stringer) string {
-		switch loc {
-		case "ja":
-			return "master " + f["master"].String() + " の validate all チェックは relation クエリ(master への where/count/sum)をまだサポートしていません"
-		default:
-			return "a validate all check of master " + f["master"].String() + " does not support a relation query (where/count/sum over a master) yet"
-		}
-	},
 	"belt.semantic.master_validate_not_assert": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

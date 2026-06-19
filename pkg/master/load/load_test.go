@@ -773,6 +773,58 @@ func TestValidateAllRelationUnionMatchReturn(t *testing.T) {
 	}
 }
 
+// TestValidateAllDirectFilteredCount pins that a relation query written directly in a
+// validate all check — not reached through a static fn — drives against the loaded rows:
+// Cards.where(power > 10).count() is two of three rows, asserted == 2. The bare row count
+// is three, so this passes only because the filter actually runs.
+func TestValidateAllDirectFilteredCount(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.where(fn(c) -> c.power > 10).count() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,20\n3,30\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("direct filtered count == 2: table_validation_failed = %d, want 0 (two rows have power > 10)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllDirectFilteredCountRejectsWrong is the negative twin: the same direct
+// query asserted == 3 (the row count, not the filtered count) must fail, proving the
+// filter runs rather than the check reading the bare row count.
+func TestValidateAllDirectFilteredCountRejectsWrong(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.where(fn(c) -> c.power > 10).count() == 3\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,20\n3,30\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) == 0 {
+		t.Error("direct filtered count == 3 must fail: only two rows have power > 10, so a pass means the filter was not run")
+	}
+}
+
+// TestValidateAllDirectFilteredSum pins a direct filtered sum: the powers above 10 are
+// 20 and 30, summing to 50.
+func TestValidateAllDirectFilteredSum(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.where(fn(c) -> c.power > 10).sum(fn(c) -> c.power) == 50\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,20\n3,30\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("direct filtered sum == 50: table_validation_failed = %d, want 0 (20 + 30)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllDirectExplicitCount pins the explicit count method on the master
+// relation (Cards.count(), distinct from the bare count keyword) folding to the row
+// count.
+func TestValidateAllDirectExplicitCount(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.count() == 3\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,20\n3,30\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("direct explicit count == 3: table_validation_failed = %d, want 0", countTableFailures(diags))
+	}
+}
+
 // TestValidateAllWideEnumColumnIgnored pins that an enum column whose member value is
 // beyond SQLite's range does not disable aggregates over the other columns, the enum
 // twin of the wide-integer-column rule: an unused enum with an overwide member is left

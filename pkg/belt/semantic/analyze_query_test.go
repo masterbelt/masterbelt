@@ -47,8 +47,8 @@ func probeReturnType(m *ir.Module) ir.Type {
 // TestRelationCountInValidateAll pins that a relation count over a master name is
 // not mistaken for a type-member access in a validate all assertion: the reference
 // walk treats Item.where/Item.count as relation methods, so no unknown_associated_const
-// is reported. The query is rejected with a dedicated unsupported diagnostic instead
-// (TestRelationQueryInValidateAllRejected), not the wrong type-member finding.
+// is reported. The query itself is accepted (TestRelationQueryInValidateAllAccepted),
+// not flagged as the wrong type-member finding.
 func TestRelationCountInValidateAll(t *testing.T) {
 	src := "master Item {\n  record { id: int, power: int }\n  primary id\n" +
 		"  validate {\n    all {\n      assert Item.where(fn(c) -> c.power > 10).count() < 50\n    }\n  }\n}\n"
@@ -58,31 +58,25 @@ func TestRelationCountInValidateAll(t *testing.T) {
 	}
 }
 
-// TestRelationQueryInValidateAllRejected pins that a relation query (a where/count
-// chain over a master) in a validate all check is rejected at compile time rather
-// than accepted and then mis-evaluated by the data layer. The per-table data fold
-// substitutes the table's row count, not a filtered relation count, so an accepted
-// filtered query would silently fail a valid table; until the loader drives such a
-// query the check is reported. A bare count (the relation's row count) stays
-// supported, and a relation query in a function body still resolves — only the
-// validate all check, whose data fold cannot run it yet, is rejected.
-func TestRelationQueryInValidateAllRejected(t *testing.T) {
+// TestRelationQueryInValidateAllAccepted pins that a relation query (a where/count/sum
+// chain over a master) directly in a validate all check is accepted: the data layer
+// drives it against the loaded rows, the same folder the static-fn path already uses,
+// so a filtered count is no longer rejected at compile time. A query it cannot drive
+// fails safe at load rather than being a compile error, matching the static-fn path.
+// The end-to-end folding is pinned in the load tests; here the check is that the
+// well-typed query is no longer reported.
+func TestRelationQueryInValidateAllAccepted(t *testing.T) {
 	for _, body := range []string{
 		"Item.where(fn(c) -> c.power > 10).count() < 50",
+		"Item.where(fn(c) -> c.power > 10).sum(fn(c) -> c.power) < 50",
 		"Item.count() < 50",
+		"count < 50",
 	} {
 		src := "master Item {\n  record { id: int, power: int }\n  primary id\n" +
 			"  validate {\n    all {\n      assert " + body + "\n    }\n  }\n}\n"
-		_, diags := analyze(src)
-		if !hasCode(diags, CodeMasterValidateAllRelationUnsupported) {
-			t.Errorf("%q: want master_validate_all_relation_unsupported, got %v", body, codes(diags))
+		if _, diags := analyze(src); len(diags) != 0 {
+			t.Errorf("%q: a relation query in validate all must be accepted, got %v", body, codes(diags))
 		}
-	}
-	// A bare count (RelationCount, no relation query) is the supported per-table form.
-	bare := "master Item {\n  record { id: int, power: int }\n  primary id\n" +
-		"  validate {\n    all {\n      assert count < 50\n    }\n  }\n}\n"
-	if _, diags := analyze(bare); hasCode(diags, CodeMasterValidateAllRelationUnsupported) {
-		t.Errorf("a bare count must stay supported in validate all, got %v", codes(diags))
 	}
 }
 
