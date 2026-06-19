@@ -127,6 +127,14 @@ func (v view) QueryColumns(recv ir.Type) ([]ir.Field, bool) {
 	return v.ws.prog.QueryColumns(recv)
 }
 
+func (v view) ResolvedMethodCall(call *ast.CallExpr) (*ir.Method, bool) {
+	return v.ws.prog.ResolvedMethodCall(v.id, call)
+}
+
+func (v view) AssignTargetReceiverType(member *ast.MemberExpr) (ir.Type, bool) {
+	return v.ws.prog.AssignTargetReceiverType(v.id, member)
+}
+
 func (v view) FuncLitTypes() map[*ast.FuncLit]*ir.Func { return v.ws.prog.FuncLitTypes(v.id) }
 
 // ExprTypes is the type the checker settled for every expression node it typed

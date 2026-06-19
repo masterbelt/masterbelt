@@ -211,48 +211,69 @@ func memberMethodDefinition(doc view, offset int, trees map[cst.Green]cst.Tree) 
 	if !ok {
 		return nil, false
 	}
-	// A static fn or a scope entry (desugared to one) is reached through the type name
-	// — Cards.zero, Cards.expensive — not the receiver's value type, so it resolves
-	// through the type's static methods, the same path the static-fn hover takes. It is
-	// tried first so a static fn that shadows a relation method navigates to the fn.
-	if locs := methodDeclLocations(doc, staticMethodsAt(doc, member)); len(locs) > 0 {
-		return locs, true
+	// A member access used as a call's callee — Cards.zero(), x.inc(), Type.eql(...) —
+	// resolves through the checker's lowered call, so the value-binding, metatype, and
+	// type-parameter rules the checker applied carry over instead of being re-derived.
+	// A member access that is not a call (a field or getter read, a setter write) is a
+	// distinct member space, so it never navigates a read to a method declaration.
+	if call, ok := callWithCallee(doc, member); ok {
+		if m, ok := doc.ResolvedMethodCall(call); ok {
+			if locs := methodDeclLocations(doc, []*ir.Method{m}); len(locs) > 0 {
+				return locs, true
+			}
+		}
+		return nil, false
 	}
-	// A value method (x.inc(), a getter, a setter) or a relation method resolves through
-	// the receiver's type, the same resolution memberHover uses.
+	// A member read or write that is not a call resolves to an accessor — a getter on a
+	// read, a setter on a write — through the receiver's type. A plain field read has no
+	// such method, so it navigates nowhere here rather than to a same-named method.
 	recv := receiverTypeOf(doc, member.Receiver, trees, offset, doc.ExprTypes())
 	if recv == nil || recv == ir.Invalid {
-		return nil, false
+		// The checker does not type an assignment target's receiver (c.fahrenheit = v),
+		// so read it off the lowered setter call instead — the one member access whose
+		// receiver receiverTypeOf cannot settle.
+		recv, ok = doc.AssignTargetReceiverType(member)
+		if !ok {
+			return nil, false
+		}
 	}
-	ms, _, ok := doc.MethodCandidates(recv, member.Member.Name)
-	if !ok {
-		return nil, false
-	}
-	if locs := methodDeclLocations(doc, ms); len(locs) > 0 {
+	if locs := methodDeclLocations(doc, accessorMethods(doc, recv, member.Member.Name)); len(locs) > 0 {
 		return locs, true
 	}
 	return nil, false
 }
 
-// staticMethodsAt returns the static-fn methods a member access names through a type
-// name — Cards.zero, Celsius.freezing — or nil when the receiver is not a bare type
-// name a value does not shadow. A scope entry is one of these, lowered to a static fn.
-func staticMethodsAt(doc view, member *ast.MemberExpr) []*ir.Method {
-	recv, ok := member.Receiver.(*ast.Identifier)
-	if !ok || doc.Resolve(recv) != nil {
-		return nil // a value shadowing the type name is a value access
-	}
-	def := lookupTypeName(doc, recv.Name)
-	if def == nil {
+// callWithCallee returns the call expression whose callee is member — so a member
+// access is resolved as a method only when it is actually called — or false when the
+// member access is a read or the left of a write, not a call.
+func callWithCallee(doc view, member *ast.MemberExpr) (*ast.CallExpr, bool) {
+	var call *ast.CallExpr
+	forEachExpr(doc.AST().File(), func(e ast.Expr) {
+		if c, ok := e.(*ast.CallExpr); ok {
+			if m, ok := c.Callee.(*ast.MemberExpr); ok && m.Syntax() == member.Syntax() {
+				call = c
+			}
+		}
+	})
+	return call, call != nil
+}
+
+// accessorMethods returns the getter and setter methods named name that recv binds —
+// the accessors a member read (value.name) or write (value.name = x) navigates to.
+// Ordinary methods are not accessors and are reached only through a call, so they are
+// left out here; a plain field, which is not a method, yields none.
+func accessorMethods(doc view, recv ir.Type, name string) []*ir.Method {
+	ms, _, ok := doc.ReceiverMethods(recv)
+	if !ok {
 		return nil
 	}
-	var statics []*ir.Method
-	for _, m := range def.Methods {
-		if m.Kind == ir.MethodStatic && m.Name == member.Member.Name {
-			statics = append(statics, m)
+	var accessors []*ir.Method
+	for _, m := range ms {
+		if (m.Kind == ir.MethodGetter || m.Kind == ir.MethodSetter) && m.Name == name {
+			accessors = append(accessors, m)
 		}
 	}
-	return statics
+	return accessors
 }
 
 // methodDeclLocations maps methods to the locations of their declaration names,

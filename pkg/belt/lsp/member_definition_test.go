@@ -3,6 +3,10 @@ package lsp
 import (
 	"strings"
 	"testing"
+
+	protocol "github.com/owenrumney/go-lsp/lsp"
+
+	"github.com/masterbelt/masterbelt/pkg/source"
 )
 
 // memberDefSrc declares a master with a static fn and a scope entry, a plain type
@@ -64,4 +68,110 @@ func TestDefinitionRelationBuiltinHasNoLocation(t *testing.T) {
 	if locs := definition(doc, off); len(locs) != 0 {
 		t.Errorf("a relation builtin has no navigable declaration; want 0 locations, got %d: %+v", len(locs), locs)
 	}
+}
+
+// TestDefinitionMemberValueBindingWins pins that a value binding whose name shadows a
+// type wins the member call: a parameter named Cards typed as another type, calling
+// Cards.zero(), navigates to that type's zero method, not the master's same-named
+// static fn — definition reads the checker's lowered call, which resolved the value
+// binding, rather than re-deriving the static fn through the shadowed type name.
+func TestDefinitionMemberValueBindingWins(t *testing.T) {
+	src := "master Cards {\n  record { id: int } impl {\n    pub static fn zero(): nint {\n      return 0\n    }\n  }\n  primary id\n}\n" +
+		"pub type Other = int impl {\n  pub fn zero(): nint {\n    return 0\n  }\n}\n" +
+		"fn f(Cards: Other): nint {\n  return Cards.zero()\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "Cards.zero()") + len("Cards.")
+	locs := definition(doc, off)
+	if len(locs) != 1 {
+		t.Fatalf("definition(Cards.zero()) = %d locations, want 1", len(locs))
+	}
+	start := fromPosition(doc.Buffer(), locs[0].Range.Start)
+	wantOther := strings.Index(src, "pub fn zero(): nint") + len("pub fn ")
+	wrongStatic := strings.Index(src, "pub static fn zero(): nint") + len("pub static fn ")
+	if start == wrongStatic {
+		t.Errorf("definition jumped to the master's static fn; the parameter Cards: Other shadows it, want Other.zero")
+	}
+	if start != wantOther {
+		t.Errorf("definition start offset = %d, want Other.zero at %d", start, wantOther)
+	}
+}
+
+// TestDefinitionMemberReadIsNotMethod pins that a member access used as a read, not a
+// call, does not navigate to a same-named method: x.inc (a method value) yields no
+// location, while x.inc() (a call) navigates to inc — method and read are distinct
+// member spaces, so only the call resolves the method.
+func TestDefinitionMemberReadIsNotMethod(t *testing.T) {
+	src := "pub type Counter = int impl {\n  pub fn inc(): self {\n    return self\n  }\n}\n" +
+		"fn f(x: Counter): Counter {\n  let y = x.inc\n  return x.inc()\n}\n"
+	doc := testView(src)
+
+	read := strings.Index(src, "x.inc\n") + len("x.")
+	if locs := definition(doc, read); len(locs) != 0 {
+		t.Errorf("a member read is not a method call; x.inc must navigate nowhere, got %d: %+v", len(locs), locs)
+	}
+
+	call := strings.Index(src, "x.inc()") + len("x.")
+	locs := definition(doc, call)
+	if len(locs) != 1 {
+		t.Fatalf("definition(x.inc()) = %d locations, want 1 (the method)", len(locs))
+	}
+	start := fromPosition(doc.Buffer(), locs[0].Range.Start)
+	if got := src[start : start+len("inc")]; got != "inc" {
+		t.Errorf("definition(x.inc()) covers %q, want the method name inc", got)
+	}
+}
+
+// TestDefinitionMetatypeMethodNotStatic pins that a metatype method call on a bare
+// type name resolves to the metatype method, not a same-named static fn: Level.eql(Level)
+// compares two type values through the builtin metatype eql even though Level also
+// declares a static fn eql, so definition navigates nowhere (the metatype method has no
+// declaration) rather than jumping to the static fn the checker did not resolve.
+func TestDefinitionMetatypeMethodNotStatic(t *testing.T) {
+	src := "pub type Level = sbyte impl {\n  pub static fn eql(o: Level): bool {\n    return true\n  }\n}\n" +
+		"assert Level.eql(Level)\n"
+	doc := testView(src)
+	off := strings.Index(src, "Level.eql(Level)\n") + len("Level.")
+	if locs := definition(doc, off); len(locs) != 0 {
+		t.Errorf("Level.eql resolves to the metatype method, not the static fn; want 0 locations, got %d: %+v", len(locs), locs)
+	}
+}
+
+// TestDefinitionAccessor pins that a getter read and a setter write navigate to the
+// accessor declaration — the member access that is not a call resolves through the
+// receiver's getters and setters, so it lands on the property's accessor rather than
+// falling through to no location.
+func TestDefinitionAccessor(t *testing.T) {
+	src := accessorType +
+		"const Cref: Celsius = Celsius{ deg: 0 }\n" +
+		"const RF: nint = Cref.fahrenheit\n" +
+		"fn boil(): Celsius {\n  let c = Celsius.freezing()\n  c.fahrenheit = 212\n  return c\n}\n"
+	doc := testView(src)
+	buf := doc.Buffer()
+	getterDecl := strings.Index(src, "pub get fahrenheit") + len("pub get ")
+	setterDecl := strings.Index(src, "pub set fahrenheit") + len("pub set ")
+
+	t.Run("getter read", func(t *testing.T) {
+		off := strings.Index(src, "Cref.fahrenheit") + len("Cref.")
+		locs := definition(doc, off)
+		if !coversOffset(buf, locs, getterDecl) {
+			t.Errorf("a getter read should navigate to the getter declaration at %d; got %+v", getterDecl, locs)
+		}
+	})
+	t.Run("setter write", func(t *testing.T) {
+		off := strings.Index(src, "c.fahrenheit = 212") + len("c.")
+		locs := definition(doc, off)
+		if !coversOffset(buf, locs, setterDecl) {
+			t.Errorf("a setter write should navigate to the setter declaration at %d; got %+v", setterDecl, locs)
+		}
+	})
+}
+
+// coversOffset reports whether some location's start is exactly at off.
+func coversOffset(buf source.Buffer, locs []protocol.Location, off int) bool {
+	for _, l := range locs {
+		if fromPosition(buf, l.Range.Start) == off {
+			return true
+		}
+	}
+	return false
 }
