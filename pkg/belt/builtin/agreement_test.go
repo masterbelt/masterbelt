@@ -103,14 +103,15 @@ func TestEveryPureExternIsBacked(t *testing.T) {
 	// The builtins the registry does not natively model. The collections and range
 	// are folder-implemented — declared `= builtin`, no NativeType, the folder
 	// supplies their method semantics (collection/range intrinsics). The query
-	// algebra (column/predicate/columns) is the other kind: its operators never
-	// fold to a value at all — a column comparison is a predicate the query
-	// lowering renders to SQL, not a constant the folder reduces — so it has no
-	// NativeType and no intrinsic, and the query lowering, not the folder, gives it
-	// meaning. Growing this set is a deliberate act, not drift.
+	// algebra (column/predicate/columns/ordering) is the other kind: its operators
+	// never fold to a value at all — a column comparison is a predicate, and a column
+	// ordering an ordering, the query lowering renders to SQL, not a constant the
+	// folder reduces — so it has no NativeType and no intrinsic, and the query
+	// lowering, not the folder, gives it meaning. Growing this set is a deliberate
+	// act, not drift.
 	evalImplemented := map[string]bool{
 		"list": true, "map": true, "range": true,
-		"column": true, "predicate": true, "columns": true, "relation": true,
+		"column": true, "predicate": true, "columns": true, "relation": true, "ordering": true,
 	}
 	for _, d := range defs {
 		if !d.Builtin {

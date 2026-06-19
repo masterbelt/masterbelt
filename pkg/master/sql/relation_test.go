@@ -83,6 +83,26 @@ func TestRelationLimitKeepsSmaller(t *testing.T) {
 	}
 }
 
+// TestRelationRowKeysOrder pins the row-key select with sort keys: each key renders in
+// priority order (descending carries DESC, ascending bare), then the synthetic key as
+// the final tiebreaker so the order stays total and deterministic.
+func TestRelationRowKeysOrder(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		rel  sql.Relation
+		want string
+	}{
+		{"descending", sql.All().OrderBy("power", true), `SELECT "k" FROM "rows" ORDER BY "power" DESC, "k"`},
+		{"ascending", sql.All().OrderBy("power", false), `SELECT "k" FROM "rows" ORDER BY "power", "k"`},
+		{"primary then tiebreak", sql.All().OrderBy("power", true).OrderBy("id", false), `SELECT "k" FROM "rows" ORDER BY "power" DESC, "id", "k"`},
+		{"order then limit", sql.All().OrderBy("power", true).Limit(2), `SELECT "k" FROM "rows" ORDER BY "power" DESC, "k" LIMIT 2`},
+	} {
+		if got, _ := c.rel.RowKeysSQL("k", "rows", sql.SQLite); got != c.want {
+			t.Errorf("%s: RowKeysSQL = %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
 // TestRelationWhereIntersects pins that narrowing a relation that already has a
 // filter keeps both — the predicates are conjoined with AND and their binds
 // merged in order — rather than the second replacing the first. A consumer that

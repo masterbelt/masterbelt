@@ -1,6 +1,9 @@
 package sql
 
-import "strconv"
+import (
+	"strconv"
+	"strings"
+)
 
 // Relation is a single-table query over a master's rows: an optional row filter
 // (the where predicate) and an optional row cap (the limit). It is the shared
@@ -10,9 +13,17 @@ import "strconv"
 // Order, joins, and the other aggregates (min/max) are later slices on this same
 // type.
 type Relation struct {
-	where   Predicate // the row filter; a zero Predicate matches every row
-	limit   int64     // the row cap, valid when limited
-	limited bool      // whether a limit is set
+	where   Predicate  // the row filter; a zero Predicate matches every row
+	order   []OrderKey // the sort keys, primary first; empty is insert order
+	limit   int64      // the row cap, valid when limited
+	limited bool       // whether a limit is set
+}
+
+// OrderKey is one sort key of a relation's order: the column to sort by and whether
+// it descends (ascending otherwise).
+type OrderKey struct {
+	Column string
+	Desc   bool
 }
 
 // All is the relation of every row of a master — no filter.
@@ -25,6 +36,20 @@ func All() Relation { return Relation{} }
 // — by conjoining them with AND.
 func (r Relation) Where(p Predicate) Relation {
 	r.where = r.where.and(p)
+	return r
+}
+
+// OrderBy returns the relation sorted by an added key, the column and its direction,
+// appended after the existing keys as a lower-priority (tiebreaker) sort. The chain
+// recognizer adds the source's outermost order first, which is the last applied and so
+// the primary key — order(a).order(b) sorts by b, then a — so adding primary-first here
+// renders ORDER BY in priority order. The keys are copied rather than appended in
+// place, so ordering a relation never mutates one derived from the same base.
+func (r Relation) OrderBy(column string, desc bool) Relation {
+	next := make([]OrderKey, 0, len(r.order)+1)
+	next = append(next, r.order...)
+	next = append(next, OrderKey{Column: column, Desc: desc})
+	r.order = next
 	return r
 }
 
@@ -55,7 +80,20 @@ func (r Relation) RowKeysSQL(keyCol, table string, d Dialect) (string, []Bind) {
 	if frag != "" {
 		q += " WHERE " + frag
 	}
-	q += " ORDER BY " + d.QuoteIdent(keyCol)
+	// The relation's sort keys come first, then the synthetic key as the final
+	// tiebreaker so the order is total and the result deterministic even when the
+	// sort columns tie (or there are none — the unordered relation reads in insert
+	// order). Ascending is the default; a descending key carries DESC.
+	keys := make([]string, 0, len(r.order)+1)
+	for _, k := range r.order {
+		term := d.QuoteIdent(k.Column)
+		if k.Desc {
+			term += " DESC"
+		}
+		keys = append(keys, term)
+	}
+	keys = append(keys, d.QuoteIdent(keyCol))
+	q += " ORDER BY " + strings.Join(keys, ", ")
 	if r.limited {
 		q += " LIMIT " + strconv.FormatInt(r.limit, 10)
 	}

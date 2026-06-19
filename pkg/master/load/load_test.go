@@ -948,6 +948,59 @@ func TestValidateAllLimitBeforeWhereFailsSafe(t *testing.T) {
 	}
 }
 
+// TestValidateAllOrderSortsRows pins that order sorts the materialized rows by the
+// column the selector names, in the chosen direction: with powers 5, 30, 20, the
+// descending order reads 30 first (id 2) and the ascending order reads 5 first, and a
+// filter, order, and limit compose — the smallest power above 10 is 20.
+func TestValidateAllOrderSortsRows(t *testing.T) {
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,30\n3,20\n"}
+	for _, c := range []struct {
+		name string
+		body string
+	}{
+		{"desc top", "Cards.order(fn(c) -> c.power.desc()).to_list()[0].id == 2"},
+		{"desc value", "Cards.order(fn(c) -> c.power.desc()).limit(1).to_list()[0].power == 30"},
+		{"asc top", "Cards.order(fn(c) -> c.power.asc()).to_list()[0].power == 5"},
+		{"filter order cap", "Cards.where(fn(c) -> c.power > 10).order(fn(c) -> c.power.asc()).limit(1).to_list()[0].power == 20"},
+		{"order ignored by count", "Cards.order(fn(c) -> c.power.desc()).count() == 3"},
+	} {
+		belt := "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+			"  validate {\n    all {\n      assert " + c.body + "\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+		if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+			t.Errorf("%s (%s): table_validation_failed = %d, want 0", c.name, c.body, countTableFailures(diags))
+		}
+	}
+}
+
+// TestValidateAllOrderRejectsWrong is the negative twin: an order assertion that does
+// not hold of the sorted rows must fail, proving the rows are really sorted rather than
+// passing vacuously — the descending top is power 30, not 5.
+func TestValidateAllOrderRejectsWrong(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.order(fn(c) -> c.power.desc()).to_list()[0].power == 5\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,30\n3,20\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) == 0 {
+		t.Error("descending top power == 5 must fail: the highest power is 30, so a pass means the rows were not sorted")
+	}
+}
+
+// TestValidateAllLimitBeforeOrderFailsSafe pins that an order applied after a limit
+// fails safe, the order twin of limit-before-where: the flat render sorts before it
+// caps, so capping the unsorted relation then sorting (limit(2).order(...)) cannot be
+// expressed and is left unfoldable rather than returning the sorted top of the whole
+// table.
+func TestValidateAllLimitBeforeOrderFailsSafe(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.limit(2).order(fn(c) -> c.power.desc()).to_list()[0].power == 30\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,30\n3,20\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) == 0 {
+		t.Error("limit(2).order(...) must fail safe: the cap applies before the sort, which the flat render cannot express")
+	}
+}
+
 // TestValidateAllWideEnumColumnIgnored pins that an enum column whose member value is
 // beyond SQLite's range does not disable aggregates over the other columns, the enum
 // twin of the wide-integer-column rule: an unused enum with an overwide member is left

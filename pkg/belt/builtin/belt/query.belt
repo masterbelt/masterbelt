@@ -31,6 +31,12 @@ pub type column<M, T> = builtin<M, T> impl {
   /// The >= operator.
   pub extern fn gteq(value: T): predicate<M>
 
+  /// The ascending ordering of this column — the relation's rows from this
+  /// column's least value to its greatest. A relation's order reads it.
+  pub extern fn asc(): ordering<M>
+  /// The descending ordering of this column — from greatest to least.
+  pub extern fn desc(): ordering<M>
+
   /// The == operator against another column of the same master.
   pub extern fn eql(other: column<M, T>): predicate<M>
   /// The != operator against another column.
@@ -57,6 +63,13 @@ pub type predicate<M> = builtin<M> impl {
   /// The ! operator: the predicate does not hold (SQL NOT).
   pub extern fn not(): predicate<M>
 }
+
+/// An ordering of master M's rows by a column — the sort key a relation's order
+/// reads. A column yields one with its asc or desc getter; the relation's order
+/// composes them, the materialized rows coming back in that order. Like the rest of
+/// the query algebra it is a `= builtin` with no native: an ordering is not a
+/// comptime value the evaluator folds but a sort the query driver applies.
+pub type ordering<M> = builtin<M>
 
 /// The columns of master M, the type of a query binding (the c in
 /// where(fn(c) -> ...)). A field access off it reads that column as a
@@ -86,6 +99,12 @@ pub type relation<M> = builtin<M> impl {
   /// widening SQL gives a sum — so it inhabits a type wide enough to hold it. An
   /// empty relation sums to zero.
   pub extern fn sum<T: numeric>(selector: fn(c: columns<M>): column<M, T>): nint
+
+  /// Order the relation's rows by the column the selector names — c.cost.asc or
+  /// c.cost.desc — the sort the materialized rows (to_list) come back in. The result
+  /// is a relation, so it composes; ordering again makes the later key primary and
+  /// the earlier one its tiebreaker.
+  pub extern fn order(by: fn(c: columns<M>): ordering<M>): relation<M>
 
   /// Keep at most n of the relation's rows, in the relation's order. The result is
   /// a relation, so it composes — narrowed first, then limited, then materialized.

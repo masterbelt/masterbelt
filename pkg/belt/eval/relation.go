@@ -48,6 +48,16 @@ func graphRelationMethod(v *ir.Call, recv *ir.Constant, ctx graphCtx) (*ir.Const
 		out.Receiver = recv.Relation
 		out.Args = []ir.Value{substituteWhereScalars(v.Args[0], ctx)}
 		return ir.RelationConstant(&out), true
+	case "order":
+		// The order selector names a column and a direction (c.cost.desc()) — no captured
+		// scalar to fold — so the chain carries it unchanged; the driver reads the column
+		// and direction from it.
+		if len(v.Args) != 1 {
+			return nil, true
+		}
+		out := *v
+		out.Receiver = recv.Relation
+		return ir.RelationConstant(&out), true
 	case "limit":
 		if len(v.Args) != 1 {
 			return nil, true
