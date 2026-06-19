@@ -825,6 +825,129 @@ func TestValidateAllDirectExplicitCount(t *testing.T) {
 	}
 }
 
+// TestValidateAllToListMaterializesRows pins that to_list() materializes the
+// relation's rows as a list the check reads: the unfiltered list has every row, and
+// a filtered list reads the actual field values of the rows the predicate keeps —
+// power > 10 keeps two rows, the first of which has power 20.
+func TestValidateAllToListMaterializesRows(t *testing.T) {
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,20\n3,30\n"}
+	for _, c := range []struct {
+		name string
+		body string
+	}{
+		{"all rows", "Cards.to_list().len() == 3"},
+		{"filtered count", "Cards.where(fn(c) -> c.power > 10).to_list().len() == 2"},
+		{"filtered field", "Cards.where(fn(c) -> c.power > 10).to_list()[0].power == 20"},
+	} {
+		belt := "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+			"  validate {\n    all {\n      assert " + c.body + "\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+		if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+			t.Errorf("%s (%s): table_validation_failed = %d, want 0", c.name, c.body, countTableFailures(diags))
+		}
+	}
+}
+
+// TestValidateAllToListRejectsWrong is the negative twin: a to_list assertion that
+// does not hold of the real rows must fail, proving the list carries the actual data
+// rather than passing vacuously.
+func TestValidateAllToListRejectsWrong(t *testing.T) {
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,20\n3,30\n"}
+	for _, body := range []string{
+		"Cards.where(fn(c) -> c.power > 10).to_list().len() == 3",
+		"Cards.to_list()[0].power == 99",
+	} {
+		belt := "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+			"  validate {\n    all {\n      assert " + body + "\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+		if _, diags := run(t, belt, bases, files); countTableFailures(diags) == 0 {
+			t.Errorf("%q must fail: the assertion does not hold of the real rows", body)
+		}
+	}
+}
+
+// TestValidateAllLimitCapsRows pins that limit(n) caps the materialized rows to n, in
+// the relation's (insert) order: limit(2).to_list() is the first two rows, so its
+// first element is row id 1; a filtered limit reads the first kept row's field.
+func TestValidateAllLimitCapsRows(t *testing.T) {
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,20\n3,30\n"}
+	for _, c := range []struct {
+		name string
+		body string
+	}{
+		{"cap count", "Cards.limit(2).to_list().len() == 2"},
+		{"cap order", "Cards.limit(2).to_list()[0].id == 1"},
+		{"filter then cap", "Cards.where(fn(c) -> c.power > 10).limit(1).to_list()[0].power == 20"},
+	} {
+		belt := "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+			"  validate {\n    all {\n      assert " + c.body + "\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+		if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+			t.Errorf("%s (%s): table_validation_failed = %d, want 0", c.name, c.body, countTableFailures(diags))
+		}
+	}
+}
+
+// TestValidateAllLimitedCountFailsSafe pins the boundary that a count or sum does not
+// respect a limit: limit(2).count() over three rows really is two, but because a count
+// query ignores the cap the chain is left unfoldable and the check fails safe rather
+// than reporting a possibly-wrong number. A limited materialization (to_list) is the
+// supported way to observe a cap.
+func TestValidateAllLimitedCountFailsSafe(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.limit(2).count() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,20\n3,30\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) == 0 {
+		t.Error("limit(2).count() == 2 must fail safe: count ignores the limit, so the chain is left unfoldable")
+	}
+}
+
+// TestValidateAllLimitRefinedArgFailsSafe pins that a limit whose cap is a refined
+// conversion the data violates fails safe rather than rendering the unchecked literal:
+// Positive(n) for a data-dependent n of 0 (the count of a relation no row matches) is a
+// refused conversion, so the cap is left whole and the materialization is left
+// unfoldable. Without the admission guard the cap would fold to LIMIT 0 and the empty
+// list would pass the assertion through a conversion that should have been refused.
+func TestValidateAllLimitRefinedArgFailsSafe(t *testing.T) {
+	const belt = "type Positive = nint where self > 0\n" +
+		"master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.limit(Positive(Cards.where(fn(c) -> c.power > 1000).count())).to_list().len() == 0\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,20\n3,30\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) == 0 {
+		t.Error("limit(Positive(0)) must fail safe: 0 does not inhabit Positive, so the refused conversion must not render LIMIT 0")
+	}
+}
+
+// TestValidateAllLimitClampsHugeCap pins that a cap wider than int64 — a valid nint the
+// signature accepts — clamps to no effective cap rather than failing safe: limit of a
+// value past int64 reads every row, since no table holds that many.
+func TestValidateAllLimitClampsHugeCap(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.limit(9223372036854775808).to_list().len() == 3\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,20\n3,30\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("limit(2^63) must read every row: table_validation_failed = %d, want 0 (a cap past int64 is no effective cap)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllLimitBeforeWhereFailsSafe pins that a where applied after a limit fails
+// safe rather than filtering outside the capped relation: limit(1) keeps row 1 (id 1),
+// which where(id > 1) drops, so the result is empty. The flat WHERE-then-LIMIT render
+// cannot express filter-after-cap, so the chain is left unfoldable — and must not return
+// row 2, which it would by filtering the whole table then capping.
+func TestValidateAllLimitBeforeWhereFailsSafe(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.limit(1).where(fn(c) -> c.id > 1).to_list()[0].id == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,20\n3,30\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) == 0 {
+		t.Error("limit(1).where(id > 1) must fail safe: limit keeps row 1, which the filter drops, so it must not return row 2")
+	}
+}
+
 // TestValidateAllWideEnumColumnIgnored pins that an enum column whose member value is
 // beyond SQLite's range does not disable aggregates over the other columns, the enum
 // twin of the wide-integer-column rule: an unused enum with an overwide member is left

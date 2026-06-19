@@ -35,6 +35,54 @@ func TestRelationCountWhere(t *testing.T) {
 	}
 }
 
+// TestRelationRowKeysAll pins the unfiltered row-key select: every key, ordered by
+// the key for deterministic (insert) order, no WHERE, no LIMIT, no binds.
+func TestRelationRowKeysAll(t *testing.T) {
+	got, binds := sql.All().RowKeysSQL("k", "rows", sql.SQLite)
+	if want := `SELECT "k" FROM "rows" ORDER BY "k"`; got != want {
+		t.Errorf("RowKeysSQL = %q, want %q", got, want)
+	}
+	if len(binds) != 0 {
+		t.Errorf("binds = %d, want 0", len(binds))
+	}
+}
+
+// TestRelationRowKeysWhereLimit pins the filtered, capped row-key select: the filter
+// is the WHERE clause (with its binds), the order is by the key, and the limit is a
+// rendered integer literal after ORDER BY.
+func TestRelationRowKeysWhereLimit(t *testing.T) {
+	pred, unsupported := lowerProbe(t, "", "id: int, power: int", "c.power > 0")
+	if len(unsupported) != 0 {
+		t.Fatalf("predicate did not lower: %+v", unsupported)
+	}
+	got, binds := sql.All().Where(pred).Limit(2).RowKeysSQL("k", "rows", sql.SQLite)
+	if want := `SELECT "k" FROM "rows" WHERE ("power" > ?) ORDER BY "k" LIMIT 2`; got != want {
+		t.Errorf("RowKeysSQL = %q, want %q", got, want)
+	}
+	if b := bindsString(binds); b != "[int 0]" {
+		t.Errorf("binds = %s, want [int 0]", b)
+	}
+}
+
+// TestRelationLimitKeepsSmaller pins that re-limiting keeps the smaller cap, so the
+// row count never widens past either limit — limit(5).limit(2) and limit(2).limit(5)
+// both cap at two — and a negative limit floors at zero.
+func TestRelationLimitKeepsSmaller(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		rel  sql.Relation
+		want string
+	}{
+		{"five then two", sql.All().Limit(5).Limit(2), `SELECT "k" FROM "rows" ORDER BY "k" LIMIT 2`},
+		{"two then five", sql.All().Limit(2).Limit(5), `SELECT "k" FROM "rows" ORDER BY "k" LIMIT 2`},
+		{"negative floors to zero", sql.All().Limit(-3), `SELECT "k" FROM "rows" ORDER BY "k" LIMIT 0`},
+	} {
+		if got, _ := c.rel.RowKeysSQL("k", "rows", sql.SQLite); got != c.want {
+			t.Errorf("%s: RowKeysSQL = %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
 // TestRelationWhereIntersects pins that narrowing a relation that already has a
 // filter keeps both — the predicates are conjoined with AND and their binds
 // merged in order — rather than the second replacing the first. A consumer that

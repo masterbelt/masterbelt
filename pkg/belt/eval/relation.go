@@ -32,10 +32,12 @@ func relationOwnsUserMethod(ctx graphCtx, v *ir.Call, recv *ir.Constant) bool {
 // which the caller dispatches the ordinary way). A where narrows the chain to a new
 // relation, folding the captured scalars its predicate compares against now — at the
 // where, where the locals are in scope — so a later reassignment of a captured let
-// does not change this relation. A count or sum hands the chain to the data layer's
-// folder, which runs it against the loaded rows; the folder declines (nil) when it
-// cannot run the query — a different master, an unsupported predicate, no rows loaded —
-// so the aggregate is left unfolded and a check over it fails safe.
+// does not change this relation. A limit caps it to a new relation likewise, folding
+// its row-count argument now. A count, sum, or to_list hands the chain to the data
+// layer's folder, which runs it against the loaded rows (an aggregate value, or the
+// materialized rows for to_list); the folder declines (nil) when it cannot run the
+// query — a different master, an unsupported predicate, no rows loaded — so the result
+// is left unfolded and a check over it fails safe.
 func graphRelationMethod(v *ir.Call, recv *ir.Constant, ctx graphCtx) (*ir.Constant, bool) {
 	switch v.Method {
 	case "where":
@@ -46,7 +48,15 @@ func graphRelationMethod(v *ir.Call, recv *ir.Constant, ctx graphCtx) (*ir.Const
 		out.Receiver = recv.Relation
 		out.Args = []ir.Value{substituteWhereScalars(v.Args[0], ctx)}
 		return ir.RelationConstant(&out), true
-	case "count", "sum":
+	case "limit":
+		if len(v.Args) != 1 {
+			return nil, true
+		}
+		out := *v
+		out.Receiver = recv.Relation
+		out.Args = []ir.Value{foldScalarArg(v.Args[0], ctx)}
+		return ir.RelationConstant(&out), true
+	case "count", "sum", "to_list":
 		rf, ok := ctx.env.(RelationFolder)
 		if !ok {
 			return nil, true
@@ -58,6 +68,26 @@ func graphRelationMethod(v *ir.Call, recv *ir.Constant, ctx graphCtx) (*ir.Const
 	default:
 		return nil, false
 	}
+}
+
+// foldScalarArg folds a relation method's scalar argument — a limit's row cap — to the
+// literal the driver binds, so the chain the folder reads is self-contained: a captured
+// cap (limit(maxRows)) resolves to its value here, where the locals are in scope. The
+// fold is admitted only when the value inhabits the argument's own type, the same guard
+// substituteScalarRefs uses: a data-dependent refined conversion the rows violate
+// (limit(Positive(n)) for n = 0) folds without checking through graphConvert, so without
+// this it would render a literal a refused conversion produced. An argument that does
+// not fold to an admissible renderable scalar is left whole, so the driver declines the
+// query and a check over it fails safe.
+func foldScalarArg(arg ir.Value, ctx graphCtx) ir.Value {
+	if c := graphValue(arg, ctx); c != nil {
+		if t := ir.TypeOf(arg); t == nil || t == ir.Invalid || graphMemberAdmits(ctx, t, c) {
+			if lit := graphConstantToValue(c); lit != nil {
+				return lit
+			}
+		}
+	}
+	return arg
 }
 
 // graphConstantToValue renders a folded constant as the literal node the driver's

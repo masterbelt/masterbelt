@@ -12,6 +12,7 @@ import (
 	"math/big"
 
 	"github.com/masterbelt/masterbelt/pkg/belt/eval"
+	"github.com/masterbelt/masterbelt/pkg/master"
 	mastersql "github.com/masterbelt/masterbelt/pkg/master/sql"
 	"github.com/masterbelt/masterbelt/pkg/master/sqlite"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -28,6 +29,11 @@ type relationFold struct {
 	rows   int64
 	master *ir.TypeDef
 	env    eval.GraphEnv
+	// full is the complete typed table — every column, not just the int64-safe
+	// subset the engine stores — so a materialized row (to_list) carries all the
+	// master's fields. The engine selects which rows by their synthetic key (their
+	// index); this rebuilds the full rows from those keys.
+	full master.Table
 }
 
 // relationEnv is the fold environment the evaluator drives a per-table check in: the
@@ -51,7 +57,37 @@ func (e relationEnv) FoldRelationAggregate(chain ir.Value) (*ir.Constant, bool) 
 	if rel, col, m, unsupported, ok := mastersql.SumRelation(chain, e.fold.env); ok {
 		return e.fold.sum(rel, col, m, unsupported)
 	}
+	if rel, m, unsupported, ok := mastersql.RowsRelation(chain, e.fold.env); ok {
+		return e.fold.toList(rel, m, unsupported)
+	}
 	return nil, false
+}
+
+// toList materializes a recognized to_list query: the engine selects the synthetic
+// keys of the rows the filter keeps (capped by the limit, in key order), and the
+// full rows are rebuilt from the typed table by those keys as a list of row records.
+// A query over another master, an unsupported predicate, or an unloaded table is not
+// driven — the materialization is left unfoldable and the check fails safe.
+func (f relationFold) toList(rel mastersql.Relation, m *ir.TypeDef, unsupported []mastersql.Unsupported) (*ir.Constant, bool) {
+	if m != f.master || len(unsupported) > 0 || f.eng == nil {
+		return nil, false
+	}
+	keys, err := f.eng.RowKeys(rel)
+	if err != nil {
+		return nil, false
+	}
+	entries := make([]ir.ConstEntry, 0, len(keys))
+	for _, idx := range keys {
+		if idx < 0 || idx >= len(f.full.Rows) {
+			return nil, false
+		}
+		rec, _, ok := rowConstant(f.full.Columns, f.full.Rows[idx])
+		if !ok {
+			return nil, false
+		}
+		entries = append(entries, ir.ConstEntry{Value: rec})
+	}
+	return ir.CollectionConstantOf(entries, ir.CollList), true
 }
 
 // count runs a recognized count query: a query over another master is not driven

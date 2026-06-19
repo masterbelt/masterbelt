@@ -1,6 +1,9 @@
 package sql
 
 import (
+	"math"
+	"math/big"
+
 	"github.com/masterbelt/masterbelt/pkg/belt/eval"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
@@ -24,7 +27,26 @@ func CountRelation(chain ir.Value, env eval.GraphEnv) (rel Relation, master *ir.
 	if !ok || len(count.Args) != 0 {
 		return Relation{}, nil, nil, false
 	}
-	return relationChain(count.Receiver, env)
+	// A count does not respect a limit (its SQL counts every matching row), so a
+	// limited count is not recognized here — it is left unfoldable and the check
+	// fails safe rather than reporting the unlimited count as if it were the limited
+	// one.
+	return relationChain(count.Receiver, env, false)
+}
+
+// RowsRelation recognizes a relation materialization — to_list() over a chain of
+// where narrowings and limits over a master relation, the shape
+// Cards.where(...).limit(n).to_list() lowers to — and returns the Relation whose
+// rows to read together with the master it is over and any where predicates lowered
+// to SQL. ok is false when the value is not such a chain. Unlike count and sum, the
+// chain may carry a limit, which caps the rows read; env folds the where operands as
+// in CountRelation.
+func RowsRelation(chain ir.Value, env eval.GraphEnv) (rel Relation, master *ir.TypeDef, unsupported []Unsupported, ok bool) {
+	tl, ok := asCall(chain, "to_list")
+	if !ok || len(tl.Args) != 0 {
+		return Relation{}, nil, nil, false
+	}
+	return relationChain(tl.Receiver, env, true)
 }
 
 // SumRelation recognizes a relation sum query — sum(fn(c) -> c.col) over a chain of
@@ -44,7 +66,9 @@ func SumRelation(chain ir.Value, env eval.GraphEnv) (rel Relation, column string
 	if !ok {
 		return Relation{}, "", nil, nil, false
 	}
-	rel, master, unsupported, ok = relationChain(sum.Receiver, env)
+	// A sum, like a count, does not respect a limit, so a limited sum is not
+	// recognized and is left to fail safe.
+	rel, master, unsupported, ok = relationChain(sum.Receiver, env, false)
 	if !ok {
 		return Relation{}, "", nil, nil, false
 	}
@@ -64,28 +88,70 @@ func SumRelation(chain ir.Value, env eval.GraphEnv) (rel Relation, column string
 // aggregate sits on — [where(fn(c)->pred)]* over MasterRelation — accumulating the
 // lowered filter. It is shared by every aggregate (count, sum), so they recognize
 // the same relation shape and lower the same where predicates.
-func relationChain(recv ir.Value, env eval.GraphEnv) (rel Relation, master *ir.TypeDef, unsupported []Unsupported, ok bool) {
+func relationChain(recv ir.Value, env eval.GraphEnv, allowLimit bool) (rel Relation, master *ir.TypeDef, unsupported []Unsupported, ok bool) {
 	rel = All()
+	// The walk runs outermost call first, so a where seen before a limit is applied
+	// after it — a filter over the already-capped relation, which the flat WHERE-then-
+	// LIMIT render cannot express (it would filter the whole table, then cap). Such a
+	// limit is declined, so a limit-before-where chain is left unfoldable and fails safe
+	// rather than returning rows from outside the capped relation. A where after a limit
+	// in source (limit outer, where inner) is the supported filter-then-cap order.
+	sawWhere := false
 	for {
 		switch r := unwrap(recv).(type) {
 		case *ir.MasterRelation:
 			return rel, r.Master, unsupported, true
 		case *ir.Call:
-			if r.Method != "where" || len(r.Args) != 1 {
+			switch {
+			case r.Method == "where" && len(r.Args) == 1:
+				pred, ok := whereBody(r.Args[0])
+				if !ok {
+					return Relation{}, nil, nil, false
+				}
+				p, u := Lower(foldOperands(pred, env))
+				unsupported = append(unsupported, u...)
+				rel = rel.Where(p)
+				recv = r.Receiver
+				sawWhere = true
+			case allowLimit && r.Method == "limit" && len(r.Args) == 1 && !sawWhere:
+				n, ok := limitValue(r.Args[0])
+				if !ok {
+					return Relation{}, nil, nil, false
+				}
+				rel = rel.Limit(n)
+				recv = r.Receiver
+			default:
 				return Relation{}, nil, nil, false
 			}
-			pred, ok := whereBody(r.Args[0])
-			if !ok {
-				return Relation{}, nil, nil, false
-			}
-			p, u := Lower(foldOperands(pred, env))
-			unsupported = append(unsupported, u...)
-			rel = rel.Where(p)
-			recv = r.Receiver
 		default:
 			return Relation{}, nil, nil, false
 		}
 	}
+}
+
+// limitValue reads the row cap a limit(n) carries: the evaluator folds the argument
+// to an integer literal before the chain reaches here, so a non-literal (an
+// unevaluable cap) is not recognized and the whole materialization is left to fail
+// safe. A cap wider than int64 is a valid nint the SQL literal cannot hold, but a cap
+// that large is no effective cap (no table holds that many rows), so it clamps to the
+// widest representable cap rather than failing to render; a value below zero floors to
+// zero, the floor Relation.Limit keeps. An unparseable literal is not recognized.
+func limitValue(arg ir.Value) (int64, bool) {
+	lit, ok := unwrap(arg).(*ir.IntLiteral)
+	if !ok {
+		return 0, false
+	}
+	n, ok := new(big.Int).SetString(lit.Text, 0)
+	if !ok {
+		return 0, false
+	}
+	if !n.IsInt64() {
+		if n.Sign() < 0 {
+			return 0, true
+		}
+		return math.MaxInt64, true
+	}
+	return n.Int64(), true
 }
 
 // selectorColumn returns the single column reference a sum selector names (the c.cost

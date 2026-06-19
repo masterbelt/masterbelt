@@ -177,6 +177,34 @@ func (e *Engine) Sum(rel mastersql.Relation, column string) (*big.Int, error) {
 	return total, rows.Err()
 }
 
+// RowKeys reads the synthetic keys of the relation's rows — the insert-position
+// indices the filter keeps, in key order, capped by the relation's limit — so the
+// caller materializes the full rows from its own loaded data by index. The keys are
+// the engine's, not SQLite's implicit rowid, for the same reason Violations selects
+// the synthetic key: a master may declare a column named rowid. An empty relation
+// yields no keys.
+func (e *Engine) RowKeys(rel mastersql.Relation) ([]int, error) {
+	query, binds := rel.RowKeysSQL(e.keyCol, tableName, dialect)
+	args, err := bindArgs(binds)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := e.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []int
+	for rows.Next() {
+		var idx int64
+		if err := rows.Scan(&idx); err != nil {
+			return nil, err
+		}
+		out = append(out, int(idx))
+	}
+	return out, rows.Err()
+}
+
 // create builds the single table from the loaded columns. A master always
 // declares at least one field, so the column list is never empty.
 func (e *Engine) create() error {
