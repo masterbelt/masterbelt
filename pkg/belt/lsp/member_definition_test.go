@@ -185,6 +185,22 @@ func TestDefinitionProvidedInterfaceMethod(t *testing.T) {
 	}
 }
 
+// TestDefinitionInterfaceRequirementByKind pins that recovering an interface member
+// matches the resolved method's kind, not only its name: an interface with both a
+// static requirement and a normal method of the same name resolves x.f() to the normal
+// method alone, not the static one in the other member space.
+func TestDefinitionInterfaceRequirementByKind(t *testing.T) {
+	src := "pub interface I {\n  static f(): nint\n  f(): nint\n}\n" +
+		"pub fn g(x: I): nint {\n  return x.f()\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "x.f()") + len("x.")
+	locs := definition(doc, off)
+	normalF := strings.Index(src, "\n  f(): nint") + len("\n  ")
+	if len(locs) != 1 || fromPosition(doc.Buffer(), locs[0].Range.Start) != normalF {
+		t.Errorf("x.f() should resolve to the normal method f at %d only, not the static requirement; got %+v", normalF, locs)
+	}
+}
+
 // TestDefinitionOverloadedInterfaceRequirement pins that a call of an overloaded
 // interface requirement navigates to the requirements of that name — each overload,
 // the way an overloaded function's go-to-definition lists every signature — rather

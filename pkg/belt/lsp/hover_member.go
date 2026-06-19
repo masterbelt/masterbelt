@@ -310,11 +310,27 @@ func methodDeclNodes(m *ir.Method) []*cst.Node {
 	}
 	var nodes []*cst.Node
 	for _, mem := range m.Owner.InterfaceSyntax.Members {
-		if mem.Name == m.Name {
+		if mem.Name == m.Name && interfaceMemberKind(mem) == m.Kind {
 			nodes = append(nodes, mem.Syntax())
 		}
 	}
 	return nodes
+}
+
+// interfaceMemberKind classifies an interface member the way the resolved method
+// records its kind, so the recovery matches the resolved method's member space: a
+// static requirement is reached through the type, a readable one read like a getter,
+// and any other is an ordinary method. A name shared across two member spaces
+// (static f and f) thus recovers only the one the call resolved to.
+func interfaceMemberKind(mem *ast.InterfaceMember) ir.MethodKind {
+	switch {
+	case mem.Static:
+		return ir.MethodStatic
+	case mem.Readable:
+		return ir.MethodGetter
+	default:
+		return ir.MethodNormal
+	}
 }
 
 // memberMethodHover builds the method card for a member access: a single
