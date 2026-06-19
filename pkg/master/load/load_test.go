@@ -948,6 +948,107 @@ func TestValidateAllLimitBeforeWhereFailsSafe(t *testing.T) {
 	}
 }
 
+// TestValidateAllOrderSortsRows pins that order sorts the materialized rows by the
+// column the selector names, in the chosen direction: with powers 5, 30, 20, the
+// descending order reads 30 first (id 2) and the ascending order reads 5 first, and a
+// filter, order, and limit compose — the smallest power above 10 is 20.
+func TestValidateAllOrderSortsRows(t *testing.T) {
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,30\n3,20\n"}
+	for _, c := range []struct {
+		name string
+		body string
+	}{
+		{"desc top", "Cards.order(fn(c) -> c.power.desc()).to_list()[0].id == 2"},
+		{"desc value", "Cards.order(fn(c) -> c.power.desc()).limit(1).to_list()[0].power == 30"},
+		{"asc top", "Cards.order(fn(c) -> c.power.asc()).to_list()[0].power == 5"},
+		{"filter order cap", "Cards.where(fn(c) -> c.power > 10).order(fn(c) -> c.power.asc()).limit(1).to_list()[0].power == 20"},
+		{"order ignored by count", "Cards.order(fn(c) -> c.power.desc()).count() == 3"},
+	} {
+		belt := "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+			"  validate {\n    all {\n      assert " + c.body + "\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+		if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+			t.Errorf("%s (%s): table_validation_failed = %d, want 0", c.name, c.body, countTableFailures(diags))
+		}
+	}
+}
+
+// TestValidateAllOrderRejectsWrong is the negative twin: an order assertion that does
+// not hold of the sorted rows must fail, proving the rows are really sorted rather than
+// passing vacuously — the descending top is power 30, not 5.
+func TestValidateAllOrderRejectsWrong(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.order(fn(c) -> c.power.desc()).to_list()[0].power == 5\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,30\n3,20\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) == 0 {
+		t.Error("descending top power == 5 must fail: the highest power is 30, so a pass means the rows were not sorted")
+	}
+}
+
+// TestValidateAllLimitBeforeOrderFailsSafe pins that an order applied after a limit
+// fails safe, the order twin of limit-before-where: the flat render sorts before it
+// caps, so capping the unsorted relation then sorting (limit(2).order(...)) cannot be
+// expressed and is left unfoldable rather than returning the sorted top of the whole
+// table.
+func TestValidateAllLimitBeforeOrderFailsSafe(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.limit(2).order(fn(c) -> c.power.desc()).to_list()[0].power == 30\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,30\n3,20\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) == 0 {
+		t.Error("limit(2).order(...) must fail safe: the cap applies before the sort, which the flat render cannot express")
+	}
+}
+
+// TestValidateAllOrderCustomOrderFailsSafe pins that a column whose type defines its
+// own ordering is not sorted by plain SQL: Rank declares lt, so it is orderable (the
+// checker accepts the order) but its order is custom, which SQL's ORDER BY on the raw
+// integer would not honor. The driver declines the key and the check fails safe rather
+// than sorting by the stored value — even here, where the custom order happens to match
+// the integer order, the driver must decline because it cannot know that.
+func TestValidateAllOrderCustomOrderFailsSafe(t *testing.T) {
+	const belt = "type Rank = int impl { pub lt(o: Rank): bool { return self.int() < o.int() } }\n" +
+		"master Cards {\n  record { id: int, rank: Rank }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.order(fn(c) -> c.rank.asc()).to_list()[0].id == 1\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,rank\n1,5\n2,30\n3,20\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) == 0 {
+		t.Error("order by a custom-ordered column must fail safe: SQL's native ORDER BY does not carry the type's order")
+	}
+}
+
+// TestValidateAllOrderIgnoredByCountWithCustomOrder pins that a count over an ordered
+// relation folds even when the order is by a custom-ordered column: count discards the
+// order, so the unsupportable sort key must not make the count fail — the order is only
+// required to be SQL-renderable when the rows are materialized, not when an aggregate
+// that ignores it consumes the relation.
+func TestValidateAllOrderIgnoredByCountWithCustomOrder(t *testing.T) {
+	const belt = "type Rank = int impl { pub lt(o: Rank): bool { return self.int() < o.int() } }\n" +
+		"master Cards {\n  record { id: int, rank: Rank }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.order(fn(c) -> c.rank.asc()).count() == 3\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,rank\n1,5\n2,30\n3,20\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("count over a custom-ordered relation: table_validation_failed = %d, want 0 (count ignores the order)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllOrderBlockSelectorIgnoredByCount pins that count folds over a relation
+// ordered by a selector the driver does not parse — a block-body lambda rather than the
+// inline fn(c) -> c.col.asc() shape. Count discards the order, so its selector is not
+// parsed at all; only a materialization (to_list) needs the recognized shape. Without
+// this the unparsed order would reject the count even though the order is unused.
+func TestValidateAllOrderBlockSelectorIgnoredByCount(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.order(fn(c): ordering<Cards> { let x = c.power.desc(); return x }).count() == 3\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,30\n3,20\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("count over a relation ordered by a block-body selector: table_validation_failed = %d, want 0 (count ignores the order, so its selector need not parse)", countTableFailures(diags))
+	}
+}
+
 // TestValidateAllWideEnumColumnIgnored pins that an enum column whose member value is
 // beyond SQLite's range does not disable aggregates over the other columns, the enum
 // twin of the wide-integer-column rule: an unused enum with an overwide member is left

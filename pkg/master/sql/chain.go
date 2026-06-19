@@ -88,15 +88,17 @@ func SumRelation(chain ir.Value, env eval.GraphEnv) (rel Relation, column string
 // aggregate sits on — [where(fn(c)->pred)]* over MasterRelation — accumulating the
 // lowered filter. It is shared by every aggregate (count, sum), so they recognize
 // the same relation shape and lower the same where predicates.
-func relationChain(recv ir.Value, env eval.GraphEnv, allowLimit bool) (rel Relation, master *ir.TypeDef, unsupported []Unsupported, ok bool) {
+func relationChain(recv ir.Value, env eval.GraphEnv, rendersRows bool) (rel Relation, master *ir.TypeDef, unsupported []Unsupported, ok bool) {
 	rel = All()
-	// The walk runs outermost call first, so a where seen before a limit is applied
-	// after it — a filter over the already-capped relation, which the flat WHERE-then-
-	// LIMIT render cannot express (it would filter the whole table, then cap). Such a
-	// limit is declined, so a limit-before-where chain is left unfoldable and fails safe
-	// rather than returning rows from outside the capped relation. A where after a limit
-	// in source (limit outer, where inner) is the supported filter-then-cap order.
-	sawWhere := false
+	// The walk runs outermost call first, and the flat render applies WHERE, then
+	// ORDER BY, then LIMIT — so a limit must be the outermost (last applied) operation.
+	// A where or order seen before a limit is applied after it (filtering or sorting the
+	// already-capped relation), which the flat shape cannot express; such a limit is
+	// declined, so a limit-before-filter or limit-before-order chain is left unfoldable
+	// and fails safe rather than reading rows from outside the cap. A where or order
+	// after a limit in source (limit outer) is the supported filter/sort-then-cap order.
+	// Filtering and ordering commute, so their relative order needs no such guard.
+	sawFilterOrOrder := false
 	for {
 		switch r := unwrap(recv).(type) {
 		case *ir.MasterRelation:
@@ -112,8 +114,17 @@ func relationChain(recv ir.Value, env eval.GraphEnv, allowLimit bool) (rel Relat
 				unsupported = append(unsupported, u...)
 				rel = rel.Where(p)
 				recv = r.Receiver
-				sawWhere = true
-			case allowLimit && r.Method == "limit" && len(r.Args) == 1 && !sawWhere:
+				sawFilterOrOrder = true
+			case r.Method == "order" && len(r.Args) == 1:
+				next, u, good := applyOrder(rel, r, rendersRows)
+				if !good {
+					return Relation{}, nil, nil, false
+				}
+				rel = next
+				unsupported = append(unsupported, u...)
+				recv = r.Receiver
+				sawFilterOrOrder = true
+			case rendersRows && r.Method == "limit" && len(r.Args) == 1 && !sawFilterOrOrder:
 				n, ok := limitValue(r.Args[0])
 				if !ok {
 					return Relation{}, nil, nil, false
@@ -127,6 +138,61 @@ func relationChain(recv ir.Value, env eval.GraphEnv, allowLimit bool) (rel Relat
 			return Relation{}, nil, nil, false
 		}
 	}
+}
+
+// applyOrder folds an order call into a relation. The order only affects the
+// materialized rows; count and sum discard it, so when the rows are not rendered the
+// selector is not parsed at all and the relation is returned unchanged — an order whose
+// selector is not the recognized inline shape (a block-body lambda) does not reject the
+// aggregate that ignores it. When the rows are rendered, the sort key is read and a
+// column whose type carries a custom order — which plain SQL would sort by the stored
+// scalar, not the type's order — is reported unsupported so the materialization fails
+// safe. good is false only when the key is needed but its selector is not recognized.
+func applyOrder(rel Relation, call *ir.Call, rendersRows bool) (out Relation, unsupported []Unsupported, good bool) {
+	if !rendersRows {
+		return rel, nil, true
+	}
+	col, desc, elem, ok := orderKey(call.Args[0])
+	if !ok {
+		return rel, nil, false
+	}
+	if !sqlOrderable(elem) {
+		unsupported = append(unsupported, Unsupported{Node: call.Args[0], Reason: "order by a column with a custom order"})
+	}
+	return rel.OrderBy(col, desc), unsupported, true
+}
+
+// orderKey reads the column and direction an order selector names: fn(c) -> c.col.asc()
+// or fn(c) -> c.col.desc(). The body is a direction method (asc or desc, no arguments)
+// on a column field access, so a selector that does not name a column ordering is not
+// recognized and the chain is left unfoldable. The field access carries the column's
+// name; the method name carries the direction.
+func orderKey(v ir.Value) (column string, desc bool, elem ir.Type, ok bool) {
+	body, ok := whereBody(v)
+	if !ok {
+		return "", false, nil, false
+	}
+	call, ok := unwrap(body).(*ir.Call)
+	if !ok || len(call.Args) != 0 {
+		return "", false, nil, false
+	}
+	switch call.Method {
+	case "asc":
+		desc = false
+	case "desc":
+		desc = true
+	default:
+		return "", false, nil, false
+	}
+	fa, ok := unwrap(call.Receiver).(*ir.FieldAccess)
+	if !ok {
+		return "", false, nil, false
+	}
+	el, ok := columnElem(fa)
+	if !ok {
+		return "", false, nil, false
+	}
+	return fa.Field, desc, el, true
 }
 
 // limitValue reads the row cap a limit(n) carries: the evaluator folds the argument

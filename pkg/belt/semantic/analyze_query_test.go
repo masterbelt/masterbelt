@@ -517,6 +517,49 @@ func TestColumnOrderingRequiresOrderable(t *testing.T) {
 	}
 }
 
+// TestColumnOrderingMethodsRequireOrderable pins that a column's asc/desc — the sort
+// operators yielding an ordering<M> — stand only for an orderable element type, the
+// same rule the comparison orderings follow: a bool column has no order, while an int,
+// string, or enum column does. Without it any column could be sorted, giving an order
+// to a value the language treats as unordered.
+func TestColumnOrderingMethodsRequireOrderable(t *testing.T) {
+	const m = "enum Rarity { common; rare; legend }\n" +
+		"master Cards {\n  record { id: int, cost: int, name: string, rarity: Rarity, active: bool }\n  primary id\n}\n"
+	cases := []struct {
+		name, key string
+		wantErr   bool
+	}{
+		{"bool asc rejected", "c.active.asc()", true},
+		{"bool desc rejected", "c.active.desc()", true},
+		{"int asc allowed", "c.cost.asc()", false},
+		{"int desc allowed", "c.cost.desc()", false},
+		{"string asc allowed", "c.name.asc()", false},
+		{"enum desc allowed", "c.rarity.desc()", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			src := m + "fn probe(c: columns<Cards>): ordering<Cards> {\n  return " + tc.key + "\n}\n"
+			if _, diags := analyze(src); (len(diags) != 0) != tc.wantErr {
+				t.Errorf("%q: gotErr=%v (diags %v), wantErr=%v", tc.key, len(diags) != 0, codes(diags), tc.wantErr)
+			}
+		})
+	}
+}
+
+// TestColumnOrderingRequiresSelfOrder pins that a column's asc/desc needs a self-order
+// — an lt applicable to (T, T) — not merely an lt of some signature. Weird declares an
+// lt that takes a string, which shadows the inherited integer ordering, so Weird is not
+// ordered by its own values (Weird(1) < Weird(2) is a type error) and its column cannot
+// be sorted, even though an lt is present by name.
+func TestColumnOrderingRequiresSelfOrder(t *testing.T) {
+	src := "type Weird = int impl { pub lt(s: string): bool { return true } }\n" +
+		"master Cards {\n  record { id: int, w: Weird }\n  primary id\n}\n" +
+		"fn probe(c: columns<Cards>): ordering<Cards> {\n  return c.w.asc()\n}\n"
+	if _, diags := analyze(src); len(diags) == 0 {
+		t.Fatal("want a type error: a column whose lt is not applicable to its own type has no order")
+	}
+}
+
 // TestColumnEqualityRequiresComparable pins the equality half of the same rule: a
 // column whose element type is not comparable has no == either, just as the value
 // comparison would be invalid — so the comparison guard covers eql/neq, not only the

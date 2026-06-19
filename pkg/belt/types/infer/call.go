@@ -265,15 +265,25 @@ var queryComparisonMethods = map[string]bool{
 	"eql": true, "neq": true, "lt": true, "lteq": true, "gt": true, "gteq": true,
 }
 
+// queryOrderingMethods are the sort operators a query column offers — asc and desc,
+// which yield an ordering<M>. An ordering stands only when its element type is
+// orderable, has the relational operator, so these are guarded against the element
+// type the same way a comparison is, against the canonical ordering operator.
+var queryOrderingMethods = map[string]bool{"asc": true, "desc": true}
+
 // queryColumnComparisonValid reports whether a method call is allowed under the
-// query-column comparison rule: true unless the receiver is a query column<M, T>,
-// the method is a comparison, and the element type T has no such operator of its
-// own. It mirrors value mode — a column comparison stands exactly where the value
-// comparison would — closing the gap that column<M, T> offers every comparison for
-// every T regardless of whether T supports it (a bool column has no ordering, a
-// non-comparable column no equality).
+// query-column operator rule: true unless the receiver is a query column<M, T>, the
+// method is a comparison or an ordering, and the element type T does not support it.
+// It mirrors value mode — a column comparison stands exactly where the value
+// comparison would, and a column ordering only where the element is orderable —
+// closing the gap that column<M, T> offers every operator for every T regardless of
+// whether T supports it (a bool column has no ordering, a non-comparable column no
+// equality). An ordering is judged by the relational operator, since a value that can
+// be compared with < can be sorted.
 func queryColumnComparisonValid(reg *builtin.Registry, recv ir.Type, method string) bool {
-	if !queryComparisonMethods[method] {
+	isComparison := queryComparisonMethods[method]
+	isOrdering := queryOrderingMethods[method]
+	if !isComparison && !isOrdering {
 		return true
 	}
 	elem, ok := queryColumnElem(reg, recv)
@@ -285,6 +295,16 @@ func queryColumnComparisonValid(reg *builtin.Registry, recv ir.Type, method stri
 	// a value comparison on the non-null T. Unwrap the null member before asking for
 	// the operator, since a union itself has no method table.
 	elem = nonNullType(elem)
+	if isOrdering {
+		// An ordering needs a self-order — an lt overload applicable to (T, T), not
+		// merely an lt of some signature. A type whose lt takes another type (lt(s:
+		// string) on an int-backed type, which shadows the inherited one) is not ordered
+		// by its own values, so SelectOverload finds no (T, T) match and its column has
+		// no sort. found alone is the method's mere presence by name, so the applicable
+		// matches are what decide.
+		matches, _ := types.SelectOverload(reg, elem, "lt", []ir.Type{elem})
+		return len(matches) > 0
+	}
 	_, _, hasOp := types.Candidates(reg, elem, method)
 	return hasOp
 }
