@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/belt/builtin"
+	"github.com/masterbelt/masterbelt/pkg/belt/types"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
@@ -310,9 +311,11 @@ func namedOf(def *ir.TypeDef) ir.Type {
 }
 
 // tagMatchesType reports whether a value's union tag denotes the same member as a
-// resolved arm type — member identity: a nominal type by its definition, a
-// builtin by its name. It is the confident dispatch's decision, the value-side
-// twin of the type layer's sameType narrowed to the two forms a tag ever takes.
+// resolved arm type — member identity: a nominal type by its definition, a builtin
+// by its name, an application (relation<M>, the master a union member carries) by its
+// structural identity, so a relation tag selects the relation arm of its own master
+// and not another's. It is the confident dispatch's decision, the value-side twin of
+// the type layer's sameType narrowed to the forms a tag ever takes.
 func tagMatchesType(tag, arm ir.Type) bool {
 	switch tag := tag.(type) {
 	case *ir.Named:
@@ -321,6 +324,8 @@ func tagMatchesType(tag, arm ir.Type) bool {
 	case *ir.Builtin:
 		a, ok := arm.(*ir.Builtin)
 		return ok && a.Name == tag.Name
+	case *ir.App:
+		return types.Identical(tag, arm)
 	default:
 		return false
 	}
