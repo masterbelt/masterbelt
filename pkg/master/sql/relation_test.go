@@ -103,6 +103,26 @@ func TestRelationRowKeysOrder(t *testing.T) {
 	}
 }
 
+// TestRelationRowKeysOffset pins the row-key select with a skip: an offset renders an
+// OFFSET after the limit, and an offset with no limit renders the no-limit cap (-1) so
+// SQL has a limit to skip against. Skips accumulate.
+func TestRelationRowKeysOffset(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		rel  sql.Relation
+		want string
+	}{
+		{"offset with limit", sql.All().Limit(2).Offset(1), `SELECT "k" FROM "rows" ORDER BY "k" LIMIT 2 OFFSET 1`},
+		{"offset no limit", sql.All().Offset(3), `SELECT "k" FROM "rows" ORDER BY "k" LIMIT -1 OFFSET 3`},
+		{"offset accumulates", sql.All().Offset(2).Offset(3), `SELECT "k" FROM "rows" ORDER BY "k" LIMIT -1 OFFSET 5`},
+		{"limit only no offset", sql.All().Limit(2), `SELECT "k" FROM "rows" ORDER BY "k" LIMIT 2`},
+	} {
+		if got, _ := c.rel.RowKeysSQL("k", "rows", sql.SQLite); got != c.want {
+			t.Errorf("%s: RowKeysSQL = %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
 // TestRelationWhereIntersects pins that narrowing a relation that already has a
 // filter keeps both — the predicates are conjoined with AND and their binds
 // merged in order — rather than the second replacing the first. A consumer that

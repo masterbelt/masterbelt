@@ -560,6 +560,25 @@ func TestColumnOrderingRequiresSelfOrder(t *testing.T) {
 	}
 }
 
+// TestRelationMinMaxRequiresOrderable pins that a relation's min/max takes only an
+// orderable column — its T: orderable bound — so an extreme of a bool column, which the
+// language treats as unordered, is rejected, while an int column's min is accepted.
+func TestRelationMinMaxRequiresOrderable(t *testing.T) {
+	const m = "master Cards {\n  record { id: int, power: int, active: bool } impl {\n    pub static fn x(): bool { return %s }\n  }\n  primary id\n}\n"
+	for _, c := range []struct {
+		name, expr string
+		wantErr    bool
+	}{
+		{"bool min rejected", "match self.min(fn(c) -> c.active) { bool b -> { return b } null e -> { return false } }", true},
+		{"int min allowed", "match self.min(fn(c) -> c.power) { int n -> { return n > 0 } null e -> { return false } }", false},
+	} {
+		src := strings.Replace(m, "%s", c.expr, 1)
+		if _, diags := analyze(src); (len(diags) != 0) != c.wantErr {
+			t.Errorf("%s: gotErr=%v (diags %v), wantErr=%v", c.name, len(diags) != 0, codes(diags), c.wantErr)
+		}
+	}
+}
+
 // TestColumnEqualityRequiresComparable pins the equality half of the same rule: a
 // column whose element type is not comparable has no == either, just as the value
 // comparison would be invalid — so the comparison guard covers eql/neq, not only the

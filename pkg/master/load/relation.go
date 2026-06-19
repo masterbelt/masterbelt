@@ -60,7 +60,51 @@ func (e relationEnv) FoldRelationAggregate(chain ir.Value) (*ir.Constant, bool) 
 	if rel, m, unsupported, ok := mastersql.RowsRelation(chain, e.fold.env); ok {
 		return e.fold.toList(rel, m, unsupported)
 	}
+	if rel, col, m, unsupported, ok := mastersql.MinRelation(chain, e.fold.env); ok {
+		return e.fold.extreme(rel, col, m, unsupported, false)
+	}
+	if rel, col, m, unsupported, ok := mastersql.MaxRelation(chain, e.fold.env); ok {
+		return e.fold.extreme(rel, col, m, unsupported, true)
+	}
 	return nil, false
+}
+
+// extreme runs a recognized min/max query: the relation ordered on the column (ascending
+// for min, descending for max) and capped to one row gives the extreme row, whose column
+// value — read from the full typed table by its key, already a typed constant — is the
+// result. An empty relation has no extreme, so the value is null. A query over another
+// master, an unsupported column, or an unloaded table is not driven and the check fails
+// safe.
+func (f relationFold) extreme(rel mastersql.Relation, col string, m *ir.TypeDef, unsupported []mastersql.Unsupported, desc bool) (*ir.Constant, bool) {
+	if m != f.master || len(unsupported) > 0 || f.eng == nil {
+		return nil, false
+	}
+	keys, err := f.eng.RowKeys(rel.OrderBy(col, desc).Limit(1))
+	if err != nil {
+		return nil, false
+	}
+	if len(keys) == 0 {
+		return ir.NullConstant(), true
+	}
+	idx, ci := keys[0], columnIndex(f.full.Columns, col)
+	if ci < 0 || idx < 0 || idx >= len(f.full.Rows) || ci >= len(f.full.Rows[idx].Cells) {
+		return nil, false
+	}
+	if v := f.full.Rows[idx].Cells[ci].Value; v != nil {
+		return v, true
+	}
+	return nil, false
+}
+
+// columnIndex returns the position of a column name in the typed table's columns, or -1
+// when it names none — the column the engine ordered by must be a real column to read.
+func columnIndex(columns []string, name string) int {
+	for i, c := range columns {
+		if c == name {
+			return i
+		}
+	}
+	return -1
 }
 
 // toList materializes a recognized to_list query: the engine selects the synthetic

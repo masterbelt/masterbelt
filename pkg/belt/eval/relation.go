@@ -58,7 +58,7 @@ func graphRelationMethod(v *ir.Call, recv *ir.Constant, ctx graphCtx) (*ir.Const
 		out := *v
 		out.Receiver = recv.Relation
 		return ir.RelationConstant(&out), true
-	case "limit":
+	case "limit", "offset":
 		if len(v.Args) != 1 {
 			return nil, true
 		}
@@ -66,7 +66,7 @@ func graphRelationMethod(v *ir.Call, recv *ir.Constant, ctx graphCtx) (*ir.Const
 		out.Receiver = recv.Relation
 		out.Args = []ir.Value{foldScalarArg(v.Args[0], ctx)}
 		return ir.RelationConstant(&out), true
-	case "count", "sum", "to_list":
+	case "count", "sum", "to_list", "min", "max":
 		rf, ok := ctx.env.(RelationFolder)
 		if !ok {
 			return nil, true

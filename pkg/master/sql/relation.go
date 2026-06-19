@@ -17,6 +17,7 @@ type Relation struct {
 	order   []OrderKey // the sort keys, primary first; empty is insert order
 	limit   int64      // the row cap, valid when limited
 	limited bool       // whether a limit is set
+	offset  int64      // rows skipped from the window's start; zero skips none
 }
 
 // OrderKey is one sort key of a relation's order: the column to sort by and whether
@@ -69,6 +70,18 @@ func (r Relation) Limit(n int64) Relation {
 	return r
 }
 
+// Offset returns the relation with n more rows skipped from the window's start.
+// Skips accumulate — offset(2).offset(3) skips five — and a negative n is treated as
+// zero, the floor a skip cannot fall below. Offset and limit set the window together,
+// independent of the order they are applied in.
+func (r Relation) Offset(n int64) Relation {
+	if n < 0 {
+		n = 0
+	}
+	r.offset += n
+	return r
+}
+
 // RowKeysSQL renders a select of the relation's row keys — the engine's synthetic
 // insert-position key — for a dialect: the keys the filter keeps, ordered by the
 // key so the result is deterministic (insert order), and capped when the relation
@@ -94,8 +107,17 @@ func (r Relation) RowKeysSQL(keyCol, table string, d Dialect) (string, []Bind) {
 	}
 	keys = append(keys, d.QuoteIdent(keyCol))
 	q += " ORDER BY " + strings.Join(keys, ", ")
-	if r.limited {
-		q += " LIMIT " + strconv.FormatInt(r.limit, 10)
+	// A skip needs a cap to apply against in SQL, so an offset with no limit renders
+	// the no-limit cap (-1) and then the skip; a limit alone renders without OFFSET.
+	if r.limited || r.offset > 0 {
+		lim := "-1"
+		if r.limited {
+			lim = strconv.FormatInt(r.limit, 10)
+		}
+		q += " LIMIT " + lim
+		if r.offset > 0 {
+			q += " OFFSET " + strconv.FormatInt(r.offset, 10)
+		}
 	}
 	if frag == "" {
 		return q, nil
