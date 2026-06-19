@@ -137,26 +137,36 @@ func forEachFuncLit(doc view, fn func(*ast.FuncLit)) {
 // arm, or an if branch holds; the expression-level recursion delegates to
 // ast.WalkExprs so a new operand position (a ternary's branches, say) is wired
 // in once, in the AST package, for every walk that layers on it.
-func forEachExpr(file *ast.File, fn func(ast.Expr)) {
-	var walkExpr func(e ast.Expr)
-	walkExpr = func(e ast.Expr) {
-		if e == nil {
-			return
-		}
-		// WalkExprs reports e and descends its operands (a member's receiver, a
-		// call's callee and arguments, a ternary's branches, a collection's and
-		// a record's values) — but, by design, not a function literal's body,
-		// which is its own scope. Drive into that body here with the shared
-		// statement walk, so a call or member nested in a lambda is reached too.
-		ast.WalkExprs(e, func(inner ast.Expr) bool {
-			fn(inner)
-			if lit, ok := inner.(*ast.FuncLit); ok {
-				ast.WalkBodyExprs(lit.Body, walkExpr)
-			}
-			return true
-		})
+// walkExprTree reports e and its operands to fn, descending into the body of a
+// function literal — its own scope, which ast.WalkExprs does not enter — so a call
+// or member access nested in a lambda is reached too. It is the recursive core
+// forEachExpr drives over every expression site in a file.
+func walkExprTree(e ast.Expr, fn func(ast.Expr)) {
+	if e == nil {
+		return
 	}
+	ast.WalkExprs(e, func(inner ast.Expr) bool {
+		fn(inner)
+		if lit, ok := inner.(*ast.FuncLit); ok {
+			ast.WalkBodyExprs(lit.Body, func(x ast.Expr) { walkExprTree(x, fn) })
+		}
+		return true
+	})
+}
+
+func forEachExpr(file *ast.File, fn func(ast.Expr)) {
+	walkExpr := func(e ast.Expr) { walkExprTree(e, fn) }
 	walkBody := func(body []ast.Stmt) { ast.WalkBodyExprs(body, walkExpr) }
+	// An associated constant's initializer is an expression site like a top-level
+	// const's: a call or member access in const Next: Counter = Counter(0).inc() is
+	// reached the same way, so it navigates and hovers too.
+	walkConsts := func(consts []*ast.ConstDecl) {
+		for _, c := range consts {
+			if c.Value != nil {
+				walkExpr(c.Value)
+			}
+		}
+	}
 
 	for _, decl := range file.Decls {
 		if decl.Value != nil {
@@ -172,11 +182,13 @@ func forEachExpr(file *ast.File, fn func(ast.Expr)) {
 		for _, m := range td.Methods {
 			walkBody(m.Body)
 		}
+		walkConsts(td.Consts)
 	}
 	for _, ed := range file.Enums {
 		for _, m := range ed.Methods {
 			walkBody(m.Body)
 		}
+		walkConsts(ed.Consts)
 	}
 	for _, id := range file.Interfaces {
 		for _, m := range id.Members {
@@ -190,6 +202,7 @@ func forEachExpr(file *ast.File, fn func(ast.Expr)) {
 		for _, m := range md.Methods {
 			walkBody(m.Body)
 		}
+		walkConsts(md.Consts)
 		// A per-row validate check is an expression site too: a lambda or a
 		// parameter-hint expression inside it is reached the same way a method
 		// body's is.

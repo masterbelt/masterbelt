@@ -258,28 +258,7 @@ func (p *Program) ResolvedMethodCall(file FileID, call *ast.CallExpr) (*ir.Metho
 		}
 		return true
 	}
-	for _, c := range module.Consts {
-		if c != nil {
-			ir.WalkValues(c.Value, visit)
-		}
-	}
-	for _, fn := range module.Funcs {
-		if fn != nil {
-			ir.WalkBody(fn.Body, visit)
-		}
-	}
-	for _, def := range module.Types {
-		for _, m := range def.Methods {
-			ir.WalkBody(m.Body, visit)
-		}
-		if def.Where != nil {
-			ir.WalkValues(def.Where, visit)
-		}
-		if def.Master != nil {
-			ir.WalkBody(masterCheckStmts(def.Master.RowChecks), visit)
-			ir.WalkBody(masterCheckStmts(def.Master.AllChecks), visit)
-		}
-	}
+	walkModuleValues(module, visit)
 	if found == nil {
 		return nil, false
 	}
@@ -323,9 +302,55 @@ func (p *Program) AssignTargetReceiverType(file FileID, member *ast.MemberExpr) 
 	return recv, recv != nil
 }
 
+// walkModuleValues walks every value graph the module retains — the constant and
+// associated-constant initializers, the enum member initializers, the assert
+// conditions, the refinement predicates, the master validate checks, and the
+// function and method bodies (whose lambda bodies ir.WalkValues descends into) — so
+// a call node carrying any syntax in the file is reachable wherever it was written.
+func walkModuleValues(module *ir.Module, visit func(ir.Value) bool) {
+	for _, c := range module.Consts {
+		if c != nil {
+			ir.WalkValues(c.Value, visit)
+		}
+	}
+	for _, a := range module.Asserts {
+		if a != nil {
+			ir.WalkValues(a.CondGraph, visit)
+		}
+	}
+	for _, fn := range module.Funcs {
+		if fn != nil {
+			ir.WalkBody(fn.Body, visit)
+		}
+	}
+	for _, def := range module.Types {
+		for _, m := range def.Methods {
+			ir.WalkBody(m.Body, visit)
+		}
+		for _, c := range def.Consts {
+			if c != nil {
+				ir.WalkValues(c.ValueGraph, visit)
+			}
+		}
+		if def.Enum != nil {
+			for _, m := range def.Enum.Members {
+				ir.WalkValues(m.ValueGraph, visit)
+			}
+		}
+		if def.Where != nil {
+			ir.WalkValues(def.Where, visit)
+		}
+		if def.Master != nil {
+			ir.WalkBody(masterCheckStmts(def.Master.RowChecks), visit)
+			ir.WalkBody(masterCheckStmts(def.Master.AllChecks), visit)
+		}
+	}
+}
+
 // walkStmts calls fn for every statement in a body, descending into the nested
-// bodies a control-flow statement carries — the statement twin of ir.WalkBody,
-// which exposes only the value graphs.
+// bodies a control-flow statement carries and the function-literal bodies its value
+// graphs hold — the statement twin of ir.WalkBody, which exposes only the value
+// graphs, extended to reach a statement (a setter write) nested in a lambda.
 func walkStmts(body []ir.Stmt, fn func(ir.Stmt)) {
 	for _, s := range body {
 		fn(s)
@@ -349,6 +374,16 @@ func walkStmts(body []ir.Stmt, fn func(ir.Stmt)) {
 		case *ir.For:
 			walkStmts(s.Body, fn)
 		}
+		// Descend into the function-literal bodies this statement's value graph holds,
+		// so a statement (a setter write) nested in a lambda is reached too. The walk
+		// stops at each literal — its body recurses here — to avoid visiting it twice.
+		ir.WalkBody([]ir.Stmt{s}, func(v ir.Value) bool {
+			if lit, ok := v.(*ir.FuncLiteral); ok {
+				walkStmts(lit.Body, fn)
+				return false
+			}
+			return true
+		})
 	}
 }
 

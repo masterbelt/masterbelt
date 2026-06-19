@@ -3,10 +3,6 @@ package lsp
 import (
 	"strings"
 	"testing"
-
-	protocol "github.com/owenrumney/go-lsp/lsp"
-
-	"github.com/masterbelt/masterbelt/pkg/source"
 )
 
 // memberDefSrc declares a master with a static fn and a scope entry, a plain type
@@ -55,6 +51,61 @@ func TestDefinitionMemberMethod(t *testing.T) {
 				t.Errorf("definition(%s) stayed at/after the call (offset %d >= %d); want the earlier declaration", c.call, start, off)
 			}
 		})
+	}
+}
+
+// TestDefinitionMemberCallInAssocConst pins that a method call inside an associated
+// constant's initializer navigates: the editor's expression walk reaches the impl
+// block's const initializers, and the resolution walk covers their value graphs, so
+// Counter(0).inc() in const Next = ... resolves inc to its declaration.
+func TestDefinitionMemberCallInAssocConst(t *testing.T) {
+	src := "pub type Counter = int impl {\n  pub fn inc(): self {\n    return self\n  }\n  pub const Next: Counter = Counter(0).inc()\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "Counter(0).inc()") + len("Counter(0).")
+	locs := definition(doc, off)
+	if len(locs) != 1 {
+		t.Fatalf("definition(inc in assoc const) = %d locations, want 1", len(locs))
+	}
+	start := fromPosition(doc.Buffer(), locs[0].Range.Start)
+	want := strings.Index(src, "pub fn inc") + len("pub fn ")
+	if start != want {
+		t.Errorf("definition start = %d, want the inc declaration at %d", start, want)
+	}
+}
+
+// TestDefinitionMemberCallInAssert pins that a method call inside a top-level assertion
+// navigates: the resolution walk covers assert condition graphs, so the inc of
+// assert C.inc() == C resolves to its declaration.
+func TestDefinitionMemberCallInAssert(t *testing.T) {
+	src := "pub type Counter = int impl {\n  pub fn inc(): self {\n    return self\n  }\n}\n" +
+		"const C: Counter = 0\nassert C.inc() == C\n"
+	doc := testView(src)
+	off := strings.Index(src, "C.inc()") + len("C.")
+	locs := definition(doc, off)
+	if len(locs) != 1 {
+		t.Fatalf("definition(inc in assert) = %d locations, want 1", len(locs))
+	}
+	start := fromPosition(doc.Buffer(), locs[0].Range.Start)
+	want := strings.Index(src, "pub fn inc") + len("pub fn ")
+	if start != want {
+		t.Errorf("definition start = %d, want the inc declaration at %d", start, want)
+	}
+}
+
+// TestDefinitionSetterInLambda pins that a setter write nested in a function literal
+// navigates: the statement walk descends into lambda bodies, so the fahrenheit of a
+// c.fahrenheit = 212 written inside a lambda resolves to the setter declaration.
+func TestDefinitionSetterInLambda(t *testing.T) {
+	src := accessorType +
+		"fn boil(): Celsius {\n" +
+		"  let bump = fn() {\n    let c = Celsius.freezing()\n    c.fahrenheit = 212\n    return c\n  }\n" +
+		"  return bump()\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "c.fahrenheit = 212") + len("c.")
+	locs := definition(doc, off)
+	want := strings.Index(src, "pub set fahrenheit") + len("pub set ")
+	if len(locs) != 1 || fromPosition(doc.Buffer(), locs[0].Range.Start) != want {
+		t.Errorf("a setter write in a lambda should navigate to the setter at %d; got %+v", want, locs)
 	}
 }
 
@@ -150,28 +201,18 @@ func TestDefinitionAccessor(t *testing.T) {
 	getterDecl := strings.Index(src, "pub get fahrenheit") + len("pub get ")
 	setterDecl := strings.Index(src, "pub set fahrenheit") + len("pub set ")
 
-	t.Run("getter read", func(t *testing.T) {
+	t.Run("getter read navigates to the getter only", func(t *testing.T) {
 		off := strings.Index(src, "Cref.fahrenheit") + len("Cref.")
 		locs := definition(doc, off)
-		if !coversOffset(buf, locs, getterDecl) {
-			t.Errorf("a getter read should navigate to the getter declaration at %d; got %+v", getterDecl, locs)
+		if len(locs) != 1 || fromPosition(buf, locs[0].Range.Start) != getterDecl {
+			t.Errorf("a getter read should navigate to the getter declaration at %d only, not the setter; got %+v", getterDecl, locs)
 		}
 	})
-	t.Run("setter write", func(t *testing.T) {
+	t.Run("setter write navigates to the setter only", func(t *testing.T) {
 		off := strings.Index(src, "c.fahrenheit = 212") + len("c.")
 		locs := definition(doc, off)
-		if !coversOffset(buf, locs, setterDecl) {
-			t.Errorf("a setter write should navigate to the setter declaration at %d; got %+v", setterDecl, locs)
+		if len(locs) != 1 || fromPosition(buf, locs[0].Range.Start) != setterDecl {
+			t.Errorf("a setter write should navigate to the setter declaration at %d only, not the getter; got %+v", setterDecl, locs)
 		}
 	})
-}
-
-// coversOffset reports whether some location's start is exactly at off.
-func coversOffset(buf source.Buffer, locs []protocol.Location, off int) bool {
-	for _, l := range locs {
-		if fromPosition(buf, l.Range.Start) == off {
-			return true
-		}
-	}
-	return false
 }

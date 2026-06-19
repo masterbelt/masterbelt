@@ -224,21 +224,22 @@ func memberMethodDefinition(doc view, offset int, trees map[cst.Green]cst.Tree) 
 		}
 		return nil, false
 	}
-	// A member read or write that is not a call resolves to an accessor — a getter on a
-	// read, a setter on a write — through the receiver's type. A plain field read has no
-	// such method, so it navigates nowhere here rather than to a same-named method.
-	recv := receiverTypeOf(doc, member.Receiver, trees, offset, doc.ExprTypes())
-	if recv == nil || recv == ir.Invalid {
-		// The checker does not type an assignment target's receiver (c.fahrenheit = v),
-		// so read it off the lowered setter call instead — the one member access whose
-		// receiver receiverTypeOf cannot settle.
-		recv, ok = doc.AssignTargetReceiverType(member)
-		if !ok {
-			return nil, false
+	// A member read that is not a call resolves to a getter through the receiver's type;
+	// a plain field read has no getter, so it navigates nowhere rather than to a
+	// same-named setter or method.
+	if recv := receiverTypeOf(doc, member.Receiver, trees, offset, doc.ExprTypes()); recv != nil && recv != ir.Invalid {
+		if locs := methodDeclLocations(doc, accessorMethods(doc, recv, member.Member.Name, ir.MethodGetter)); len(locs) > 0 {
+			return locs, true
 		}
+		return nil, false
 	}
-	if locs := methodDeclLocations(doc, accessorMethods(doc, recv, member.Member.Name)); len(locs) > 0 {
-		return locs, true
+	// A member write resolves to a setter. The checker does not type an assignment
+	// target's receiver (c.fahrenheit = v), so its type is read off the lowered setter
+	// call — the one member access whose receiver receiverTypeOf cannot settle.
+	if recv, ok := doc.AssignTargetReceiverType(member); ok {
+		if locs := methodDeclLocations(doc, accessorMethods(doc, recv, member.Member.Name, ir.MethodSetter)); len(locs) > 0 {
+			return locs, true
+		}
 	}
 	return nil, false
 }
@@ -258,18 +259,19 @@ func callWithCallee(doc view, member *ast.MemberExpr) (*ast.CallExpr, bool) {
 	return call, call != nil
 }
 
-// accessorMethods returns the getter and setter methods named name that recv binds —
-// the accessors a member read (value.name) or write (value.name = x) navigates to.
-// Ordinary methods are not accessors and are reached only through a call, so they are
-// left out here; a plain field, which is not a method, yields none.
-func accessorMethods(doc view, recv ir.Type, name string) []*ir.Method {
+// accessorMethods returns the accessor methods of the given kind named name that recv
+// binds — the getter a member read (value.name) navigates to, or the setter a write
+// (value.name = x) does. Filtering by the access kind keeps a read off the setter and a
+// write off the getter; an ordinary method is reached only through a call, and a plain
+// field is not a method, so neither is returned here.
+func accessorMethods(doc view, recv ir.Type, name string, kind ir.MethodKind) []*ir.Method {
 	ms, _, ok := doc.ReceiverMethods(recv)
 	if !ok {
 		return nil
 	}
 	var accessors []*ir.Method
 	for _, m := range ms {
-		if (m.Kind == ir.MethodGetter || m.Kind == ir.MethodSetter) && m.Name == name {
+		if m.Kind == kind && m.Name == name {
 			accessors = append(accessors, m)
 		}
 	}
