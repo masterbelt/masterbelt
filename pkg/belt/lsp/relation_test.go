@@ -414,6 +414,51 @@ func TestCompletionQueryColumns(t *testing.T) {
 	}
 }
 
+// TestCompletionQueryBindingShadowingType pins that a query binding whose name also
+// names a type wins the member access: in where(fn(Rarity) -> Rarity.) the parameter
+// Rarity (typed columns<Cards>) shadows the enum Rarity in value position, so its member
+// access offers the master's columns, not the enum's members — the columns check runs
+// before the receiver-as-type reading.
+func TestCompletionQueryBindingShadowingType(t *testing.T) {
+	src := "enum Rarity { common, legend }\n" +
+		"master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n" +
+		"fn probe(): nint {\n  return Cards.where(fn(Rarity) -> Rarity.).count()\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "Rarity.)") + len("Rarity.")
+	items := byLabel(completion(doc, off).Items)
+	for _, col := range []string{"id", "cost"} {
+		it, ok := items[col]
+		if !ok {
+			t.Errorf("the binding Rarity shadows the enum; Rarity. should offer the column %q: %v", col, labels(items))
+			continue
+		}
+		if it.Kind == nil || *it.Kind != protocol.CompletionItemKindField {
+			t.Errorf("%s kind = %v, want Field", col, it.Kind)
+		}
+	}
+	for _, m := range []string{"common", "legend"} {
+		if _, ok := items[m]; ok {
+			t.Errorf("the enum is shadowed by the binding; its member %q must not be offered: %v", m, labels(items))
+		}
+	}
+}
+
+// TestCompletionQueryColumnsGenericAliasRow pins that the column completion mirrors the
+// checker's column rule, not a broader record expansion: a master whose row is a generic
+// record alias (record Box<int>) is a row form the checker does not lift columns from, so
+// a query binding over it offers no columns — never one a where/sum query could not use.
+func TestCompletionQueryColumnsGenericAliasRow(t *testing.T) {
+	src := "type Box<T> = { value: T }\n" +
+		"master Cards {\n  record Box<int>\n  primary value\n}\n" +
+		"fn probe(): nint {\n  return Cards.where(fn(c) -> c.).count()\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "c.)") + len("c.")
+	items := byLabel(completion(doc, off).Items)
+	if _, ok := items["value"]; ok {
+		t.Errorf("a generic record alias row lifts no columns; value must not be offered: %v", labels(items))
+	}
+}
+
 // TestCompletionUserColumnsNotMistaken pins that the column completion matches the
 // prelude columns builtin by identity, not by name: a file that declares its own
 // generic type columns<T> and accesses a member of it gets that type's real fields,

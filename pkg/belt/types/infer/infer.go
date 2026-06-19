@@ -508,6 +508,40 @@ func columnsFieldType(reg *builtin.Registry, recv ir.Type, name string) ir.Type 
 	return &ir.App{Def: colDef, Args: []ir.Type{master, ft}}
 }
 
+// QueryColumns returns the columns a query binding of type recv (columns<M>) offers
+// and whether recv is the query binding at all. Each column is an ir.Field naming one
+// of master M's row fields, typed as the column<M, FieldType> a column access reads it
+// as — the exact set columnsFieldType resolves, the master's row read through the same
+// recordOf, so a row form recordOf does not lift (a generic record alias application)
+// yields no columns rather than a column a query cannot use. ok is false for any other
+// receiver, including a file's own generic columns<T>, matched off by identity. It is
+// the editor's read of the columns a query names, so a completion offers exactly the
+// columns the checker would accept.
+func QueryColumns(reg *builtin.Registry, recv ir.Type) ([]ir.Field, bool) {
+	app, ok := recv.(*ir.App)
+	if !ok || app.Def == nil || len(app.Args) != 1 {
+		return nil, false
+	}
+	if def, ok := reg.Lookup(builtin.NameColumns); !ok || app.Def != def {
+		return nil, false
+	}
+	master, ok := app.Args[0].(*ir.Named)
+	if !ok || master.Def == nil || master.Def.Master == nil {
+		return nil, false
+	}
+	rec := recordOf(master.Def.Master.Row)
+	if rec == nil {
+		return nil, true // a query binding whose row form lifts no columns
+	}
+	cols := make([]ir.Field, 0, len(rec.Fields))
+	for _, f := range rec.Fields {
+		if ct := columnsFieldType(reg, recv, f.Name); ct != ir.Invalid {
+			cols = append(cols, ir.Field{Name: f.Name, Type: ct})
+		}
+	}
+	return cols, true
+}
+
 // queryColumnElem returns the value type T of a column<M, T> receiver — the type a
 // comparison against the column expects its operand to be — matching the prelude's
 // column by identity. It is how a bare member argument (c.rarity == legend) finds

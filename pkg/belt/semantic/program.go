@@ -231,22 +231,15 @@ func (p *Program) ReceiverMethods(recv ir.Type) ([]*ir.Method, map[string]ir.Typ
 	return types.ReceiverMethods(p.db.reg, recv)
 }
 
-// QueryColumnsMaster returns the master a query binding's columns<M> type names — the
-// receiver of a query column access, the c in where(fn(c) -> ...) — together with true.
-// The columns builtin is matched by identity against the registry's definition, not by
-// name, so a file that declares its own generic type columns<T> is not mistaken for the
-// query binding (the rule columnsFieldType resolves a column access by). ok is false for
-// any other type.
-func (p *Program) QueryColumnsMaster(recv ir.Type) (ir.Type, bool) {
-	app, ok := recv.(*ir.App)
-	if !ok || len(app.Args) != 1 {
-		return nil, false
-	}
-	def, ok := p.db.reg.Lookup(builtin.NameColumns)
-	if !ok || app.Def != def {
-		return nil, false
-	}
-	return app.Args[0], true
+// QueryColumns returns the columns a query binding's columns<M> type offers — the
+// receiver of a query column access, the c in where(fn(c) -> ...) — each an ir.Field
+// typed as the column<M, FieldType> it reads as, and whether recv is the query binding
+// at all. It mirrors the checker's column rule (columnsFieldType): the columns builtin
+// matched by identity, not by name, so a file's own generic type columns<T> is not
+// mistaken for it, and the master's row read through the same recordOf, so a row form
+// that lifts no columns yields none. ok is false for any other type.
+func (p *Program) QueryColumns(recv ir.Type) ([]ir.Field, bool) {
+	return infer.QueryColumns(p.db.reg, recv)
 }
 
 // FileOf returns the file a constant of the last Refresh is declared in.
