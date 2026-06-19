@@ -116,9 +116,15 @@ func relationChain(recv ir.Value, env eval.GraphEnv, allowLimit bool) (rel Relat
 				recv = r.Receiver
 				sawFilterOrOrder = true
 			case r.Method == "order" && len(r.Args) == 1:
-				col, desc, ok := orderKey(r.Args[0])
+				col, desc, elem, ok := orderKey(r.Args[0])
 				if !ok {
 					return Relation{}, nil, nil, false
+				}
+				// A column whose type carries a custom order cannot be sorted by plain
+				// SQL — it would sort by the stored scalar, not the type's order — so the
+				// key is recorded but reported unsupported, and the consumer fails safe.
+				if !sqlOrderable(elem) {
+					unsupported = append(unsupported, Unsupported{Node: r.Args[0], Reason: "order by a column with a custom order"})
 				}
 				rel = rel.OrderBy(col, desc)
 				recv = r.Receiver
@@ -144,14 +150,14 @@ func relationChain(recv ir.Value, env eval.GraphEnv, allowLimit bool) (rel Relat
 // on a column field access, so a selector that does not name a column ordering is not
 // recognized and the chain is left unfoldable. The field access carries the column's
 // name; the method name carries the direction.
-func orderKey(v ir.Value) (column string, desc, ok bool) {
+func orderKey(v ir.Value) (column string, desc bool, elem ir.Type, ok bool) {
 	body, ok := whereBody(v)
 	if !ok {
-		return "", false, false
+		return "", false, nil, false
 	}
 	call, ok := unwrap(body).(*ir.Call)
 	if !ok || len(call.Args) != 0 {
-		return "", false, false
+		return "", false, nil, false
 	}
 	switch call.Method {
 	case "asc":
@@ -159,16 +165,17 @@ func orderKey(v ir.Value) (column string, desc, ok bool) {
 	case "desc":
 		desc = true
 	default:
-		return "", false, false
+		return "", false, nil, false
 	}
 	fa, ok := unwrap(call.Receiver).(*ir.FieldAccess)
 	if !ok {
-		return "", false, false
+		return "", false, nil, false
 	}
-	if _, ok := columnElem(fa); !ok {
-		return "", false, false
+	el, ok := columnElem(fa)
+	if !ok {
+		return "", false, nil, false
 	}
-	return fa.Field, desc, true
+	return fa.Field, desc, el, true
 }
 
 // limitValue reads the row cap a limit(n) carries: the evaluator folds the argument

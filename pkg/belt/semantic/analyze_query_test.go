@@ -517,6 +517,35 @@ func TestColumnOrderingRequiresOrderable(t *testing.T) {
 	}
 }
 
+// TestColumnOrderingMethodsRequireOrderable pins that a column's asc/desc — the sort
+// operators yielding an ordering<M> — stand only for an orderable element type, the
+// same rule the comparison orderings follow: a bool column has no order, while an int,
+// string, or enum column does. Without it any column could be sorted, giving an order
+// to a value the language treats as unordered.
+func TestColumnOrderingMethodsRequireOrderable(t *testing.T) {
+	const m = "enum Rarity { common; rare; legend }\n" +
+		"master Cards {\n  record { id: int, cost: int, name: string, rarity: Rarity, active: bool }\n  primary id\n}\n"
+	cases := []struct {
+		name, key string
+		wantErr   bool
+	}{
+		{"bool asc rejected", "c.active.asc()", true},
+		{"bool desc rejected", "c.active.desc()", true},
+		{"int asc allowed", "c.cost.asc()", false},
+		{"int desc allowed", "c.cost.desc()", false},
+		{"string asc allowed", "c.name.asc()", false},
+		{"enum desc allowed", "c.rarity.desc()", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			src := m + "fn probe(c: columns<Cards>): ordering<Cards> {\n  return " + tc.key + "\n}\n"
+			if _, diags := analyze(src); (len(diags) != 0) != tc.wantErr {
+				t.Errorf("%q: gotErr=%v (diags %v), wantErr=%v", tc.key, len(diags) != 0, codes(diags), tc.wantErr)
+			}
+		})
+	}
+}
+
 // TestColumnEqualityRequiresComparable pins the equality half of the same rule: a
 // column whose element type is not comparable has no == either, just as the value
 // comparison would be invalid — so the comparison guard covers eql/neq, not only the

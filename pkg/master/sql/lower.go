@@ -340,6 +340,24 @@ func summableBuiltin(name string) bool {
 	}
 }
 
+// sqlOrderable reports whether a column's element type can be ordered by plain SQL —
+// it does not define its own ordering. A type that declares a relational operator
+// (lt/lteq/gt/gteq of its own) carries a custom order SQL's native ORDER BY would not
+// honor: it would sort by the stored scalar, not the type's order. It is the ordering
+// twin of the comparison lowering's overridden-operator rejection and the sum
+// lowering's custom-add rejection. The element's language orderability — that it has a
+// relational operator at all, not a bool — is the checker's guard; this is only the
+// custom-semantics exclusion the driver adds.
+func sqlOrderable(elem ir.Type) bool {
+	t := nonNullType(elem)
+	for _, op := range []string{"lt", "lteq", "gt", "gteq"} {
+		if declaresMethod(t, op) {
+			return false
+		}
+	}
+	return true
+}
+
 // nonNullType strips a null member from a union, yielding the single remaining
 // member — so a nullable type T | null is examined as T. A non-union, or a union
 // with more than one non-null member, is returned unchanged.

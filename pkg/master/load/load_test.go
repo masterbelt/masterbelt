@@ -1001,6 +1001,23 @@ func TestValidateAllLimitBeforeOrderFailsSafe(t *testing.T) {
 	}
 }
 
+// TestValidateAllOrderCustomOrderFailsSafe pins that a column whose type defines its
+// own ordering is not sorted by plain SQL: Rank declares lt, so it is orderable (the
+// checker accepts the order) but its order is custom, which SQL's ORDER BY on the raw
+// integer would not honor. The driver declines the key and the check fails safe rather
+// than sorting by the stored value — even here, where the custom order happens to match
+// the integer order, the driver must decline because it cannot know that.
+func TestValidateAllOrderCustomOrderFailsSafe(t *testing.T) {
+	const belt = "type Rank = int impl { pub lt(o: Rank): bool { return self.int() < o.int() } }\n" +
+		"master Cards {\n  record { id: int, rank: Rank }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.order(fn(c) -> c.rank.asc()).to_list()[0].id == 1\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,rank\n1,5\n2,30\n3,20\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) == 0 {
+		t.Error("order by a custom-ordered column must fail safe: SQL's native ORDER BY does not carry the type's order")
+	}
+}
+
 // TestValidateAllWideEnumColumnIgnored pins that an enum column whose member value is
 // beyond SQLite's range does not disable aggregates over the other columns, the enum
 // twin of the wide-integer-column rule: an unused enum with an overwide member is left
