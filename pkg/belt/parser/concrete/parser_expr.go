@@ -737,6 +737,13 @@ func (p *parser) parseOperand() cst.Green {
 		// never begins the `type Foo =` declaration the keyword otherwise heads —
 		// and the semantic layer reifies it to a type value, like any type name.
 		return cst.NewNode(cst.NameRef, []cst.Green{p.bump()})
+	case token.Where:
+		// The `where` keyword names the relation's narrowing method when it begins an
+		// expression — where(...) over a master relation, the scope-body form that
+		// reads as self.where(...). A value-expression position never begins the
+		// refinement `T where pred` clause the keyword otherwise heads (that is parsed
+		// in type position), so reading it as a name here is unambiguous.
+		return cst.NewNode(cst.NameRef, []cst.Green{p.bump()})
 	case token.Fn:
 		return p.parseFuncLit()
 	case token.LParen:
@@ -1076,7 +1083,7 @@ func nameLike(kind token.Kind) bool {
 func startsExpr(kind token.Kind) bool {
 	switch kind {
 	case token.Int, token.BinInt, token.OctInt, token.HexInt, token.String, token.DatetimeLit, token.DurationLit,
-		token.Ident, token.True, token.False, token.Null, token.Self, token.Type,
+		token.Ident, token.True, token.False, token.Null, token.Self, token.Type, token.Where,
 		token.LBracket, token.LBrace, token.Plus, token.Minus, token.Bang,
 		token.Fn, token.LParen, token.Await:
 		return true

@@ -1,0 +1,567 @@
+Module
+  Consts: ~
+  Types:
+    TypeDef
+      Name: "Rarity"
+      Anchor: "belt:/Rarity"
+      Public: false
+      Doc: ~
+      Params: ~
+      Body: ~
+      Methods:
+        Method
+          Name: "eql"
+          Anchor: "belt:/Rarity#eql"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          TypeParams: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Rarity"
+        Method
+          Name: "neq"
+          Anchor: "belt:/Rarity#neq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          TypeParams: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Rarity"
+        Method
+          Name: "lt"
+          Anchor: "belt:/Rarity#lt"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          TypeParams: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Rarity"
+        Method
+          Name: "lteq"
+          Anchor: "belt:/Rarity#lteq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          TypeParams: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Rarity"
+        Method
+          Name: "gt"
+          Anchor: "belt:/Rarity#gt"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          TypeParams: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Rarity"
+        Method
+          Name: "gteq"
+          Anchor: "belt:/Rarity#gteq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          TypeParams: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Rarity"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls:
+        Named
+          Def: "comparable"
+        Named
+          Def: "orderable"
+      Enum: EnumDef
+        Base: "nint"
+        Members:
+          EnumMember
+            Name: "common"
+            Value: Constant
+              Kind: 0
+              Int: 0
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+          EnumMember
+            Name: "rare"
+            Value: Constant
+              Kind: 0
+              Int: 1
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+          EnumMember
+            Name: "legend"
+            Value: Constant
+              Kind: 0
+              Int: 2
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Cards"
+      Anchor: "belt:/Cards"
+      Public: false
+      Doc: ~
+      Params: ~
+      Body: ~
+      Methods:
+        Method
+          Name: "expensive"
+          Anchor: "belt:/Cards#expensive"
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Doc: ~
+          TypeParams: ~
+          Params: ~
+          Result: App
+            Def: "relation"
+            Args:
+              Named
+                Def: "Cards"
+          Body:
+            Return
+              Value: Call
+                Receiver: MasterRelation
+                  Master: "Cards"
+                  Type: App
+                    Def: "relation"
+                    Args:
+                      Named
+                        Def: "Cards"
+                Method: "where"
+                Args:
+                  FuncLiteral
+                    Params: "c"
+                    Body:
+                      Return
+                        Value: Call
+                          Receiver: FieldAccess
+                            Receiver: ParamRef
+                              Name: "c"
+                              Type: App
+                                Def: "columns"
+                                Args:
+                                  Named
+                                    Def: "Cards"
+                            Field: "cost"
+                            Type: App
+                              Def: "column"
+                              Args:
+                                Named
+                                  Def: "Cards"
+                                Builtin
+                                  Name: "int"
+                          Method: "gt"
+                          Args:
+                            Adapt
+                              Value: IntLiteral
+                                Text: "100"
+                                Type: Builtin
+                                  Name: "nint"
+                              To: Builtin
+                                Name: "int"
+                          Setter: false
+                          Resolved: "column.gt(T)"
+                          Subst:
+                            Entry
+                              Key: "M"
+                              Value: Named
+                                Def: "Cards"
+                            Entry
+                              Key: "T"
+                              Value: Builtin
+                                Name: "int"
+                          Type: App
+                            Def: "predicate"
+                            Args:
+                              Named
+                                Def: "Cards"
+                    Type: Func
+                      Params:
+                        App
+                          Def: "columns"
+                          Args:
+                            Named
+                              Def: "Cards"
+                      Result: App
+                        Def: "predicate"
+                        Args:
+                          Named
+                            Def: "Cards"
+                Setter: false
+                Resolved: ~
+                Subst:
+                  Entry
+                    Key: "M"
+                    Value: Named
+                      Def: "Cards"
+                Type: App
+                  Def: "relation"
+                  Args:
+                    Named
+                      Def: "Cards"
+          Owner: "Cards"
+        Method
+          Name: "rarity"
+          Anchor: "belt:/Cards#rarity"
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Doc: ~
+          TypeParams: ~
+          Params:
+            Param
+              Name: "r"
+              Type: Named
+                Def: "Rarity"
+          Result: App
+            Def: "relation"
+            Args:
+              Named
+                Def: "Cards"
+          Body:
+            Return
+              Value: Call
+                Receiver: MasterRelation
+                  Master: "Cards"
+                  Type: App
+                    Def: "relation"
+                    Args:
+                      Named
+                        Def: "Cards"
+                Method: "where"
+                Args:
+                  FuncLiteral
+                    Params: "c"
+                    Body:
+                      Return
+                        Value: Call
+                          Receiver: FieldAccess
+                            Receiver: ParamRef
+                              Name: "c"
+                              Type: App
+                                Def: "columns"
+                                Args:
+                                  Named
+                                    Def: "Cards"
+                            Field: "rarity"
+                            Type: App
+                              Def: "column"
+                              Args:
+                                Named
+                                  Def: "Cards"
+                                Named
+                                  Def: "Rarity"
+                          Method: "eql"
+                          Args:
+                            ParamRef
+                              Name: "r"
+                              Type: Named
+                                Def: "Rarity"
+                          Setter: false
+                          Resolved: "column.eql(T)"
+                          Subst:
+                            Entry
+                              Key: "M"
+                              Value: Named
+                                Def: "Cards"
+                            Entry
+                              Key: "T"
+                              Value: Named
+                                Def: "Rarity"
+                          Type: App
+                            Def: "predicate"
+                            Args:
+                              Named
+                                Def: "Cards"
+                    Type: Func
+                      Params:
+                        App
+                          Def: "columns"
+                          Args:
+                            Named
+                              Def: "Cards"
+                      Result: App
+                        Def: "predicate"
+                        Args:
+                          Named
+                            Def: "Cards"
+                Setter: false
+                Resolved: ~
+                Subst:
+                  Entry
+                    Key: "M"
+                    Value: Named
+                      Def: "Cards"
+                Type: App
+                  Def: "relation"
+                  Args:
+                    Named
+                      Def: "Cards"
+          Owner: "Cards"
+        Method
+          Name: "top"
+          Anchor: "belt:/Cards#top"
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Doc: ~
+          TypeParams: ~
+          Params:
+            Param
+              Name: "n"
+              Type: Builtin
+                Name: "nint"
+          Result: App
+            Def: "relation"
+            Args:
+              Named
+                Def: "Cards"
+          Body:
+            Return
+              Value: Call
+                Receiver: Call
+                  Receiver: MasterRelation
+                    Master: "Cards"
+                    Type: App
+                      Def: "relation"
+                      Args:
+                        Named
+                          Def: "Cards"
+                  Method: "order"
+                  Args:
+                    FuncLiteral
+                      Params: "c"
+                      Body:
+                        Return
+                          Value: Call
+                            Receiver: FieldAccess
+                              Receiver: ParamRef
+                                Name: "c"
+                                Type: App
+                                  Def: "columns"
+                                  Args:
+                                    Named
+                                      Def: "Cards"
+                              Field: "cost"
+                              Type: App
+                                Def: "column"
+                                Args:
+                                  Named
+                                    Def: "Cards"
+                                  Builtin
+                                    Name: "int"
+                            Method: "desc"
+                            Args: ~
+                            Setter: false
+                            Resolved: ~
+                            Subst:
+                              Entry
+                                Key: "M"
+                                Value: Named
+                                  Def: "Cards"
+                              Entry
+                                Key: "T"
+                                Value: Builtin
+                                  Name: "int"
+                            Type: App
+                              Def: "ordering"
+                              Args:
+                                Named
+                                  Def: "Cards"
+                      Type: Func
+                        Params:
+                          App
+                            Def: "columns"
+                            Args:
+                              Named
+                                Def: "Cards"
+                        Result: App
+                          Def: "ordering"
+                          Args:
+                            Named
+                              Def: "Cards"
+                  Setter: false
+                  Resolved: ~
+                  Subst:
+                    Entry
+                      Key: "M"
+                      Value: Named
+                        Def: "Cards"
+                  Type: App
+                    Def: "relation"
+                    Args:
+                      Named
+                        Def: "Cards"
+                Method: "limit"
+                Args:
+                  ParamRef
+                    Name: "n"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst:
+                  Entry
+                    Key: "M"
+                    Value: Named
+                      Def: "Cards"
+                Type: App
+                  Def: "relation"
+                  Args:
+                    Named
+                      Def: "Cards"
+          Owner: "Cards"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: MasterDef
+        Row: Record
+          Fields:
+            Field
+              Name: "id"
+              Type: Builtin
+                Name: "int"
+            Field
+              Name: "cost"
+              Type: Builtin
+                Name: "int"
+            Field
+              Name: "rarity"
+              Type: Named
+                Def: "Rarity"
+        Primary: "id"
+        RowChecks: ~
+        AllChecks:
+          AssertStmt
+            Cond: Call
+              Receiver: Call
+                Receiver: StaticCall
+                  Def: "Cards"
+                  Name: "expensive"
+                  Args: ~
+                  Resolved: ~
+                  Subst: ~
+                  Type: App
+                    Def: "relation"
+                    Args:
+                      Named
+                        Def: "Cards"
+                Method: "count"
+                Args: ~
+                Setter: false
+                Resolved: ~
+                Subst:
+                  Entry
+                    Key: "M"
+                    Value: Named
+                      Def: "Cards"
+                Type: Builtin
+                  Name: "nint"
+              Method: "eql"
+              Args:
+                IntLiteral
+                  Text: "2"
+                  Type: Builtin
+                    Name: "nint"
+              Setter: false
+              Resolved: ~
+              Subst: ~
+              Type: Builtin
+                Name: "bool"
+      Where: ~
+  Funcs: ~
+  Asserts: ~

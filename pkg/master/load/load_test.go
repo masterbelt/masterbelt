@@ -1151,6 +1151,49 @@ func TestValidateAllOffsetBeforeAggregateFailsSafe(t *testing.T) {
 	}
 }
 
+// TestValidateAllScopeDrives pins that a named scope — a scope-block entry — drives as
+// the static fn it desugars to: the body's leading relation method reads against the
+// implicit master relation (where(...) is self.where(...)), so a scope composes with
+// the algebra (count, sum, a further where) and a parameterized scope filters by its
+// argument. expensive() keeps the two rows costing over 100; rarity(legend) the one.
+func TestValidateAllScopeDrives(t *testing.T) {
+	const decls = "enum Rarity { common; rare; legend }\n" +
+		"master Cards {\n  record { id: int, cost: int, rarity: Rarity }\n" +
+		"  scope {\n    pub expensive() -> where(fn(c) -> c.cost > 100)\n" +
+		"    pub rarity(r: Rarity) -> where(fn(c) -> c.rarity == r)\n" +
+		"    pub top(n: nint) -> order(fn(c) -> c.cost.desc()).limit(n)\n  }\n  primary id\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost,rarity\n1,50,common\n2,150,rare\n3,200,legend\n"}
+	for _, c := range []struct {
+		name, body string
+	}{
+		{"scope count", "Cards.expensive().count() == 2"},
+		{"scope sum", "Cards.expensive().sum(fn(c) -> c.cost) == 350"},
+		{"scope composes where", "Cards.expensive().where(fn(c) -> c.cost > 175).count() == 1"},
+		{"parameterized scope", "Cards.rarity(Rarity.legend).count() == 1"},
+		{"scope chains order and limit", "Cards.top(1).to_list()[0].cost == 200"},
+	} {
+		belt := decls + "  validate {\n    all {\n      assert " + c.body + "\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+		if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+			t.Errorf("%s (%s): table_validation_failed = %d, want 0", c.name, c.body, countTableFailures(diags))
+		}
+	}
+}
+
+// TestValidateAllScopeRejectsWrong is the negative twin: a check over a scope that does
+// not hold of the real rows must fail, proving the scope runs its query rather than
+// passing vacuously — expensive() keeps two rows, not three.
+func TestValidateAllScopeRejectsWrong(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, cost: int }\n" +
+		"  scope {\n    pub expensive() -> where(fn(c) -> c.cost > 100)\n  }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.expensive().count() == 3\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,cost\n1,50\n2,150\n3,200\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) == 0 {
+		t.Error("expensive().count() == 3 must fail: only two rows cost over 100, so a pass means the scope query was not run")
+	}
+}
+
 // TestValidateAllWideEnumColumnIgnored pins that an enum column whose member value is
 // beyond SQLite's range does not disable aggregates over the other columns, the enum
 // twin of the wide-integer-column rule: an unused enum with an overwide member is left

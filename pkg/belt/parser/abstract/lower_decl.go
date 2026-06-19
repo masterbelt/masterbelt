@@ -281,18 +281,19 @@ func lowerMasterDecl(t cst.Tree, buf source.Buffer) *ast.MasterDecl {
 	green, _ := t.Node()
 
 	var (
-		doc         []string
-		public      bool
-		name        string
-		seenBody    bool
-		record      ast.TypeExpr
-		where       ast.Expr
-		methods     []*ast.MethodDecl
-		consts      []*ast.ConstDecl
-		impls       []ast.TypeExpr
-		primary     []string
-		sources     []*ast.SourceEntry
-		validations []*ast.ValidateClause
+		doc          []string
+		public       bool
+		name         string
+		seenBody     bool
+		record       ast.TypeExpr
+		where        ast.Expr
+		methods      []*ast.MethodDecl
+		consts       []*ast.ConstDecl
+		impls        []ast.TypeExpr
+		primary      []string
+		sources      []*ast.SourceEntry
+		validations  []*ast.ValidateClause
+		scopeMethods []*ast.MethodDecl
 	)
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
@@ -328,12 +329,20 @@ func lowerMasterDecl(t cst.Tree, buf source.Buffer) *ast.MasterDecl {
 			sources = append(sources, lowerMasterSource(child, buf)...)
 		case cst.MasterValidate:
 			validations = append(validations, lowerMasterValidate(child, buf)...)
+		case cst.MasterScope:
+			scopeMethods = append(scopeMethods, lowerMasterScope(child, buf, name)...)
 		default:
 			// Any other child node (the MasterKeyword wrapping the master keyword)
 			// contributes no field of the master.
 		}
 	}
-	return ast.NewMasterDecl(doc, public, name, record, where, methods, consts, impls, primary, sources, validations, green)
+	// A scope entry desugars to a static fn returning the master's relation, so its
+	// methods join the record impl's — after them, independent of whether the scope
+	// block precedes or follows the record member in source.
+	allMethods := make([]*ast.MethodDecl, 0, len(methods)+len(scopeMethods))
+	allMethods = append(allMethods, methods...)
+	allMethods = append(allMethods, scopeMethods...)
+	return ast.NewMasterDecl(doc, public, name, record, where, allMethods, consts, impls, primary, sources, validations, green)
 }
 
 // lowerMasterValidate lowers a master's validate member to its clauses, in
@@ -374,8 +383,94 @@ func lowerValidateClause(t cst.Tree, buf source.Buffer) *ast.ValidateClause {
 	return ast.NewValidateClause(perRow, body, green)
 }
 
+// lowerMasterScope lowers a master's scope member to the static fns its entries
+// desugar to, in declaration order. A scope entry is sugar for a static fn that
+// returns the master's relation, so the named relation expression composes with the
+// query algebra (count, where, order, ...) the same way any relation does; master is
+// the master's name, which the synthesized relation<master> result type carries.
+func lowerMasterScope(t cst.Tree, buf source.Buffer, master string) []*ast.MethodDecl {
+	methods := make([]*ast.MethodDecl, 0, len(t.Children()))
+	for _, child := range t.Children() {
+		if node, ok := child.Node(); ok && node.Kind() == cst.ScopeEntry {
+			if m := lowerScopeEntry(child, buf, master); m != nil {
+				methods = append(methods, m)
+			}
+		}
+	}
+	return methods
+}
+
+// lowerScopeEntry desugars one scope entry — [pub] name(params) -> body — into a
+// static fn `[pub] static fn name(params): relation<master> { return body }`. The
+// body's leading relation-method call is rooted at self (the implicit master
+// relation), so `where(...)` reads as `self.where(...)`; an entry missing its name or
+// body is dropped (its malformed syntax already reported by the parser).
+func lowerScopeEntry(t cst.Tree, buf source.Buffer, master string) *ast.MethodDecl {
+	green, _ := t.Node()
+	var (
+		public bool
+		name   string
+		params []*ast.ParamDef
+		body   ast.Expr
+	)
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok {
+			switch tok.Kind() {
+			case token.Pub:
+				public = true
+			case token.Ident:
+				if name == "" {
+					name = child.Text(buf)
+				}
+			default:
+				// The arrow and any other token name no field of the entry.
+			}
+			continue
+		}
+		node, _ := child.Node()
+		if node.Kind() == cst.ParamList {
+			params = lowerParamList(child, buf)
+			continue
+		}
+		// The entry's only other node child is the body expression after the arrow.
+		if e := lowerExpr(child, buf); e != nil {
+			body = e
+		}
+	}
+	if name == "" || body == nil {
+		return nil
+	}
+	result := ast.NewNamedType("", "relation", []ast.TypeExpr{ast.NewNamedType("", master, nil, nil, green)}, nil, green)
+	ret := ast.NewReturnStmt(rootHeadAtSelf(body, green), green)
+	return ast.NewMethodDecl(nil, public, false, ast.MethodStatic, nil, name, nil, params, result, []ast.Stmt{ret}, green)
+}
+
+// rootHeadAtSelf roots the head of a relation-method chain at self, so a scope body
+// written without an explicit receiver — where(...).order(...) — reads as
+// self.where(...).order(...). It rewrites the innermost call whose callee is a bare
+// name (the chain's head) to call that name as a member of self; a head that already
+// has a receiver (self.where, Other.where) is left unchanged, so an explicit receiver
+// is never overridden. green anchors the synthesized self and member nodes.
+func rootHeadAtSelf(e ast.Expr, green *cst.Node) ast.Expr {
+	switch n := e.(type) {
+	case *ast.CallExpr:
+		switch callee := n.Callee.(type) {
+		case *ast.Identifier:
+			n.Callee = ast.NewMemberExpr(ast.NewSelfExpr(green), callee, green)
+		case *ast.MemberExpr:
+			callee.Receiver = rootHeadAtSelf(callee.Receiver, green)
+		}
+		return n
+	case *ast.MemberExpr:
+		n.Receiver = rootHeadAtSelf(n.Receiver, green)
+		return n
+	default:
+		return e
+	}
+}
+
 // masterKeywordText returns the text of the context keyword a MasterKeyword node
-// wraps (master, record, primary, source, validate, each, or all).
+// wraps (master, record, primary, source, validate, each, all, or scope).
 func masterKeywordText(t cst.Tree, buf source.Buffer) string {
 	for _, child := range t.Children() {
 		if _, ok := child.Token(); ok {

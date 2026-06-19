@@ -602,21 +602,15 @@ func (p *parser) parseMasterDecl(lead []cst.Green) *cst.Node {
 		case p.peekSignificant() == token.EOF:
 			return cst.NewNode(cst.MasterDecl, children)
 		case p.masterMemberIs("record"):
-			var lead []cst.Green
-			p.skipTrivia(&lead)
-			children = append(children, p.parseMasterRecord(lead))
+			children = append(children, p.masterMember(p.parseMasterRecord))
 		case p.masterMemberIs("primary"):
-			var lead []cst.Green
-			p.skipTrivia(&lead)
-			children = append(children, p.parseMasterPrimary(lead))
+			children = append(children, p.masterMember(p.parseMasterPrimary))
 		case p.masterMemberIs("source"):
-			var lead []cst.Green
-			p.skipTrivia(&lead)
-			children = append(children, p.parseMasterSource(lead))
+			children = append(children, p.masterMember(p.parseMasterSource))
 		case p.masterMemberIs("validate"):
-			var lead []cst.Green
-			p.skipTrivia(&lead)
-			children = append(children, p.parseMasterValidate(lead))
+			children = append(children, p.masterMember(p.parseMasterValidate))
+		case p.masterMemberIs("scope"):
+			children = append(children, p.masterMember(p.parseMasterScope))
 		default:
 			p.skipTrivia(&children)
 			p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
@@ -857,6 +851,87 @@ func (p *parser) parseValidateClause(lead []cst.Green) *cst.Node {
 	return cst.NewNode(cst.ValidateClause, children)
 }
 
+// parseMasterScope parses the scope member of a master declaration, prepending the
+// already-collected leading trivia:
+//
+//	scope "{" ( ScopeEntry )* "}"
+//
+// The block holds the master's named relation expressions — reusable, parameterized
+// queries over the rows. scope is an ordinary identifier everywhere else, recognized
+// here by position like the master's other members. Each entry is a ScopeEntry; an
+// entry begins with pub or its own name. The cursor sits on the scope keyword.
+func (p *parser) parseMasterScope(lead []cst.Green) *cst.Node {
+	children := lead
+	children = append(children, p.masterKeyword()) // "scope"
+
+	if p.peekSignificant() == token.LBrace {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // "{"
+	} else {
+		p.reportUnexpected()
+		return cst.NewNode(cst.MasterScope, children)
+	}
+
+	for {
+		switch {
+		case p.peekSignificant() == token.RBrace:
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // "}"
+			return cst.NewNode(cst.MasterScope, children)
+		case p.peekSignificant() == token.EOF:
+			return cst.NewNode(cst.MasterScope, children)
+		case p.peekSignificant() == token.Pub, p.peekSignificant() == token.Ident:
+			var lead []cst.Green
+			p.skipTrivia(&lead)
+			children = append(children, p.parseScopeEntry(lead))
+		default:
+			p.skipTrivia(&children)
+			p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+			children = append(children, p.bump())
+		}
+	}
+}
+
+// parseScopeEntry parses one entry of a scope member, prepending the already-collected
+// leading trivia:
+//
+//	[pub] Ident ParamList "->" Expr
+//
+// An entry names a relation expression and its parameters: pub rarity(r: Rarity) ->
+// where(fn(c) -> c.rarity == r). The body after "->" is an expression — a relation
+// method chain over the implicit master relation — which the AST lowering desugars
+// into a static fn returning relation<M>. The cursor sits on pub or the entry name.
+func (p *parser) parseScopeEntry(lead []cst.Green) *cst.Node {
+	children := lead
+	if p.kind() == token.Pub {
+		children = append(children, p.bump()) // "pub"
+		p.skipTrivia(&children)
+	}
+	if p.peekSignificant() == token.Ident {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // the entry name
+	} else {
+		p.reportUnexpected()
+		return cst.NewNode(cst.ScopeEntry, children)
+	}
+	if p.peekSignificant() == token.LParen {
+		p.skipTrivia(&children)
+		children = append(children, p.parseParamList(true))
+	} else {
+		p.reportUnexpected()
+	}
+	if p.peekSignificant() == token.Arrow {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // "->"
+	} else {
+		p.reportUnexpected()
+		return cst.NewNode(cst.ScopeEntry, children)
+	}
+	p.skipTrivia(&children)
+	children = append(children, p.parseExpr())
+	return cst.NewNode(cst.ScopeEntry, children)
+}
+
 // masterKeyword consumes the context-keyword identifier at the cursor
 // (master/record/primary/source) and wraps it in a MasterKeyword node, so the AST
 // lowering reads it as the construct's keyword rather than as a name, and the
@@ -876,6 +951,15 @@ func (p *parser) masterKeyword() cst.Green {
 func (p *parser) masterMemberIs(kw string) bool {
 	i := p.nextSignificantIndex(p.pos)
 	return p.toks[i].Kind == token.Ident && p.identText(i) == kw
+}
+
+// masterMember parses one master member with parse, handing it the member's leading
+// trivia (its doc comment most of all, which belongs to the member rather than the
+// master body). Every member begins this way, so the dispatch reads as one line each.
+func (p *parser) masterMember(parse func([]cst.Green) *cst.Node) *cst.Node {
+	var lead []cst.Green
+	p.skipTrivia(&lead)
+	return parse(lead)
 }
 
 // --- top-level functions ------------------------------------------------------

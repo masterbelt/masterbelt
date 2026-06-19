@@ -1,0 +1,21 @@
+enum Rarity {
+  common
+  rare
+  legend
+}
+
+master Cards {
+  record { id: int, cost: int, rarity: Rarity }
+  scope {
+    pub expensive() -> where(fn(c) -> c.cost > 100)
+    pub rarity(r: Rarity) -> where(fn(c) -> c.rarity == r)
+    pub top(n: nint) -> order(fn(c) -> c.cost.desc()).limit(n)
+  }
+  primary id
+  validate {
+    all {
+      assert Cards.expensive().count() == 2
+    }
+  }
+  source { csv "cards.csv" }
+}

@@ -137,7 +137,9 @@ const (
 	SourceEntry    // Ident StringLit [RecordLit]  (a format name, a locator string, and optional format options)
 	MasterValidate // validate "{" ValidateClause* "}"  (the per-row and per-table data checks)
 	ValidateClause // ( each | all ) Block  (one check block; the keyword names its scope — each is per-row, all per-table)
-	MasterKeyword  // a context keyword in a master declaration: master, record, primary, source, validate, each, or all (an Ident the parser recognizes by position)
+	MasterScope    // scope "{" ScopeEntry* "}"  (named relation expressions over the master)
+	ScopeEntry     // [pub] Ident ParamList "->" Expr  (one named, parameterized relation expression)
+	MasterKeyword  // a context keyword in a master declaration: master, record, primary, source, validate, each, all, or scope (an Ident the parser recognizes by position)
 
 	Error // a run of tokens that did not fit the grammar
 
@@ -211,6 +213,8 @@ var kindNames = [...]string{
 	SourceEntry:      "SourceEntry",
 	MasterValidate:   "MasterValidate",
 	ValidateClause:   "ValidateClause",
+	MasterScope:      "MasterScope",
+	ScopeEntry:       "ScopeEntry",
 	MasterKeyword:    "MasterKeyword",
 	Error:            "Error",
 }
