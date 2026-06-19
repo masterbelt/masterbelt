@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"math"
 	"math/big"
 
 	"github.com/masterbelt/masterbelt/pkg/belt/eval"
@@ -89,6 +90,13 @@ func SumRelation(chain ir.Value, env eval.GraphEnv) (rel Relation, column string
 // the same relation shape and lower the same where predicates.
 func relationChain(recv ir.Value, env eval.GraphEnv, allowLimit bool) (rel Relation, master *ir.TypeDef, unsupported []Unsupported, ok bool) {
 	rel = All()
+	// The walk runs outermost call first, so a where seen before a limit is applied
+	// after it — a filter over the already-capped relation, which the flat WHERE-then-
+	// LIMIT render cannot express (it would filter the whole table, then cap). Such a
+	// limit is declined, so a limit-before-where chain is left unfoldable and fails safe
+	// rather than returning rows from outside the capped relation. A where after a limit
+	// in source (limit outer, where inner) is the supported filter-then-cap order.
+	sawWhere := false
 	for {
 		switch r := unwrap(recv).(type) {
 		case *ir.MasterRelation:
@@ -104,7 +112,8 @@ func relationChain(recv ir.Value, env eval.GraphEnv, allowLimit bool) (rel Relat
 				unsupported = append(unsupported, u...)
 				rel = rel.Where(p)
 				recv = r.Receiver
-			case allowLimit && r.Method == "limit" && len(r.Args) == 1:
+				sawWhere = true
+			case allowLimit && r.Method == "limit" && len(r.Args) == 1 && !sawWhere:
 				n, ok := limitValue(r.Args[0])
 				if !ok {
 					return Relation{}, nil, nil, false
@@ -123,15 +132,24 @@ func relationChain(recv ir.Value, env eval.GraphEnv, allowLimit bool) (rel Relat
 // limitValue reads the row cap a limit(n) carries: the evaluator folds the argument
 // to an integer literal before the chain reaches here, so a non-literal (an
 // unevaluable cap) is not recognized and the whole materialization is left to fail
-// safe. A cap wider than int64 (or otherwise unparseable) is likewise unrecognized.
+// safe. A cap wider than int64 is a valid nint the SQL literal cannot hold, but a cap
+// that large is no effective cap (no table holds that many rows), so it clamps to the
+// widest representable cap rather than failing to render; a value below zero floors to
+// zero, the floor Relation.Limit keeps. An unparseable literal is not recognized.
 func limitValue(arg ir.Value) (int64, bool) {
 	lit, ok := unwrap(arg).(*ir.IntLiteral)
 	if !ok {
 		return 0, false
 	}
 	n, ok := new(big.Int).SetString(lit.Text, 0)
-	if !ok || !n.IsInt64() {
+	if !ok {
 		return 0, false
+	}
+	if !n.IsInt64() {
+		if n.Sign() < 0 {
+			return 0, true
+		}
+		return math.MaxInt64, true
 	}
 	return n.Int64(), true
 }

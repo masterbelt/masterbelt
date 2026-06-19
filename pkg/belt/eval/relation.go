@@ -72,13 +72,19 @@ func graphRelationMethod(v *ir.Call, recv *ir.Constant, ctx graphCtx) (*ir.Const
 
 // foldScalarArg folds a relation method's scalar argument — a limit's row cap — to the
 // literal the driver binds, so the chain the folder reads is self-contained: a captured
-// cap (limit(maxRows)) resolves to its value here, where the locals are in scope. An
-// argument that does not fold to a renderable scalar is left whole, so the driver
-// declines the query and a check over it fails safe.
+// cap (limit(maxRows)) resolves to its value here, where the locals are in scope. The
+// fold is admitted only when the value inhabits the argument's own type, the same guard
+// substituteScalarRefs uses: a data-dependent refined conversion the rows violate
+// (limit(Positive(n)) for n = 0) folds without checking through graphConvert, so without
+// this it would render a literal a refused conversion produced. An argument that does
+// not fold to an admissible renderable scalar is left whole, so the driver declines the
+// query and a check over it fails safe.
 func foldScalarArg(arg ir.Value, ctx graphCtx) ir.Value {
 	if c := graphValue(arg, ctx); c != nil {
-		if lit := graphConstantToValue(c); lit != nil {
-			return lit
+		if t := ir.TypeOf(arg); t == nil || t == ir.Invalid || graphMemberAdmits(ctx, t, c) {
+			if lit := graphConstantToValue(c); lit != nil {
+				return lit
+			}
 		}
 	}
 	return arg

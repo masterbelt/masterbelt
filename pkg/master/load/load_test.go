@@ -903,6 +903,51 @@ func TestValidateAllLimitedCountFailsSafe(t *testing.T) {
 	}
 }
 
+// TestValidateAllLimitRefinedArgFailsSafe pins that a limit whose cap is a refined
+// conversion the data violates fails safe rather than rendering the unchecked literal:
+// Positive(n) for a data-dependent n of 0 (the count of a relation no row matches) is a
+// refused conversion, so the cap is left whole and the materialization is left
+// unfoldable. Without the admission guard the cap would fold to LIMIT 0 and the empty
+// list would pass the assertion through a conversion that should have been refused.
+func TestValidateAllLimitRefinedArgFailsSafe(t *testing.T) {
+	const belt = "type Positive = nint where self > 0\n" +
+		"master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.limit(Positive(Cards.where(fn(c) -> c.power > 1000).count())).to_list().len() == 0\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,20\n3,30\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) == 0 {
+		t.Error("limit(Positive(0)) must fail safe: 0 does not inhabit Positive, so the refused conversion must not render LIMIT 0")
+	}
+}
+
+// TestValidateAllLimitClampsHugeCap pins that a cap wider than int64 — a valid nint the
+// signature accepts — clamps to no effective cap rather than failing safe: limit of a
+// value past int64 reads every row, since no table holds that many.
+func TestValidateAllLimitClampsHugeCap(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.limit(9223372036854775808).to_list().len() == 3\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,20\n3,30\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("limit(2^63) must read every row: table_validation_failed = %d, want 0 (a cap past int64 is no effective cap)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllLimitBeforeWhereFailsSafe pins that a where applied after a limit fails
+// safe rather than filtering outside the capped relation: limit(1) keeps row 1 (id 1),
+// which where(id > 1) drops, so the result is empty. The flat WHERE-then-LIMIT render
+// cannot express filter-after-cap, so the chain is left unfoldable — and must not return
+// row 2, which it would by filtering the whole table then capping.
+func TestValidateAllLimitBeforeWhereFailsSafe(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.limit(1).where(fn(c) -> c.id > 1).to_list()[0].id == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,20\n3,30\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) == 0 {
+		t.Error("limit(1).where(id > 1) must fail safe: limit keeps row 1, which the filter drops, so it must not return row 2")
+	}
+}
+
 // TestValidateAllWideEnumColumnIgnored pins that an enum column whose member value is
 // beyond SQLite's range does not disable aggregates over the other columns, the enum
 // twin of the wide-integer-column rule: an unused enum with an overwide member is left
