@@ -198,7 +198,7 @@ module.exports = grammar({
         $.master_keyword,
         field("name", $.identifier),
         op.LBrace,
-        repeat(choice($.master_record, $.master_primary, $.master_source, $.master_validate)),
+        repeat(choice($.master_record, $.master_primary, $.master_source, $.master_validate, $.master_scope)),
         op.RBrace,
       ),
 
@@ -265,6 +265,28 @@ module.exports = grammar({
 
     validate_clause: ($) =>
       seq(alias(choice("each", "all"), $.master_keyword), $.block),
+
+    // The scope member holds the master's named relation expressions: a block of
+    // entries, each a parameterized query over the rows. scope is a context keyword
+    // aliased to master_keyword like validate. An entry is [pub] name(params) -> body,
+    // the body an expression (a relation method chain over the implicit master
+    // relation) the real parser desugars to a static fn returning relation<M>.
+    master_scope: ($) =>
+      seq(
+        alias("scope", $.master_keyword),
+        op.LBrace,
+        repeat($.scope_entry),
+        op.RBrace,
+      ),
+
+    scope_entry: ($) =>
+      seq(
+        optional(kw.pub),
+        field("name", $.identifier),
+        $.param_list,
+        op.Arrow,
+        field("body", $._expr),
+      ),
 
     // --- impl blocks and methods --------------------------------------------
 
@@ -477,10 +499,11 @@ module.exports = grammar({
         $.await_expr,
       ),
 
-    // A value reference: a name, or the `type` keyword naming the metatype as a
-    // value (const t = type). The real parser lowers `type` here to a NameRef,
-    // which value_ref aliases to in the CST skeleton.
-    value_ref: ($) => choice($.identifier, kw.type),
+    // A value reference: a name, the `type` keyword naming the metatype as a value
+    // (const t = type), or the `where` keyword naming the relation's narrowing method
+    // when it begins an expression (where(...) in a scope body). The real parser
+    // lowers each here to a NameRef, which value_ref aliases to in the CST skeleton.
+    value_ref: ($) => choice($.identifier, kw.type, kw.where),
     self_expr: ($) => kw.self,
 
     literal: ($) =>
