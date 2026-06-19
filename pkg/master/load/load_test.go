@@ -724,6 +724,55 @@ func TestValidateAllRelationAliasOverridesBuiltin(t *testing.T) {
 	}
 }
 
+// TestValidateAllRelationUnionMatchLet pins that a relation held in a union-typed local
+// is selected by a match: x is relation<Cards> | error, bound to a filtered relation, and
+// the match's relation<Cards> arm counts its rows. The scrutinee is tagged with its
+// relation member from the binding's structural type, so the arm dispatch must compare
+// the relation tag against the relation arm — two rows match id > 1.
+func TestValidateAllRelationUnionMatchLet(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int } impl {\n    pub static fn f(): nint {\n" +
+		"      let x: relation<Cards> | error = self.where(fn(c) -> c.id > 1)\n" +
+		"      match x { relation<Cards> r -> { return r.count() } error e -> { return 0 } }\n    }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.f() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id\n1\n2\n3\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("match over a union-typed relation local: table_validation_failed = %d, want 0 (the relation arm counts two rows)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllRelationUnionMatchStaticParam pins the same dispatch when the relation
+// flows into a static fn's union-typed parameter: g(x: relation<Cards> | error) matches x,
+// and the caller passes a filtered relation. The argument is tagged with its relation
+// member at the call, so the match in g selects the relation arm — two rows.
+func TestValidateAllRelationUnionMatchStaticParam(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int } impl {\n" +
+		"    pub static fn g(x: relation<Cards> | error): nint { match x { relation<Cards> r -> { return r.count() } error e -> { return 0 } } }\n" +
+		"    pub static fn f(): nint { return Cards.g(self.where(fn(c) -> c.id > 1)) }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.f() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id\n1\n2\n3\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("match over a union-typed relation parameter: table_validation_failed = %d, want 0 (the relation arm counts two rows)", countTableFailures(diags))
+	}
+}
+
+// TestValidateAllRelationUnionMatchReturn pins the same dispatch when the relation is the
+// relation member of a union return type: h(): relation<Cards> | error returns a filtered
+// relation, and the caller matches h(). The return value is tagged structurally, so the
+// match selects the relation arm — two rows.
+func TestValidateAllRelationUnionMatchReturn(t *testing.T) {
+	const belt = "master Cards {\n  record { id: int } impl {\n" +
+		"    pub static fn h(): relation<Cards> | error { return self.where(fn(c) -> c.id > 1) }\n" +
+		"    pub static fn f(): nint { match Cards.h() { relation<Cards> r -> { return r.count() } error e -> { return 0 } } }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.f() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id\n1\n2\n3\n"}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("match over a union return holding a relation: table_validation_failed = %d, want 0 (the relation arm counts two rows)", countTableFailures(diags))
+	}
+}
+
 // TestValidateAllWideEnumColumnIgnored pins that an enum column whose member value is
 // beyond SQLite's range does not disable aggregates over the other columns, the enum
 // twin of the wide-integer-column rule: an unused enum with an overwide member is left
