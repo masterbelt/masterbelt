@@ -197,6 +197,142 @@ func memberHover(doc view, offset int, trees map[cst.Green]cst.Tree) *protocol.H
 	return nil
 }
 
+// memberMethodDefinition resolves a member-access method call — Cards.zero() (a
+// master's static fn), Cards.expensive() (a scope entry, desugared to one), x.inc()
+// (a value method), a getter or setter — to the declaration locations of the methods
+// it names. It is the go-to-definition twin of memberHover: it resolves the receiver's
+// type and the methods of that name the same way, then locates each method's
+// declaration (every overload, in its own file). A method built outside a source
+// declaration — a relation builtin assembled from the prelude, which carries no
+// navigable view — contributes no location, so a query method like count resolves to
+// nothing rather than a phantom position.
+func memberMethodDefinition(doc view, offset int, trees map[cst.Green]cst.Tree) ([]protocol.Location, bool) {
+	member, ok := memberAccessAt(doc, offset)
+	if !ok {
+		return nil, false
+	}
+	// A member access used as a call's callee — Cards.zero(), x.inc(), Type.eql(...) —
+	// resolves through the checker's lowered call, so the value-binding, metatype, and
+	// type-parameter rules the checker applied carry over instead of being re-derived.
+	// A member access that is not a call (a field or getter read, a setter write) is a
+	// distinct member space, so it never navigates a read to a method declaration.
+	if call, ok := callWithCallee(doc, member); ok {
+		if ms, ok := doc.ResolvedMethodCall(call); ok {
+			if locs := methodDeclLocations(doc, ms); len(locs) > 0 {
+				return locs, true
+			}
+		}
+		return nil, false
+	}
+	// A member write resolves to a setter — detected before the read so a write whose
+	// receiver type the checker does know (a parameter, self) is not mistaken for a
+	// getter read. The assignment target's type is read off the lowered setter call,
+	// which AssignTargetReceiverType returns only when the member access is one.
+	if recv, ok := doc.AssignTargetReceiverType(member); ok {
+		if locs := methodDeclLocations(doc, accessorMethods(doc, recv, member.Member.Name, ir.MethodSetter)); len(locs) > 0 {
+			return locs, true
+		}
+		return nil, false
+	}
+	// A member read that is not a call resolves to a getter through the receiver's type;
+	// a plain field read has no getter, so it navigates nowhere rather than to a
+	// same-named setter or method.
+	if recv := receiverTypeOf(doc, member.Receiver, trees, offset, doc.ExprTypes()); recv != nil && recv != ir.Invalid {
+		if locs := methodDeclLocations(doc, accessorMethods(doc, recv, member.Member.Name, ir.MethodGetter)); len(locs) > 0 {
+			return locs, true
+		}
+	}
+	return nil, false
+}
+
+// callWithCallee returns the call expression whose callee is member — so a member
+// access is resolved as a method only when it is actually called — or false when the
+// member access is a read or the left of a write, not a call.
+func callWithCallee(doc view, member *ast.MemberExpr) (*ast.CallExpr, bool) {
+	var call *ast.CallExpr
+	forEachExpr(doc.AST().File(), func(e ast.Expr) {
+		if c, ok := e.(*ast.CallExpr); ok {
+			if m, ok := c.Callee.(*ast.MemberExpr); ok && m.Syntax() == member.Syntax() {
+				call = c
+			}
+		}
+	})
+	return call, call != nil
+}
+
+// accessorMethods returns the accessor methods of the given kind named name that recv
+// binds — the getter a member read (value.name) navigates to, or the setter a write
+// (value.name = x) does. Filtering by the access kind keeps a read off the setter and a
+// write off the getter; an ordinary method is reached only through a call, and a plain
+// field is not a method, so neither is returned here.
+func accessorMethods(doc view, recv ir.Type, name string, kind ir.MethodKind) []*ir.Method {
+	ms, _, ok := doc.ReceiverMethods(recv)
+	if !ok {
+		return nil
+	}
+	var accessors []*ir.Method
+	for _, m := range ms {
+		if m.Kind == kind && m.Name == name {
+			accessors = append(accessors, m)
+		}
+	}
+	return accessors
+}
+
+// methodDeclLocations maps methods to the locations of their declaration names,
+// every overload in its own file, skipping any method built outside a source
+// declaration — a relation builtin assembled from the prelude carries no navigable
+// view, so it contributes nothing rather than a phantom location.
+func methodDeclLocations(doc view, ms []*ir.Method) []protocol.Location {
+	var locs []protocol.Location
+	for _, m := range ms {
+		at := declLocation(doc.viewOfType(m.Owner))
+		for _, node := range methodDeclNodes(m) {
+			locs = append(locs, at(node)...)
+		}
+	}
+	return locs
+}
+
+// methodDeclNodes returns the CST declaration nodes to navigate to for a method: its
+// own MethodDecl, or — for an interface member, whose resolved method carries no
+// source MethodDecl (a required member has no syntax, a provided one a synthetic decl
+// with no CST) — the InterfaceMembers of that name, recovered from the owning
+// interface. An overloaded interface member of that name yields each overload, the way
+// an overloaded function's go-to-definition lists every signature. It is empty for a
+// method built outside a source declaration (a prelude builtin), which has neither.
+func methodDeclNodes(m *ir.Method) []*cst.Node {
+	if m.Syntax != nil && m.Syntax.Syntax() != nil {
+		return []*cst.Node{m.Syntax.Syntax()}
+	}
+	if m.Owner == nil || m.Owner.InterfaceSyntax == nil {
+		return nil
+	}
+	var nodes []*cst.Node
+	for _, mem := range m.Owner.InterfaceSyntax.Members {
+		if mem.Name == m.Name && interfaceMemberKind(mem) == m.Kind {
+			nodes = append(nodes, mem.Syntax())
+		}
+	}
+	return nodes
+}
+
+// interfaceMemberKind classifies an interface member the way the resolved method
+// records its kind, so the recovery matches the resolved method's member space: a
+// static requirement is reached through the type, a readable one read like a getter,
+// and any other is an ordinary method. A name shared across two member spaces
+// (static f and f) thus recovers only the one the call resolved to.
+func interfaceMemberKind(mem *ast.InterfaceMember) ir.MethodKind {
+	switch {
+	case mem.Static:
+		return ir.MethodStatic
+	case mem.Readable:
+		return ir.MethodGetter
+	default:
+		return ir.MethodNormal
+	}
+}
+
 // memberMethodHover builds the method card for a member access: a single
 // signature with its doc below, or — for an overloaded name — every signature
 // listed each under its own doc comment, reading like the impl block itself.

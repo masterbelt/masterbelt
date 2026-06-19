@@ -231,6 +231,216 @@ func (p *Program) ReceiverMethods(recv ir.Type) ([]*ir.Method, map[string]ir.Typ
 	return types.ReceiverMethods(p.db.reg, recv)
 }
 
+// ResolvedMethodCall returns the method a member-access call resolves to, read off
+// the checker's lowered call node for that syntax — the value-method call x.inc(),
+// the static fn or scope entry Cards.zero(), the metatype method Type.eql(...) each
+// resolve as the checker settled them, so the editor honours the value-binding,
+// metatype, and type-parameter rules instead of re-deriving a resolution that would
+// pick a same-named static fn or concrete type. ok is false when no lowered call
+// carries that syntax (the member access is not a call callee) or its callee is a
+// value rather than a method, or an overloaded name the checker left unselected.
+func (p *Program) ResolvedMethodCall(file FileID, call *ast.CallExpr) ([]*ir.Method, bool) {
+	module := p.modules[file]
+	if module == nil {
+		return nil, false
+	}
+	var found ir.Value
+	visit := func(v ir.Value) bool {
+		if found != nil {
+			return false
+		}
+		switch v.(type) {
+		case *ir.Call, *ir.StaticCall:
+			if ir.SyntaxOf(v) == call {
+				found = v
+				return false
+			}
+		}
+		return true
+	}
+	walkModuleValues(module, visit)
+	if found == nil {
+		return nil, false
+	}
+	return p.resolvedMethodOf(found)
+}
+
+// AssignTargetReceiverType returns the type of the receiver a member-access
+// assignment target writes through — the c of c.fahrenheit = 212 — read off the
+// lowered setter call. The checker does not type an assignment target's receiver, so
+// the editor cannot read its type the way it reads a value expression's; the lowered
+// setter call carries the receiver at its settled type, so the accessor lookup finds
+// the property's setter. ok is false when the member is not a setter-write target.
+func (p *Program) AssignTargetReceiverType(file FileID, member *ast.MemberExpr) (ir.Type, bool) {
+	module := p.modules[file]
+	if module == nil || member == nil {
+		return nil, false
+	}
+	var recv ir.Type
+	find := func(s ir.Stmt) {
+		if recv != nil {
+			return
+		}
+		a, ok := s.(*ir.Assign)
+		if !ok || a.Syntax == nil || a.Syntax.Target == nil || a.Syntax.Target.Syntax() != member.Syntax() {
+			return
+		}
+		if c, ok := a.Value.(*ir.Call); ok && c.Setter {
+			recv = ir.TypeOf(c.Receiver)
+		}
+	}
+	for _, fn := range module.Funcs {
+		if fn != nil {
+			walkStmts(fn.Body, find)
+		}
+	}
+	for _, def := range module.Types {
+		for _, m := range def.Methods {
+			walkStmts(m.Body, find)
+		}
+	}
+	// A setter write can also sit in a function literal stored in a value graph — a
+	// constant, an assert, an associated constant — which the statement walks above do
+	// not reach. Walk every value graph for those literals and descend into each.
+	walkModuleValues(module, func(v ir.Value) bool {
+		if lit, ok := v.(*ir.FuncLiteral); ok {
+			walkStmts(lit.Body, find)
+			return false
+		}
+		return true
+	})
+	return recv, recv != nil
+}
+
+// walkModuleValues walks every value graph the module retains — the constant and
+// associated-constant initializers, the enum member initializers, the assert
+// conditions, the refinement predicates, the master validate checks, and the
+// function and method bodies (whose lambda bodies ir.WalkValues descends into) — so
+// a call node carrying any syntax in the file is reachable wherever it was written.
+func walkModuleValues(module *ir.Module, visit func(ir.Value) bool) {
+	for _, c := range module.Consts {
+		if c != nil {
+			ir.WalkValues(c.Value, visit)
+		}
+	}
+	for _, a := range module.Asserts {
+		if a != nil {
+			ir.WalkValues(a.CondGraph, visit)
+		}
+	}
+	for _, fn := range module.Funcs {
+		if fn != nil {
+			ir.WalkBody(fn.Body, visit)
+		}
+	}
+	for _, def := range module.Types {
+		for _, m := range def.Methods {
+			ir.WalkBody(m.Body, visit)
+		}
+		for _, c := range def.Consts {
+			if c != nil {
+				ir.WalkValues(c.ValueGraph, visit)
+			}
+		}
+		if def.Enum != nil {
+			for _, m := range def.Enum.Members {
+				ir.WalkValues(m.ValueGraph, visit)
+			}
+		}
+		if def.Where != nil {
+			ir.WalkValues(def.Where, visit)
+		}
+		if def.Master != nil {
+			ir.WalkBody(masterCheckStmts(def.Master.RowChecks), visit)
+			ir.WalkBody(masterCheckStmts(def.Master.AllChecks), visit)
+		}
+	}
+}
+
+// walkStmts calls fn for every statement in a body, descending into the nested
+// bodies a control-flow statement carries and the function-literal bodies its value
+// graphs hold — the statement twin of ir.WalkBody, which exposes only the value
+// graphs, extended to reach a statement (a setter write) nested in a lambda.
+func walkStmts(body []ir.Stmt, fn func(ir.Stmt)) {
+	for _, s := range body {
+		fn(s)
+		switch s := s.(type) {
+		case *ir.Switch:
+			for _, arm := range s.Arms {
+				walkStmts(arm.Body, fn)
+			}
+			walkStmts(s.Else, fn)
+		case *ir.Match:
+			for _, arm := range s.Arms {
+				walkStmts(arm.Body, fn)
+			}
+			walkStmts(s.Else, fn)
+		case *ir.If:
+			walkStmts(s.Then, fn)
+			if s.ElseIf != nil {
+				walkStmts([]ir.Stmt{s.ElseIf}, fn)
+			}
+			walkStmts(s.Else, fn)
+		case *ir.For:
+			walkStmts(s.Body, fn)
+		}
+		// Descend into the function-literal bodies this statement's value graph holds,
+		// so a statement (a setter write) nested in a lambda is reached too. The walk
+		// stops at each literal — its body recurses here — to avoid visiting it twice.
+		ir.WalkBody([]ir.Stmt{s}, func(v ir.Value) bool {
+			if lit, ok := v.(*ir.FuncLiteral); ok {
+				walkStmts(lit.Body, fn)
+				return false
+			}
+			return true
+		})
+	}
+}
+
+// resolvedMethodOf reads the method a lowered call node binds: the checker's
+// selected overload when one was written back, otherwise the single method the
+// receiver's type (for a value or metatype call) or the owning type (for a static
+// call) declares under that name. A name that resolves to several signatures with
+// no selection, or to none, is left unresolved — the editor offers no jump rather
+// than guessing one.
+func (p *Program) resolvedMethodOf(v ir.Value) ([]*ir.Method, bool) {
+	switch v := v.(type) {
+	case *ir.Call:
+		if v.Resolved != nil {
+			return []*ir.Method{v.Resolved}, true
+		}
+		recv := ir.TypeOf(v.Receiver)
+		if recv == nil {
+			return nil, false
+		}
+		// No selected overload was written back (the lowering's guess for a
+		// single-signature name, or an initializer the checker did not annotate): the
+		// methods of that name on the receiver. A unique name is the one method; an
+		// unselected overloaded name yields every candidate, the way an overloaded
+		// function's go-to-definition lists each signature.
+		if ms, _, ok := types.Candidates(p.db.reg, recv, v.Method); ok && len(ms) > 0 {
+			return ms, true
+		}
+	case *ir.StaticCall:
+		if v.Resolved != nil {
+			return []*ir.Method{v.Resolved}, true
+		}
+		if v.Def == nil {
+			return nil, false
+		}
+		var statics []*ir.Method
+		for _, m := range v.Def.Methods {
+			if m.Kind == ir.MethodStatic && m.Name == v.Name {
+				statics = append(statics, m)
+			}
+		}
+		if len(statics) > 0 {
+			return statics, true
+		}
+	}
+	return nil, false
+}
+
 // QueryColumns returns the columns a query binding's columns<M> type offers — the
 // receiver of a query column access, the c in where(fn(c) -> ...) — each an ir.Field
 // typed as the column<M, FieldType> it reads as, and whether recv is the query binding
