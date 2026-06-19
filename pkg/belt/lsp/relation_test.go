@@ -443,6 +443,30 @@ func TestCompletionQueryBindingShadowingType(t *testing.T) {
 	}
 }
 
+// TestCompletionQueryBindingShadowingConst pins that a query binding whose name also
+// names a module constant wins its member access: in where(fn(c) -> c.) the parameter c
+// (typed columns<Cards>) shadows a top-level const c in value position, so its member
+// access offers the master's columns, not the constant's members — the lambda parameter
+// is resolved before the constant a same-named module binding would otherwise return.
+func TestCompletionQueryBindingShadowingConst(t *testing.T) {
+	src := "const c = 5\n" +
+		"master Cards {\n  record { id: int, cost: int }\n  primary id\n}\n" +
+		"fn probe(): nint {\n  return Cards.where(fn(c) -> c.).count()\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "c.)") + len("c.")
+	items := byLabel(completion(doc, off).Items)
+	for _, col := range []string{"id", "cost"} {
+		it, ok := items[col]
+		if !ok {
+			t.Errorf("the binding c shadows the const; c. should offer the column %q: %v", col, labels(items))
+			continue
+		}
+		if it.Kind == nil || *it.Kind != protocol.CompletionItemKindField {
+			t.Errorf("%s kind = %v, want Field", col, it.Kind)
+		}
+	}
+}
+
 // TestCompletionQueryColumnsGenericAliasRow pins that the column completion mirrors the
 // checker's column rule, not a broader record expansion: a master whose row is a generic
 // record alias (record Box<int>) is a row form the checker does not lift columns from, so

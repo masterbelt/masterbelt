@@ -304,6 +304,13 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 		}
 		return nil
 	case *ast.Identifier:
+		// The checker's settled type wins, as it does for every other receiver form: a
+		// lambda parameter shadows a same-named module constant in value position, and the
+		// checker types the body's reference as the parameter, so its settled type offers
+		// the binding's members rather than the constant doc.Resolve would return first.
+		if t := settledType(exprTypes, e); t != ir.Invalid {
+			return t
+		}
 		if c := doc.Resolve(e); c != nil {
 			return c.Type
 		}
