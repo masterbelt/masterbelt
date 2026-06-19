@@ -1,6 +1,7 @@
 package sql_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/master/sql"
@@ -115,9 +116,31 @@ func TestRelationRowKeysOffset(t *testing.T) {
 		{"offset with limit", sql.All().Limit(2).Offset(1), `SELECT "k" FROM "rows" ORDER BY "k" LIMIT 2 OFFSET 1`},
 		{"offset no limit", sql.All().Offset(3), `SELECT "k" FROM "rows" ORDER BY "k" LIMIT -1 OFFSET 3`},
 		{"offset accumulates", sql.All().Offset(2).Offset(3), `SELECT "k" FROM "rows" ORDER BY "k" LIMIT -1 OFFSET 5`},
+		{"offset saturates", sql.All().Offset(math.MaxInt64).Offset(1), `SELECT "k" FROM "rows" ORDER BY "k" LIMIT -1 OFFSET 9223372036854775807`},
 		{"limit only no offset", sql.All().Limit(2), `SELECT "k" FROM "rows" ORDER BY "k" LIMIT 2`},
 	} {
 		if got, _ := c.rel.RowKeysSQL("k", "rows", sql.SQLite); got != c.want {
+			t.Errorf("%s: RowKeysSQL = %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+// TestRelationRowKeysOffsetDialect pins that an offset with no limit renders the
+// uncapped-limit spelling of each backend, not SQLite's everywhere: a skip needs a
+// limit to skip against, so the LIMIT clause is dialect-specific (SQLite -1,
+// PostgreSQL ALL, MySQL the largest unsigned integer).
+func TestRelationRowKeysOffsetDialect(t *testing.T) {
+	rel := sql.All().Offset(3)
+	for _, c := range []struct {
+		name    string
+		dialect sql.Dialect
+		want    string
+	}{
+		{"sqlite", sql.SQLite, `SELECT "k" FROM "rows" ORDER BY "k" LIMIT -1 OFFSET 3`},
+		{"postgres", sql.Postgres, `SELECT "k" FROM "rows" ORDER BY "k" LIMIT ALL OFFSET 3`},
+		{"mysql", sql.MySQL, "SELECT `k` FROM `rows` ORDER BY `k` LIMIT 18446744073709551615 OFFSET 3"},
+	} {
+		if got, _ := rel.RowKeysSQL("k", "rows", c.dialect); got != c.want {
 			t.Errorf("%s: RowKeysSQL = %q, want %q", c.name, got, c.want)
 		}
 	}

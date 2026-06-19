@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"math"
 	"strconv"
 	"strings"
 )
@@ -72,13 +73,19 @@ func (r Relation) Limit(n int64) Relation {
 
 // Offset returns the relation with n more rows skipped from the window's start.
 // Skips accumulate — offset(2).offset(3) skips five — and a negative n is treated as
-// zero, the floor a skip cannot fall below. Offset and limit set the window together,
+// zero, the floor a skip cannot fall below. The sum saturates at the widest skip
+// rather than wrapping past it, so two huge skips still skip everything (an overflow
+// would wrap negative and skip nothing). Offset and limit set the window together,
 // independent of the order they are applied in.
 func (r Relation) Offset(n int64) Relation {
 	if n < 0 {
 		n = 0
 	}
-	r.offset += n
+	if r.offset > math.MaxInt64-n {
+		r.offset = math.MaxInt64
+	} else {
+		r.offset += n
+	}
 	return r
 }
 
@@ -110,7 +117,7 @@ func (r Relation) RowKeysSQL(keyCol, table string, d Dialect) (string, []Bind) {
 	// A skip needs a cap to apply against in SQL, so an offset with no limit renders
 	// the no-limit cap (-1) and then the skip; a limit alone renders without OFFSET.
 	if r.limited || r.offset > 0 {
-		lim := "-1"
+		lim := d.LimitAll()
 		if r.limited {
 			lim = strconv.FormatInt(r.limit, 10)
 		}
