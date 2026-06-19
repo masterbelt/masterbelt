@@ -169,6 +169,77 @@ func TestDefinitionSetterWriteOnTypedReceiver(t *testing.T) {
 	}
 }
 
+// TestDefinitionProvidedInterfaceMethod pins that a call of a provided (default)
+// interface method navigates to the member's declaration: x.f() where
+// interface I { f(): nint { ... } } resolves to f, even though the provided method's
+// resolved form carries a synthetic declaration with no source token.
+func TestDefinitionProvidedInterfaceMethod(t *testing.T) {
+	src := "pub interface I {\n  f(): nint {\n    return 1\n  }\n}\n" +
+		"pub fn g(x: I): nint {\n  return x.f()\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "x.f()") + len("x.")
+	locs := definition(doc, off)
+	want := strings.Index(src, "f(): nint")
+	if len(locs) != 1 || fromPosition(doc.Buffer(), locs[0].Range.Start) != want {
+		t.Errorf("a provided interface method call should navigate to f at %d; got %+v", want, locs)
+	}
+}
+
+// TestDefinitionOverloadedInterfaceRequirement pins that a call of an overloaded
+// interface requirement navigates to the requirements of that name — each overload,
+// the way an overloaded function's go-to-definition lists every signature — rather
+// than jumping to the wrong single one.
+func TestDefinitionOverloadedInterfaceRequirement(t *testing.T) {
+	src := "pub interface I {\n  f(s: string): string\n  f(n: nint): nint\n}\n" +
+		"pub fn g(x: I): nint {\n  return x.f(1)\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "x.f(1)") + len("x.")
+	locs := definition(doc, off)
+	starts := map[int]bool{}
+	for _, l := range locs {
+		starts[fromPosition(doc.Buffer(), l.Range.Start)] = true
+	}
+	for _, sig := range []string{"f(s: string)", "f(n: nint)"} {
+		if !starts[strings.Index(src, sig)] {
+			t.Errorf("an overloaded interface requirement should list the overload %q; got %v", sig, starts)
+		}
+	}
+}
+
+// TestDefinitionOverloadedCallInAssocConst pins that an overloaded member call in an
+// associated-constant initializer navigates: the initializer's value graph carries no
+// written-back overload selection, so go-to-definition lists every candidate of that
+// name rather than nothing.
+func TestDefinitionOverloadedCallInAssocConst(t *testing.T) {
+	src := "pub type Score = nint impl {\n  pub fn merge(n: nint): self {\n    return self\n  }\n  pub fn merge(s: string): self {\n    return self\n  }\n  pub const X: Score = Score(0).merge(1)\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "Score(0).merge(1)") + len("Score(0).")
+	locs := definition(doc, off)
+	starts := map[int]bool{}
+	for _, l := range locs {
+		starts[fromPosition(doc.Buffer(), l.Range.Start)] = true
+	}
+	for _, sig := range []string{"merge(n: nint)", "merge(s: string)"} {
+		if !starts[strings.Index(src, sig)] {
+			t.Errorf("an overloaded assoc-const call should list the overload %q; got %v", sig, starts)
+		}
+	}
+}
+
+// TestDefinitionSetterInConstLambda pins that a setter write inside a function literal
+// stored in a constant navigates: the setter-write walk now covers the value graphs of
+// constants, not only function and method bodies, so fahrenheit resolves to the setter.
+func TestDefinitionSetterInConstLambda(t *testing.T) {
+	src := accessorType + "const Bump: fn(): Celsius = fn() {\n  let c = Celsius.freezing()\n  c.fahrenheit = 212\n  return c\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "c.fahrenheit = 212") + len("c.")
+	locs := definition(doc, off)
+	want := strings.Index(src, "pub set fahrenheit") + len("pub set ")
+	if len(locs) != 1 || fromPosition(doc.Buffer(), locs[0].Range.Start) != want {
+		t.Errorf("a setter write in a constant-held lambda should navigate to the setter at %d; got %+v", want, locs)
+	}
+}
+
 // TestDefinitionRelationBuiltinHasNoLocation pins that a relation builtin (count,
 // assembled from the prelude) has no navigable declaration: it resolves to zero
 // locations rather than a phantom position, since the prelude is in no workspace file.

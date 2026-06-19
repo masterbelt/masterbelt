@@ -127,7 +127,7 @@ func (v view) QueryColumns(recv ir.Type) ([]ir.Field, bool) {
 	return v.ws.prog.QueryColumns(recv)
 }
 
-func (v view) ResolvedMethodCall(call *ast.CallExpr) (*ir.Method, bool) {
+func (v view) ResolvedMethodCall(call *ast.CallExpr) ([]*ir.Method, bool) {
 	return v.ws.prog.ResolvedMethodCall(v.id, call)
 }
 

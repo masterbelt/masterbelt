@@ -239,7 +239,7 @@ func (p *Program) ReceiverMethods(recv ir.Type) ([]*ir.Method, map[string]ir.Typ
 // pick a same-named static fn or concrete type. ok is false when no lowered call
 // carries that syntax (the member access is not a call callee) or its callee is a
 // value rather than a method, or an overloaded name the checker left unselected.
-func (p *Program) ResolvedMethodCall(file FileID, call *ast.CallExpr) (*ir.Method, bool) {
+func (p *Program) ResolvedMethodCall(file FileID, call *ast.CallExpr) ([]*ir.Method, bool) {
 	module := p.modules[file]
 	if module == nil {
 		return nil, false
@@ -299,6 +299,16 @@ func (p *Program) AssignTargetReceiverType(file FileID, member *ast.MemberExpr) 
 			walkStmts(m.Body, find)
 		}
 	}
+	// A setter write can also sit in a function literal stored in a value graph — a
+	// constant, an assert, an associated constant — which the statement walks above do
+	// not reach. Walk every value graph for those literals and descend into each.
+	walkModuleValues(module, func(v ir.Value) bool {
+		if lit, ok := v.(*ir.FuncLiteral); ok {
+			walkStmts(lit.Body, find)
+			return false
+		}
+		return true
+	})
 	return recv, recv != nil
 }
 
@@ -393,36 +403,39 @@ func walkStmts(body []ir.Stmt, fn func(ir.Stmt)) {
 // call) declares under that name. A name that resolves to several signatures with
 // no selection, or to none, is left unresolved — the editor offers no jump rather
 // than guessing one.
-func (p *Program) resolvedMethodOf(v ir.Value) (*ir.Method, bool) {
+func (p *Program) resolvedMethodOf(v ir.Value) ([]*ir.Method, bool) {
 	switch v := v.(type) {
 	case *ir.Call:
 		if v.Resolved != nil {
-			return v.Resolved, true
+			return []*ir.Method{v.Resolved}, true
 		}
 		recv := ir.TypeOf(v.Receiver)
 		if recv == nil {
 			return nil, false
 		}
-		if ms, _, ok := types.Candidates(p.db.reg, recv, v.Method); ok && len(ms) == 1 {
-			return ms[0], true
+		// No selected overload was written back (the lowering's guess for a
+		// single-signature name, or an initializer the checker did not annotate): the
+		// methods of that name on the receiver. A unique name is the one method; an
+		// unselected overloaded name yields every candidate, the way an overloaded
+		// function's go-to-definition lists each signature.
+		if ms, _, ok := types.Candidates(p.db.reg, recv, v.Method); ok && len(ms) > 0 {
+			return ms, true
 		}
 	case *ir.StaticCall:
 		if v.Resolved != nil {
-			return v.Resolved, true
+			return []*ir.Method{v.Resolved}, true
 		}
 		if v.Def == nil {
 			return nil, false
 		}
-		var match *ir.Method
-		n := 0
+		var statics []*ir.Method
 		for _, m := range v.Def.Methods {
 			if m.Kind == ir.MethodStatic && m.Name == v.Name {
-				match = m
-				n++
+				statics = append(statics, m)
 			}
 		}
-		if n == 1 {
-			return match, true
+		if len(statics) > 0 {
+			return statics, true
 		}
 	}
 	return nil, false

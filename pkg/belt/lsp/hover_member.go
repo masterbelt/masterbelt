@@ -217,8 +217,8 @@ func memberMethodDefinition(doc view, offset int, trees map[cst.Green]cst.Tree) 
 	// A member access that is not a call (a field or getter read, a setter write) is a
 	// distinct member space, so it never navigates a read to a method declaration.
 	if call, ok := callWithCallee(doc, member); ok {
-		if m, ok := doc.ResolvedMethodCall(call); ok {
-			if locs := methodDeclLocations(doc, []*ir.Method{m}); len(locs) > 0 {
+		if ms, ok := doc.ResolvedMethodCall(call); ok {
+			if locs := methodDeclLocations(doc, ms); len(locs) > 0 {
 				return locs, true
 			}
 		}
@@ -286,31 +286,35 @@ func accessorMethods(doc view, recv ir.Type, name string, kind ir.MethodKind) []
 func methodDeclLocations(doc view, ms []*ir.Method) []protocol.Location {
 	var locs []protocol.Location
 	for _, m := range ms {
-		if node := methodDeclNode(m); node != nil {
-			locs = append(locs, declLocation(doc.viewOfType(m.Owner))(node)...)
+		at := declLocation(doc.viewOfType(m.Owner))
+		for _, node := range methodDeclNodes(m) {
+			locs = append(locs, at(node)...)
 		}
 	}
 	return locs
 }
 
-// methodDeclNode returns the CST declaration node to navigate to for a method: its
-// own MethodDecl, or — for an interface requirement, which carries no MethodDecl —
-// the InterfaceMember it was declared as, recovered from the owning interface by
-// name. It is nil for a method built outside a source declaration (a prelude
-// builtin), which has neither.
-func methodDeclNode(m *ir.Method) *cst.Node {
-	if m.Syntax != nil {
-		return m.Syntax.Syntax()
+// methodDeclNodes returns the CST declaration nodes to navigate to for a method: its
+// own MethodDecl, or — for an interface member, whose resolved method carries no
+// source MethodDecl (a required member has no syntax, a provided one a synthetic decl
+// with no CST) — the InterfaceMembers of that name, recovered from the owning
+// interface. An overloaded interface member of that name yields each overload, the way
+// an overloaded function's go-to-definition lists every signature. It is empty for a
+// method built outside a source declaration (a prelude builtin), which has neither.
+func methodDeclNodes(m *ir.Method) []*cst.Node {
+	if m.Syntax != nil && m.Syntax.Syntax() != nil {
+		return []*cst.Node{m.Syntax.Syntax()}
 	}
 	if m.Owner == nil || m.Owner.InterfaceSyntax == nil {
 		return nil
 	}
+	var nodes []*cst.Node
 	for _, mem := range m.Owner.InterfaceSyntax.Members {
 		if mem.Name == m.Name {
-			return mem.Syntax()
+			nodes = append(nodes, mem.Syntax())
 		}
 	}
-	return nil
+	return nodes
 }
 
 // memberMethodHover builds the method card for a member access: a single
