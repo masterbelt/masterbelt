@@ -222,23 +222,36 @@ func TestDefinitionOverloadedInterfaceRequirement(t *testing.T) {
 	}
 }
 
+// TestDefinitionReferenceReceiverInInitializer pins that a member call on a reference
+// receiver in a retained initializer graph navigates: an enum member a = C.val() calls
+// val on the constant C, whose receiver node carries a settled type only because the
+// initializer graph is now written back — without it the receiver has no type and the
+// call resolves nowhere.
+func TestDefinitionReferenceReceiverInInitializer(t *testing.T) {
+	src := "pub type Counter = int impl {\n  pub fn val(): nint {\n    return 1\n  }\n}\n" +
+		"const C: Counter = 0\n" +
+		"enum E {\n  a = C.val()\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "C.val()") + len("C.")
+	locs := definition(doc, off)
+	want := strings.Index(src, "pub fn val") + len("pub fn ")
+	if len(locs) != 1 || fromPosition(doc.Buffer(), locs[0].Range.Start) != want {
+		t.Errorf("a reference-receiver call in an enum member initializer should navigate to val at %d; got %+v", want, locs)
+	}
+}
+
 // TestDefinitionOverloadedCallInAssocConst pins that an overloaded member call in an
-// associated-constant initializer navigates: the initializer's value graph carries no
-// written-back overload selection, so go-to-definition lists every candidate of that
-// name rather than nothing.
+// associated-constant initializer resolves to the selected overload: the initializer's
+// value graph is now written back, so Score(0).merge(1) — the nint argument selecting
+// the nint overload — navigates to merge(n: nint) alone, not every candidate.
 func TestDefinitionOverloadedCallInAssocConst(t *testing.T) {
 	src := "pub type Score = nint impl {\n  pub fn merge(n: nint): self {\n    return self\n  }\n  pub fn merge(s: string): self {\n    return self\n  }\n  pub const X: Score = Score(0).merge(1)\n}\n"
 	doc := testView(src)
 	off := strings.Index(src, "Score(0).merge(1)") + len("Score(0).")
 	locs := definition(doc, off)
-	starts := map[int]bool{}
-	for _, l := range locs {
-		starts[fromPosition(doc.Buffer(), l.Range.Start)] = true
-	}
-	for _, sig := range []string{"merge(n: nint)", "merge(s: string)"} {
-		if !starts[strings.Index(src, sig)] {
-			t.Errorf("an overloaded assoc-const call should list the overload %q; got %v", sig, starts)
-		}
+	want := strings.Index(src, "merge(n: nint)")
+	if len(locs) != 1 || fromPosition(doc.Buffer(), locs[0].Range.Start) != want {
+		t.Errorf("Score(0).merge(1) should resolve to the nint overload merge(n: nint) at %d alone; got %+v", want, locs)
 	}
 }
 

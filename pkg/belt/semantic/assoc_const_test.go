@@ -47,6 +47,30 @@ func TestAssocConstTypedAnnotation(t *testing.T) {
 	}
 }
 
+// TestAssocConstInitializerTypeChecked pins that an associated constant's
+// initializer is type-checked: an operator applied to mismatched operands and a
+// method call with no matching overload are reported, the same as in a top-level
+// constant. These positions were folded but never typed before.
+func TestAssocConstInitializerTypeChecked(t *testing.T) {
+	op := "pub type T = nint impl {\n  pub const X: nint = \"abc\" * 2\n}\n"
+	if _, diags := analyze(op); !hasCode(diags, CodeInvalidOperation) {
+		t.Errorf("an operator type error in an assoc const initializer should be reported: %v", codes(diags))
+	}
+	overload := "pub type T = nint impl {\n  pub fn m(n: nint): self {\n    return self\n  }\n  pub const X: T = T(0).m(\"s\")\n}\n"
+	if _, diags := analyze(overload); !hasCode(diags, CodeInvalidOperation) {
+		t.Errorf("a no-overload method call in an assoc const initializer should be reported: %v", codes(diags))
+	}
+}
+
+// TestEnumMemberInitializerTypeChecked pins the enum-member twin: an operator type
+// error in an enum member's initializer is reported, the position now typed.
+func TestEnumMemberInitializerTypeChecked(t *testing.T) {
+	src := "enum E {\n  a = \"x\" * 2\n}\n"
+	if _, diags := analyze(src); !hasCode(diags, CodeInvalidOperation) {
+		t.Errorf("an operator type error in an enum member initializer should be reported: %v", codes(diags))
+	}
+}
+
 // TestAssocConstDiagnostics covers the new and reused error paths.
 func TestAssocConstDiagnostics(t *testing.T) {
 	cases := []struct {

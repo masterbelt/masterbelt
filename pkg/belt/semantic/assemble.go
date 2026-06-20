@@ -281,6 +281,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		checkBuiltinSurface(file, a.at, a.diags)
 	}
 	a.checkAssocConstRefs()
+	a.checkAssocConstAndEnumInits()
 	a.reportMasterValidationRefs()
 	genv := a.writeBack()
 	checkIndexWritesIR(a.module, genv, a.at, a.diags)
@@ -562,6 +563,44 @@ func (a *assembler) checkAssocConstRefs() {
 	}
 	for _, md := range a.file.Masters {
 		check(md.Consts)
+	}
+}
+
+// checkAssocConstAndEnumInits type-checks the associated-constant and enum-member
+// initializers, streaming the overload selections and settled types into res so the
+// write-back annotates their retained value graphs the way it annotates a body's.
+// These positions were folded and reference-checked but never run through the typing
+// walk — so an operator type error in one is reported here, and, more importantly for
+// the editor, their value graphs gain the receiver types and selected overloads that
+// hover and go-to-definition read. Only the typing walk runs (exprSink): the reference
+// issues and the stray-self check are already reported (checkAssocConstRefs), an enum
+// member's value conformance by reportEnumMemberValueErrors, and the value-range checks
+// stay the fold's, so nothing is reported twice. An assoc const pushes its declared
+// type; an enum member is checked without a pushed type (its base conformance is the
+// enum phase's), so the member's own calls still resolve.
+func (a *assembler) checkAssocConstAndEnumInits() {
+	check := func(value ast.Expr, want ir.Type) {
+		if value == nil {
+			return
+		}
+		sink := exprSink(a.at, a.diags, a.res)
+		if want != nil && want != ir.Invalid {
+			infer.CheckAgainst(value, want, a.env, sink)
+		} else {
+			infer.Check(value, a.env, sink)
+		}
+	}
+	for _, def := range a.module.Types {
+		for _, ac := range def.Consts {
+			if ac != nil && ac.Syntax != nil {
+				check(ac.Syntax.Value, ac.Type)
+			}
+		}
+	}
+	for _, ed := range a.file.Enums {
+		for _, m := range ed.Members {
+			check(m.Value, ir.Invalid)
+		}
 	}
 }
 
