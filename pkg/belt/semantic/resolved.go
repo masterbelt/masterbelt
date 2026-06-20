@@ -103,6 +103,11 @@ func writeBackResolutions(module *ir.Module, res *callResolutions, fnShells map[
 			}
 			w.stmts(m.Body, bindings{self: mself, params: bindParams(m.Params, self)})
 		}
+		// An associated constant's and an enum member's initializer are retained value
+		// graphs over no self, their facts streamed from the typing walk like a
+		// constant's — so they type and select overloads the same way, giving the
+		// editor the receiver types and resolved methods their member calls carry.
+		w.initializerGraphs(def)
 		// The refinement predicate is a value graph over self like any method
 		// body — its facts streamed from the declaration's checking walk — so
 		// it types and adapts the same way.
@@ -122,6 +127,27 @@ func writeBackResolutions(module *ir.Module, res *callResolutions, fnShells map[
 		// facts, exactly as the row checks are; the data layer folds the result.
 		if def.Master != nil && len(def.Master.AllChecks) > 0 {
 			w.stmts(masterCheckStmts(def.Master.AllChecks), bindings{})
+		}
+	}
+}
+
+// initializerGraphs binds the checker facts onto a definition's retained
+// initializer graphs — its associated constants' and, for an enum, its members'
+// — each a value graph over no self, so a member call in one carries the receiver
+// type and selected overload the editor reads. The fold already consumed these
+// graphs' folded values; the annotation only enriches what they retain.
+func (w resolutionWriter) initializerGraphs(def *ir.TypeDef) {
+	for _, ac := range def.Consts {
+		if ac != nil && ac.ValueGraph != nil {
+			ac.ValueGraph = w.value(ac.ValueGraph, bindings{})
+		}
+	}
+	if def.Enum == nil {
+		return
+	}
+	for i := range def.Enum.Members {
+		if def.Enum.Members[i].ValueGraph != nil {
+			def.Enum.Members[i].ValueGraph = w.value(def.Enum.Members[i].ValueGraph, bindings{})
 		}
 	}
 }
