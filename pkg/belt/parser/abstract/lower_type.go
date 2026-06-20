@@ -204,5 +204,22 @@ func lowerFuncType(t cst.Tree, buf source.Buffer, node *cst.Node) ast.TypeExpr {
 			result = lowerTypeExpr(child, buf)
 		}
 	}
+	for i, p := range params {
+		params[i] = funcTypeParam(p)
+	}
 	return ast.NewFuncType(params, result, node)
+}
+
+// funcTypeParam normalizes a function-type parameter: a function type names
+// types, not bindings, so a bare parameter (fn(nint), fn(T)) is parsed by the
+// shared parameter-list rule with the type name as the parameter's name and no
+// type — the form a function literal's inferred parameter takes. Here it is the
+// parameter's type, so the name moves to a NamedType the resolver reads (nint to
+// its builtin, T to the owner's type variable). A parameter written name: type
+// keeps its written type and is left as is.
+func funcTypeParam(p *ast.ParamDef) *ast.ParamDef {
+	if p.Type != nil || p.Name == "" {
+		return p
+	}
+	return ast.NewParamDef("", ast.NewNamedType("", p.Name, nil, nil, p.Syntax()), p.Syntax())
 }

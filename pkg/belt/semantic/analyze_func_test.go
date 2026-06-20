@@ -860,3 +860,35 @@ func TestEffectfulFunctionNeverFolds(t *testing.T) {
 		t.Errorf("pure call eval = %s, want 1", m.Consts[0].Eval)
 	}
 }
+
+// TestFuncTypeParamChecked pins that a function type's bare parameter is its
+// type, so a function value flowing into a function-typed slot is checked against
+// it: a fn(string): nint passed where fn(nint): nint is expected is a mismatch, and
+// calling a fn(nint): nint value with a string argument is too. The bare parameter
+// is lowered to its type (it used to be read as an unnamed parameter's name, leaving
+// the parameter type unresolved, so neither mismatch was caught).
+func TestFuncTypeParamChecked(t *testing.T) {
+	mismatch := "fn takesFn(f: fn(nint): nint): nint {\n  return f(1)\n}\n" +
+		"const Bad: fn(string): nint = fn(s) -> 0\n" +
+		"const R: nint = takesFn(Bad)\n"
+	if _, diags := analyze(mismatch); !hasCode(diags, CodeTypeMismatch) {
+		t.Errorf("a fn(string): nint passed where fn(nint): nint is expected should be a type mismatch: %v", codes(diags))
+	}
+	wrongArg := "fn apply(f: fn(nint): nint): nint {\n  return f(\"x\")\n}\n"
+	if _, diags := analyze(wrongArg); !hasCode(diags, CodeTypeMismatch) {
+		t.Errorf("calling a fn(nint): nint value with a string argument should be a type mismatch: %v", codes(diags))
+	}
+}
+
+// TestFuncTypeBareParamResolves pins that a bare function-type parameter resolves
+// to its type, not Invalid: const Twice: fn(nint): nint has an nint parameter.
+func TestFuncTypeBareParamResolves(t *testing.T) {
+	m, _ := analyze("const Twice: fn(nint): nint = fn(x) -> x * 2\n")
+	fn, ok := m.Consts[0].Type.(*ir.Func)
+	if !ok {
+		t.Fatalf("Twice type = %T, want a function type", m.Consts[0].Type)
+	}
+	if len(fn.Params) != 1 || ir.HasInvalid(fn.Params[0]) {
+		t.Errorf("Twice parameter = %v, want a resolved nint (not Invalid)", fn.Params)
+	}
+}
