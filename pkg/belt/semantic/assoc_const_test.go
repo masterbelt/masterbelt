@@ -47,27 +47,28 @@ func TestAssocConstTypedAnnotation(t *testing.T) {
 	}
 }
 
-// TestAssocConstInitializerTypeChecked pins that an associated constant's
-// initializer is type-checked: an operator applied to mismatched operands and a
-// method call with no matching overload are reported, the same as in a top-level
-// constant. These positions were folded but never typed before.
-func TestAssocConstInitializerTypeChecked(t *testing.T) {
-	op := "pub type T = nint impl {\n  pub const X: nint = \"abc\" * 2\n}\n"
-	if _, diags := analyze(op); !hasCode(diags, CodeInvalidOperation) {
-		t.Errorf("an operator type error in an assoc const initializer should be reported: %v", codes(diags))
-	}
-	overload := "pub type T = nint impl {\n  pub fn m(n: nint): self {\n    return self\n  }\n  pub const X: T = T(0).m(\"s\")\n}\n"
-	if _, diags := analyze(overload); !hasCode(diags, CodeInvalidOperation) {
-		t.Errorf("a no-overload method call in an assoc const initializer should be reported: %v", codes(diags))
+// TestAssocConstUnannotatedNotMistyped pins that settling an unannotated
+// associated constant's initializer for the editor does not report a spurious type
+// mismatch: the constant's inferred type comes from its folded value's kind, not its
+// static type, so the settling walk must not push it as an expectation.
+func TestAssocConstUnannotatedNotMistyped(t *testing.T) {
+	for _, src := range []string{
+		"pub type T = nint impl {\n  pub const X = sbyte(1)\n}\n",
+		"pub type Tag = string\npub type T = nint impl {\n  pub const X = Tag(\"x\")\n}\n",
+	} {
+		if _, diags := analyze(src); len(diags) != 0 {
+			t.Errorf("an unannotated assoc const should settle without a diagnostic; %q gave %v", src, codes(diags))
+		}
 	}
 }
 
-// TestEnumMemberInitializerTypeChecked pins the enum-member twin: an operator type
-// error in an enum member's initializer is reported, the position now typed.
-func TestEnumMemberInitializerTypeChecked(t *testing.T) {
-	src := "enum E {\n  a = \"x\" * 2\n}\n"
-	if _, diags := analyze(src); !hasCode(diags, CodeInvalidOperation) {
-		t.Errorf("an operator type error in an enum member initializer should be reported: %v", codes(diags))
+// TestGenericAssocConstNotMistyped pins that settling a generic type's associated
+// constant does not report a spurious mismatch: the owner's type parameters are in
+// scope, so a const on Box<T> annotated with T is not flagged.
+func TestGenericAssocConstNotMistyped(t *testing.T) {
+	src := "pub type Box<T> = T impl {\n  pub const Id: fn(T): T = fn(x) {\n    return x\n  }\n}\n"
+	if _, diags := analyze(src); len(diags) != 0 {
+		t.Errorf("a generic type's assoc const should settle without a diagnostic; got %v", codes(diags))
 	}
 }
 

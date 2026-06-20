@@ -5,6 +5,22 @@ import (
 	"testing"
 )
 
+// TestHoverMemberCallInInitializer pins that hover resolves a member call inside an
+// associated-constant initializer: the editor's type-query walk now settles these
+// initializers, so the call's receiver carries a type and inc hovers as a method.
+func TestHoverMemberCallInInitializer(t *testing.T) {
+	src := "pub type Counter = int impl {\n  pub fn inc(): self {\n    return self\n  }\n  pub const Next: Counter = Counter(0).inc()\n}\n"
+	doc := testView(src)
+	off := strings.Index(src, "Counter(0).inc()") + len("Counter(0).")
+	h := hover(doc, off)
+	if h == nil {
+		t.Fatal("a member call in an assoc const initializer should hover")
+	}
+	if !strings.Contains(h.Contents.Value, "inc") {
+		t.Errorf("hover should name inc: %q", h.Contents.Value)
+	}
+}
+
 // memberDefSrc declares a master with a static fn and a scope entry, a plain type
 // with a value method, and a function that calls each — so every user-declared
 // member kind has both a declaration and a call site to navigate between.

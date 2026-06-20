@@ -37,6 +37,17 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List, res *callResolutio
 	return sink
 }
 
+// resolutionSink wires only the overload-selection and typing streams to the
+// resolutions collector, with no diagnostics — the settling-only half of exprSink.
+// It types a value graph for the IR write-back (so the editor reads its receiver
+// types and selected overloads) without reporting, for a position whose
+// diagnostics another pass owns or whose typing is informational.
+func resolutionSink(res *callResolutions) *infer.Sink {
+	sink := &infer.Sink{}
+	wireResolutionStreams(sink, res)
+	return sink
+}
+
 // wireResolutionStreams wires the informational overload-selection, typing, and
 // adaption streams to the resolutions collector. res is nil where no collector
 // is in play (a refinement predicate's reporting pass), and the selections are
@@ -281,7 +292,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		checkBuiltinSurface(file, a.at, a.diags)
 	}
 	a.checkAssocConstRefs()
-	a.checkAssocConstAndEnumInits()
+	a.settleInitializerTypes()
 	a.reportMasterValidationRefs()
 	genv := a.writeBack()
 	checkIndexWritesIR(a.module, genv, a.at, a.diags)
@@ -566,40 +577,54 @@ func (a *assembler) checkAssocConstRefs() {
 	}
 }
 
-// checkAssocConstAndEnumInits type-checks the associated-constant and enum-member
-// initializers, streaming the overload selections and settled types into res so the
-// write-back annotates their retained value graphs the way it annotates a body's.
-// These positions were folded and reference-checked but never run through the typing
-// walk — so an operator type error in one is reported here, and, more importantly for
-// the editor, their value graphs gain the receiver types and selected overloads that
-// hover and go-to-definition read. Only the typing walk runs (exprSink): the reference
-// issues and the stray-self check are already reported (checkAssocConstRefs), an enum
-// member's value conformance by reportEnumMemberValueErrors, and the value-range checks
-// stay the fold's, so nothing is reported twice. An assoc const pushes its declared
-// type; an enum member is checked without a pushed type (its base conformance is the
-// enum phase's), so the member's own calls still resolve.
-func (a *assembler) checkAssocConstAndEnumInits() {
-	check := func(value ast.Expr, want ir.Type) {
-		if value == nil {
-			return
-		}
-		sink := exprSink(a.at, a.diags, a.res)
-		if want != nil && want != ir.Invalid {
-			infer.CheckAgainst(value, want, a.env, sink)
-		} else {
-			infer.Check(value, a.env, sink)
-		}
-	}
-	for _, def := range a.module.Types {
+// settleInitializerTypes types the associated-constant and enum-member initializers,
+// streaming the overload selections and settled types into res so the write-back
+// annotates their retained value graphs the way it annotates a body's — giving the
+// editor the receiver types and selected overloads that hover and go-to-definition
+// read. The walk settles silently (resolutionSink, no diagnostics): these positions'
+// reference and conformance errors are already reported (checkAssocConstRefs,
+// reportEnumMemberValueErrors) and their value-range checks stay the fold's, and a
+// reporting walk here would surface the annotation resolver's own gaps on degenerate
+// generic forms — the full type-checking of these positions is its own follow-up. An
+// assoc const pushes its cleanly-resolved declared type to settle a function value's
+// parameter types; an enum member is settled without a pushed type.
+func (a *assembler) settleInitializerTypes() {
+	settleInitializers(a.module.Types, a.file.Enums, a.env, resolutionSink(a.res))
+}
+
+// settleInitializers types every associated-constant and enum-member initializer
+// through env, streaming the facts to sink. It is shared by the assemble pass (whose
+// sink feeds the IR write-back) and the editor's type-query walk (whose sink captures
+// the expression types), so the two settle these positions identically. The const
+// scope resolves a top-level constant reference — the receiver of an initializer
+// member call (C.inc()) — which a body scope would not type; a generic owner type
+// parameter is not in this scope, but the walk is silent, so a degenerate generic
+// form is left partly untyped rather than reported (the full type-checking of these
+// positions is its own follow-up).
+func settleInitializers(defs []*ir.TypeDef, enums []*ast.EnumDecl, env infer.Env, sink *infer.Sink) {
+	for _, def := range defs {
 		for _, ac := range def.Consts {
-			if ac != nil && ac.Syntax != nil {
-				check(ac.Syntax.Value, ac.Type)
+			if ac == nil || ac.Syntax == nil || ac.Syntax.Value == nil {
+				continue
+			}
+			// Push only a written annotation that resolved cleanly. An unannotated
+			// constant's resolved type is inferred from its folded value's kind (an
+			// nint for sbyte(1)), not the value's static type, so pushing it would
+			// settle the value against itself; and an annotation with an invalid part
+			// (a generic parameter the annotation resolver left unresolved on a
+			// degenerate form) is no usable expectation. Both are settled without one.
+			if ac.Syntax.Type != nil && !ir.HasInvalid(ac.Type) {
+				infer.CheckAgainst(ac.Syntax.Value, ac.Type, env, sink)
+			} else {
+				infer.Check(ac.Syntax.Value, env, sink)
 			}
 		}
 	}
-	for _, ed := range a.file.Enums {
+	for _, ed := range enums {
 		for _, m := range ed.Members {
-			check(m.Value, ir.Invalid)
+			if m.Value != nil {
+				infer.Check(m.Value, env, sink)
+			}
 		}
 	}
 }

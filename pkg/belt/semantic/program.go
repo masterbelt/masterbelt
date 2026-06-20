@@ -614,6 +614,10 @@ func runCheckWalks(db *database, fileID FileID, file *ast.File, sink *infer.Sink
 			infer.Check(a.Cond, env, sink)
 		}
 	}
+	// The associated-constant and enum-member initializers settle their types for
+	// the editor the same way the assemble pass does, so a member call's receiver or
+	// a function literal inside one carries a type in the editor's queries too.
+	settleInitializers(q.typeDefs(fileID), file.Enums, env, sink)
 	funcs := buildFuncSymbols(file)
 	qualifiedFuncs := qualifiedFuncsFrom(q, q.importsOf(fileID))
 	constShadows := constShadowsFrom(q, fileID)
