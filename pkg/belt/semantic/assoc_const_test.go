@@ -62,13 +62,68 @@ func TestAssocConstUnannotatedNotMistyped(t *testing.T) {
 	}
 }
 
-// TestGenericAssocConstNotMistyped pins that settling a generic type's associated
-// constant does not report a spurious mismatch: the owner's type parameters are in
-// scope, so a const on Box<T> annotated with T is not flagged.
-func TestGenericAssocConstNotMistyped(t *testing.T) {
-	src := "pub type Box<T> = T impl {\n  pub const Id: fn(T): T = fn(x) {\n    return x\n  }\n}\n"
-	if _, diags := analyze(src); len(diags) != 0 {
-		t.Errorf("a generic type's assoc const should settle without a diagnostic; got %v", codes(diags))
+// TestGenericFuncLitAssocConstNotReported pins that a generic type's associated
+// constant holding a function literal whose parameter reads the owner's type
+// parameter settles clean: the constant is checked in the owner's type-parameter
+// scope, so T is a rigid type variable the lambda parameter resolves to, not a
+// spuriously uninferable one. It holds for a function-valued constant and for a
+// function literal nested in a record value.
+func TestGenericFuncLitAssocConstNotReported(t *testing.T) {
+	top := "pub type Box<T> = T impl {\n  pub const Id: fn(x: T): T = fn(y) {\n    return y\n  }\n}\n"
+	if _, diags := analyze(top); len(diags) != 0 {
+		t.Errorf("a generic function-literal assoc const should settle without a diagnostic; got %v", codes(diags))
+	}
+	nested := "pub type Box<T> = { v: T } impl {\n  pub const Mk: { make: fn(x: T): T } = { make: fn(y) {\n    return y\n  } }\n}\n"
+	if _, diags := analyze(nested); len(diags) != 0 {
+		t.Errorf("a generic constant's record holding a function literal should settle without a diagnostic; got %v", codes(diags))
+	}
+}
+
+// TestGenericAssocConstSiblingReported pins that a real type error beside a function
+// literal in a generic constant is still reported: checking in the owner's type scope
+// resolves the lambda parameter cleanly, so the sibling "x" * 2 is reported as the
+// invalid operation it is — the lambda no longer suppresses the whole initializer.
+func TestGenericAssocConstSiblingReported(t *testing.T) {
+	src := "pub type Box<T> = { v: T } impl {\n" +
+		"  pub const Mk: { bad: nint, make: fn(x: T): T } = { bad: \"x\" * 2, make: fn(y) {\n    return y\n  } }\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeInvalidOperation) {
+		t.Errorf("a type error beside a function literal in a generic constant should be reported: %v", codes(diags))
+	}
+	// And the lambda itself stays clean — the owner scope makes its parameter rigid.
+	if hasCode(diags, CodeUninferableParameter) {
+		t.Errorf("the function literal beside it must not report a spurious uninferable parameter: %v", codes(diags))
+	}
+}
+
+// TestAssocConstInitializerReported pins that a non-function-literal associated
+// constant initializer is type-checked: an operator on mismatched operands and a
+// method call with no matching overload are reported as invalid_operation, the type
+// error the position carries — these were folded but never typed before, surfacing
+// only as the unclear "no compile-time value".
+func TestAssocConstInitializerReported(t *testing.T) {
+	op := "pub type T = nint impl {\n  pub const X: nint = \"abc\" * 2\n}\n"
+	if _, diags := analyze(op); !hasCode(diags, CodeInvalidOperation) {
+		t.Errorf("an operator type error in an assoc const initializer should be reported: %v", codes(diags))
+	}
+	overload := "pub type T = nint impl {\n  pub fn m(n: nint): self {\n    return self\n  }\n  pub const X: T = T(0).m(\"s\")\n}\n"
+	if _, diags := analyze(overload); !hasCode(diags, CodeInvalidOperation) {
+		t.Errorf("a no-overload method call in an assoc const initializer should be reported: %v", codes(diags))
+	}
+}
+
+// TestAssocConstBadAnnotationNoRecordPileOn pins that an associated constant whose
+// annotation failed to resolve and whose value is an inferred record reports only the
+// unknown type, not an uninferable_record on top: the failed annotation would have
+// supplied the record's type, so the pile-on is suppressed, as the top-level const
+// path does.
+func TestAssocConstBadAnnotationNoRecordPileOn(t *testing.T) {
+	_, diags := analyze("pub type T = nint impl {\n  pub const X: Missing = { x: 1 }\n}\n")
+	if !hasCode(diags, CodeUnknownType) {
+		t.Fatalf("a missing annotation type should be reported: %v", codes(diags))
+	}
+	if hasCode(diags, CodeUninferableRecord) {
+		t.Errorf("a record under a failed annotation must not also report uninferable_record: %v", codes(diags))
 	}
 }
 

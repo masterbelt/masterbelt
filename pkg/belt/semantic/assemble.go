@@ -581,28 +581,43 @@ func (a *assembler) checkAssocConstRefs() {
 // streaming the overload selections and settled types into res so the write-back
 // annotates their retained value graphs the way it annotates a body's — giving the
 // editor the receiver types and selected overloads that hover and go-to-definition
-// read. The walk settles silently (resolutionSink, no diagnostics): these positions'
-// reference and conformance errors are already reported (checkAssocConstRefs,
-// reportEnumMemberValueErrors) and their value-range checks stay the fold's, and a
-// reporting walk here would surface the annotation resolver's own gaps on degenerate
-// generic forms — the full type-checking of these positions is its own follow-up. An
-// assoc const pushes its cleanly-resolved declared type to settle a function value's
-// parameter types; an enum member is settled without a pushed type.
+// read — and reporting the type errors an associated constant's initializer carries
+// (an operator on mismatched operands, a call with no matching overload), which were
+// folded but never typed before. The reference and stray-self checks are already
+// reported (checkAssocConstRefs) and value ranges stay the fold's, so nothing is
+// reported twice.
 func (a *assembler) settleInitializerTypes() {
-	settleInitializers(a.module.Types, a.file.Enums, a.env, resolutionSink(a.res))
+	assocSink := func(annotationInvalid bool) *infer.Sink {
+		sink := exprSink(a.at, a.diags, a.res)
+		if annotationInvalid {
+			// The annotation failed to resolve (reported at its own site); with no
+			// resolved type to supply, an inferred record literal would pile on an
+			// uninferable_record, so it is suppressed the way the top-level const path
+			// suppresses it in the same situation.
+			sink.UninferableRecord = nil
+		}
+		return sink
+	}
+	// An enum member's initializer is settled silently for the editor, not reported:
+	// reporting its type errors needs the broken-value withholding the enum value
+	// resolution does not yet do (a type-invalid member still folds and feeds the
+	// duplicate-value check), so enum-member reporting is its own follow-up.
+	settleInitializers(a.module.Types, a.file.Enums, a.env, assocSink, resolutionSink(a.res))
 }
 
-// settleInitializers types every associated-constant and enum-member initializer
-// through env, streaming the facts to sink. It is shared by the assemble pass (whose
-// sink feeds the IR write-back) and the editor's type-query walk (whose sink captures
-// the expression types), so the two settle these positions identically. The const
-// scope resolves a top-level constant reference — the receiver of an initializer
-// member call (C.inc()) — which a body scope would not type; a generic owner type
-// parameter is not in this scope, but the walk is silent, so a degenerate generic
-// form is left partly untyped rather than reported (the full type-checking of these
-// positions is its own follow-up).
-func settleInitializers(defs []*ir.TypeDef, enums []*ast.EnumDecl, env infer.Env, sink *infer.Sink) {
+// settleInitializers types every associated-constant initializer through assocSink
+// and every enum-member initializer through enumSink, streaming the facts to those
+// sinks. It is shared by the assemble pass (whose sinks feed the IR write-back,
+// reporting on the associated constants it type-checks) and the editor's type-query
+// walk (whose one sink captures the expression types and reports nothing), so the two
+// settle these positions identically. An associated constant is checked in the owning
+// type's generic-parameter scope, so a value reading the owner's parameter — a function
+// literal whose parameter is T — resolves it the way a method body does rather than
+// reporting it uninferable; assocSink only suppresses the inferred-record pile-on of a
+// constant whose annotation failed to resolve.
+func settleInitializers(defs []*ir.TypeDef, enums []*ast.EnumDecl, env infer.Env, assocSink func(annotationInvalid bool) *infer.Sink, enumSink *infer.Sink) {
 	for _, def := range defs {
+		tscope := ownerTScope(def)
 		for _, ac := range def.Consts {
 			if ac == nil || ac.Syntax == nil || ac.Syntax.Value == nil {
 				continue
@@ -613,20 +628,37 @@ func settleInitializers(defs []*ir.TypeDef, enums []*ast.EnumDecl, env infer.Env
 			// settle the value against itself; and an annotation with an invalid part
 			// (a generic parameter the annotation resolver left unresolved on a
 			// degenerate form) is no usable expectation. Both are settled without one.
+			annotationInvalid := ac.Syntax.Type != nil && ir.HasInvalid(ac.Type)
+			sink := assocSink(annotationInvalid)
 			if ac.Syntax.Type != nil && !ir.HasInvalid(ac.Type) {
-				infer.CheckAgainst(ac.Syntax.Value, ac.Type, env, sink)
+				infer.CheckConstAgainst(ac.Syntax.Value, ac.Type, env, tscope, sink)
 			} else {
-				infer.Check(ac.Syntax.Value, env, sink)
+				infer.CheckConst(ac.Syntax.Value, env, tscope, sink)
 			}
 		}
 	}
 	for _, ed := range enums {
 		for _, m := range ed.Members {
 			if m.Value != nil {
-				infer.Check(m.Value, env, sink)
+				infer.Check(m.Value, env, enumSink)
 			}
 		}
 	}
+}
+
+// ownerTScope is the generic type-parameter scope a type's own members see — each
+// owner parameter mapped to its resolved bound — or nil for a non-generic type. An
+// associated constant is checked through it so a value reading the owner's parameter
+// resolves it to a rigid type variable, the way a method body of the same type does.
+func ownerTScope(def *ir.TypeDef) infer.TypeScope {
+	if len(def.Params) == 0 {
+		return nil
+	}
+	ts := make(infer.TypeScope, len(def.Params))
+	for _, p := range def.Params {
+		ts[p.Name] = p.Bound
+	}
+	return ts
 }
 
 // writeBack binds the checker-selected overloads, the settled types, and the

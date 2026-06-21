@@ -137,19 +137,27 @@ func metatype() ir.Type { return &ir.Builtin{Name: builtin.NameType} }
 // is the type it names, and the null literal. A field access reads a
 // record-typed constant's field (Hero.lv); self is not meaningful in a
 // constant, so it is ir.Invalid.
-type constScope struct{ env Env }
+type constScope struct {
+	env Env
+	// params are the generic type parameters in scope — the owning type's, for an
+	// associated constant on a generic type (Box<T>'s const may read T); empty for a
+	// top-level constant, which has none. They make T a rigid type variable a value
+	// reads through, so a function literal whose parameter is T is not reported as
+	// uninferable, the way a method body of the same type resolves it.
+	params TypeScope
+}
 
 func (s constScope) registry() *builtin.Registry { return s.env.Registry() }
 
 // self: a constant initializer has no receiver.
 func (s constScope) self() ir.Type { return ir.Invalid }
 
-// rigid: a constant initializer has no generic type parameters in scope.
-func (s constScope) rigid(string) bool { return false }
+// rigid reports whether name is one of the owner type parameters in scope.
+func (s constScope) rigid(name string) bool { _, ok := s.params[name]; return ok }
 
-// tscope: a constant initializer has no generic type parameters, so a lambda
-// in one resolves its annotations with no type-variable scope.
-func (s constScope) tscope() TypeScope { return nil }
+// tscope is the owner type-parameter scope a lambda in the initializer resolves its
+// annotations through — nil for a top-level constant.
+func (s constScope) tscope() TypeScope { return s.params }
 
 func (s constScope) universe() map[string]*ir.TypeDef { return s.env.Universe() }
 

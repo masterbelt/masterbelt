@@ -23,7 +23,15 @@ import (
 // that is itself Invalid, or an undefined reference reported elsewhere —
 // without re-reporting it.
 func Check(e ast.Expr, env Env, sink *Sink) ir.Type {
-	return check(e, constScope{env}, sink)
+	return check(e, constScope{env: env}, sink)
+}
+
+// CheckConst is Check over a constant initializer that may read the owning type's
+// generic parameters — an associated constant on Box<T>, whose tscope makes T a rigid
+// type variable a lambda reads through. A top-level constant passes a nil tscope and
+// is identical to Check.
+func CheckConst(e ast.Expr, env Env, tscope TypeScope, sink *Sink) ir.Type {
+	return check(e, constScope{env: env, params: tscope}, sink)
 }
 
 // CheckAgainst checks expression e against the expected type want, pushing
@@ -33,7 +41,14 @@ func Check(e ast.Expr, env Env, sink *Sink) ir.Type {
 // omitted. A nil sink checks silently (pure typing); diagnostic callers pass
 // callbacks.
 func CheckAgainst(e ast.Expr, want ir.Type, env Env, sink *Sink) ir.Type {
-	return checkType(e, want, constScope{env}, map[string]ir.Type{}, sink)
+	return checkType(e, want, constScope{env: env}, map[string]ir.Type{}, sink)
+}
+
+// CheckConstAgainst is CheckAgainst over a constant initializer that may read the
+// owning type's generic parameters — the bidirectional twin of CheckConst, so a
+// function literal pushed a fn(T): T receives T as a rigid type variable.
+func CheckConstAgainst(e ast.Expr, want ir.Type, env Env, tscope TypeScope, sink *Sink) ir.Type {
+	return checkType(e, want, constScope{env: env, params: tscope}, map[string]ir.Type{}, sink)
 }
 
 // CheckBody is CheckAgainst over a method-body scope, so a returned function
