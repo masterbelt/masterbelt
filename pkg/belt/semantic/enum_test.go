@@ -132,6 +132,29 @@ func TestEnumPoisonedValueWithheld(t *testing.T) {
 	}
 }
 
+// TestEnumValueErrorWithheld pins that a member whose value fails the base — a
+// mismatched kind or an out-of-range value — is poisoned too, not only one whose
+// expression draws an operator error: two members both rejected by the base do not
+// then collide as a duplicate value.
+func TestEnumValueErrorWithheld(t *testing.T) {
+	if _, diags := analyze("enum E {\n  A = \"x\"\n  B = \"x\"\n}\n"); hasCode(diags, CodeDuplicateEnumValue) {
+		t.Errorf("base-mismatched members must be withheld, not duplicate-checked: %v", codes(diags))
+	}
+	if _, diags := analyze("enum E: byte {\n  A = 256\n  B = 256\n}\n"); hasCode(diags, CodeDuplicateEnumValue) {
+		t.Errorf("overflowing members must be withheld, not duplicate-checked: %v", codes(diags))
+	}
+}
+
+// TestEnumPoisonResetsAutoNumbering pins that a poisoned member does not advance the
+// auto-numbering counter: A = true ? 5 : "s" is withheld, so the implicit B continues
+// from before A (0), not from the rejected 5, and a later C = 6 is not a duplicate.
+func TestEnumPoisonResetsAutoNumbering(t *testing.T) {
+	src := "enum E {\n  A = true ? 5 : \"s\"\n  B\n  C = 6\n}\n"
+	if _, diags := analyze(src); hasCode(diags, CodeDuplicateEnumValue) {
+		t.Errorf("a poisoned value must not advance auto-numbering into a later member: %v", codes(diags))
+	}
+}
+
 // TestEnumNestedErrorWithheld pins that a member is poisoned by a type error nested
 // under a valid outer type — a function literal with an ill-typed body that still
 // returns the base type, called — so the poisoning keys off a reported diagnostic, not

@@ -1625,29 +1625,34 @@ func resolveEnumMembers(folder exprFolder, defs map[string]*ir.TypeDef, reg *bui
 			memberSeen[m.Name] = true
 		}
 
+		prevBeforeMember := prevInt
 		value, graph, nextInt := enumMemberValue(folder, defs, m, isString, baseType, prevInt)
 		prevInt = nextInt
 		def.Enum.Members[i].Value = value
 		def.Enum.Members[i].ValueGraph = graph
-		reportEnumMemberValueErrors(reg, m, value, base, baseType, isString, at, diags)
-		// A written initializer whose expression carries a type error — a mismatched
-		// ternary, an operator on the wrong operands, a function literal returning the
-		// wrong type — is poisoned: the fold takes a branch (or a default) regardless of
-		// the error, so its value is withheld the way a top-level constant withholds a
-		// poisoned value, or the same pass's duplicate-value check would consume a value
-		// the type rules rejected. The poisoning keys off whether the typing walk
-		// reported a diagnostic, not the outer expression's type, so a nested error
-		// under a valid outer type (a call of an ill-typed lambda) poisons the member
-		// too. It runs only in the reporting pass (at and diags non-nil): the memoizing
-		// pass has not resolved the file's constants, so a valid initializer reading one
-		// (A = Base) would type as invalid there and be withheld wrongly; a member whose
-		// value is bad only after a reported type error is broken either way, so the
-		// memoized definition keeping the folded value is harmless.
-		if m.Value != nil && at != nil && diags != nil {
+
+		// A member whose value or written initializer draws any diagnostic is poisoned —
+		// a value that does not fit the base or overflows it (reportEnumMemberValueErrors),
+		// a mismatched ternary, an operator on the wrong operands, a nested error under a
+		// valid outer type (a call of an ill-typed function literal). The fold takes a
+		// branch or a default regardless, so a poisoned member's value is withheld the way
+		// a top-level constant withholds a poisoned value, or the same pass's duplicate
+		// check would consume a value the type rules rejected; the auto-numbering counter
+		// is restored too, so a later implicit member continues from the last sound value
+		// rather than the rejected one. Poisoning keys off whether a diagnostic was
+		// reported, not the expression's type, and so runs only in the reporting pass (the
+		// memoizing pass has resolved no constants and would withhold a valid member
+		// reading one); a member bad only after a reported error is broken either way, so
+		// the memoized definition keeping the folded value is harmless.
+		if at != nil && diags != nil {
 			before := diags.Len()
-			infer.Check(m.Value, typeEnv(folder), exprSink(at, diags, nil))
+			reportEnumMemberValueErrors(reg, m, value, base, baseType, isString, at, diags)
+			if m.Value != nil {
+				infer.Check(m.Value, typeEnv(folder), exprSink(at, diags, nil))
+			}
 			if diags.Len() > before {
 				def.Enum.Members[i].Value = nil
+				prevInt = prevBeforeMember
 			}
 		}
 	}
