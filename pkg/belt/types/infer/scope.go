@@ -127,6 +127,51 @@ func (s funcScope) nsReceiver(recv ast.Expr) bool {
 	return s.outer.nsReceiver(recv)
 }
 
+// columnsScope types an argument written in a relation method's columns context —
+// the bare-column form of a query, where(cost > 100) or sum(cost), the columns
+// binding omitted the way a method body omits self. It wraps the call site's scope,
+// delegating every form to it, and adds only a last-resort reading: a bare name the
+// enclosing scope does not bind reads master M's column of that name (cost →
+// column<M, costType>). The fallback is last resort, so a local, parameter,
+// constant, or type of the same name still wins — only an otherwise-undefined name
+// that is a column becomes one. columns is the columns<M> the receiver's relation<M>
+// offers, built from the receiver before the argument is synthesized (M is the
+// receiver's binding, not the argument's, so it is known before overload selection).
+type columnsScope struct {
+	outer   scope
+	columns ir.Type
+}
+
+func (s columnsScope) registry() *builtin.Registry           { return s.outer.registry() }
+func (s columnsScope) universe() map[string]*ir.TypeDef      { return s.outer.universe() }
+func (s columnsScope) self() ir.Type                         { return s.outer.self() }
+func (s columnsScope) rigid(name string) bool                { return s.outer.rigid(name) }
+func (s columnsScope) tscope() TypeScope                     { return s.outer.tscope() }
+func (s columnsScope) conv(id *ast.Identifier) ir.Type       { return s.outer.conv(id) }
+func (s columnsScope) fn(id *ast.Identifier) []*ast.FuncDecl { return s.outer.fn(id) }
+func (s columnsScope) nsReceiver(recv ast.Expr) bool         { return s.outer.nsReceiver(recv) }
+
+func (s columnsScope) qualified() func(namespace, name string) *ir.TypeDef {
+	return s.outer.qualified()
+}
+
+func (s columnsScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl { return s.outer.fnMember(m) }
+
+func (s columnsScope) leaf(e ast.Expr) ir.Type {
+	if t := s.outer.leaf(e); t != ir.Invalid {
+		return t // a local, parameter, constant, or type of the same name wins
+	}
+	// Last resort: a bare name that resolves no other way reads M's column of that
+	// name — the columns binding omitted, exactly as a bare self member reads self.
+	// A name that is no column of M stays Invalid, so a typo is still undefined.
+	if id, ok := e.(*ast.Identifier); ok {
+		if ct := columnsFieldType(s.registry(), s.columns, id.Name); ct != ir.Invalid {
+			return ct
+		}
+	}
+	return ir.Invalid
+}
+
 // metatype is the type of a reified type value — the builtin `type` (type :
 // type), the type a bare type name carries in value position. It is built fresh
 // per call, like the other primitive types the scopes synthesize.

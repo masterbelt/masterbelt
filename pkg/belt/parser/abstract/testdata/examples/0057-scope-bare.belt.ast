@@ -1,0 +1,274 @@
+File
+  Uses: ~
+  Decls: ~
+  Types: ~
+  Enums:
+    EnumDecl
+      Doc: ~
+      Public: false
+      Name: "Rarity"
+      Base: ~
+      Members:
+        EnumMember
+          Name: "common"
+          Value: ~
+        EnumMember
+          Name: "rare"
+          Value: ~
+        EnumMember
+          Name: "legend"
+          Value: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~
+  Masters:
+    MasterDecl
+      Doc: ~
+      Public: false
+      Name: "Cards"
+      Record: RecordType
+        Fields:
+          FieldDef
+            Name: "id"
+            Type: NamedType
+              Namespace: ""
+              Name: "int"
+              Args: ~
+              Projections: ~
+          FieldDef
+            Name: "cost"
+            Type: NamedType
+              Namespace: ""
+              Name: "int"
+              Args: ~
+              Projections: ~
+          FieldDef
+            Name: "rarity"
+            Type: NamedType
+              Namespace: ""
+              Name: "Rarity"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: ~
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Name: "expensive"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "relation"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "Cards"
+                Args: ~
+                Projections: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: Identifier
+                  Name: "where"
+                Arguments:
+                  CallExpr
+                    Callee: MemberExpr
+                      Receiver: Identifier
+                        Name: "cost"
+                      Member: Identifier
+                        Name: "gt"
+                    Arguments:
+                      IntLit
+                        Text: "100"
+                        Base: 0
+        MethodDecl
+          Doc: ~
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Name: "by_rarity"
+          TypeParams: ~
+          Params:
+            ParamDef
+              Name: "r"
+              Type: NamedType
+                Namespace: ""
+                Name: "Rarity"
+                Args: ~
+                Projections: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "relation"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "Cards"
+                Args: ~
+                Projections: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: Identifier
+                  Name: "where"
+                Arguments:
+                  CallExpr
+                    Callee: MemberExpr
+                      Receiver: Identifier
+                        Name: "rarity"
+                      Member: Identifier
+                        Name: "eql"
+                    Arguments:
+                      Identifier
+                        Name: "r"
+        MethodDecl
+          Doc: ~
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Name: "priciest"
+          TypeParams: ~
+          Params:
+            ParamDef
+              Name: "n"
+              Type: NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+                Projections: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "relation"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "Cards"
+                Args: ~
+                Projections: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: CallExpr
+                    Callee: Identifier
+                      Name: "order"
+                    Arguments:
+                      CallExpr
+                        Callee: MemberExpr
+                          Receiver: Identifier
+                            Name: "cost"
+                          Member: Identifier
+                            Name: "desc"
+                        Arguments: ~
+                  Member: Identifier
+                    Name: "limit"
+                Arguments:
+                  Identifier
+                    Name: "n"
+      Consts: ~
+      Impls: ~
+      Primary: "id"
+      Sources:
+        SourceEntry
+          Format: "csv"
+          Locator: "cards.csv"
+          Options: ~
+      Validations:
+        ValidateClause
+          PerRow: false
+          Body:
+            AssertStmt
+              Cond: CallExpr
+                Callee: MemberExpr
+                  Receiver: CallExpr
+                    Callee: MemberExpr
+                      Receiver: CallExpr
+                        Callee: MemberExpr
+                          Receiver: Identifier
+                            Name: "Cards"
+                          Member: Identifier
+                            Name: "where"
+                        Arguments:
+                          CallExpr
+                            Callee: MemberExpr
+                              Receiver: Identifier
+                                Name: "cost"
+                              Member: Identifier
+                                Name: "gt"
+                            Arguments:
+                              IntLit
+                                Text: "100"
+                                Base: 0
+                      Member: Identifier
+                        Name: "count"
+                    Arguments: ~
+                  Member: Identifier
+                    Name: "eql"
+                Arguments:
+                  IntLit
+                    Text: "2"
+                    Base: 0
+            AssertStmt
+              Cond: CallExpr
+                Callee: MemberExpr
+                  Receiver: CallExpr
+                    Callee: MemberExpr
+                      Receiver: Identifier
+                        Name: "Cards"
+                      Member: Identifier
+                        Name: "sum"
+                    Arguments:
+                      Identifier
+                        Name: "cost"
+                  Member: Identifier
+                    Name: "eql"
+                Arguments:
+                  IntLit
+                    Text: "350"
+                    Base: 0
+            AssertStmt
+              Cond: CallExpr
+                Callee: MemberExpr
+                  Receiver: MemberExpr
+                    Receiver: CallExpr
+                      Callee: MemberExpr
+                        Receiver: CallExpr
+                          Callee: MemberExpr
+                            Receiver: CallExpr
+                              Callee: MemberExpr
+                                Receiver: Identifier
+                                  Name: "Cards"
+                                Member: Identifier
+                                  Name: "priciest"
+                              Arguments:
+                                IntLit
+                                  Text: "1"
+                                  Base: 0
+                            Member: Identifier
+                              Name: "to_list"
+                          Arguments: ~
+                        Member: Identifier
+                          Name: "get"
+                      Arguments:
+                        IntLit
+                          Text: "0"
+                          Base: 0
+                    Member: Identifier
+                      Name: "cost"
+                  Member: Identifier
+                    Name: "eql"
+                Arguments:
+                  IntLit
+                    Text: "200"
+                    Base: 0

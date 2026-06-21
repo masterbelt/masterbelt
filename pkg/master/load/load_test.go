@@ -57,6 +57,42 @@ func countTableFailures(diags []diagnostic.Diagnostic) int {
 	return n
 }
 
+// TestValidateAllBareColumnForm exercises the bare-column query form end to end: a
+// relation method's argument written without the columns binding (where(power > 10),
+// sum(power), order(power.desc())) folds to the same query the lambda form does. It is
+// a red→green gate over the whole pipeline: drop the columnsScope from the checker (the
+// bare column types Invalid, so the bare overload no longer matches and the query
+// declines) or the synthesized-lambda lowering (the column reads off no binding), and
+// the queries fold to nothing and every assertion fails safe.
+func TestValidateAllBareColumnForm(t *testing.T) {
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power\n1,5\n2,30\n3,20\n"}
+	pass := []struct{ name, body string }{
+		{"bare where", "Cards.where(power > 10).count() == 2"},
+		{"bare sum", "Cards.sum(power) == 55"},
+		{"bare min", "Cards.min(power) == 5"},
+		{"bare max", "Cards.max(power) == 30"},
+		{"bare order top", "Cards.order(power.desc()).to_list()[0].power == 30"},
+		{"bare chain", "Cards.where(power > 10).order(power.asc()).limit(1).to_list()[0].power == 20"},
+		{"bare equals lambda", "Cards.where(power > 10).count() == Cards.where(fn(c) -> c.power > 10).count()"},
+	}
+	for _, c := range pass {
+		belt := "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+			"  validate {\n    all {\n      assert " + c.body + "\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+		if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+			t.Errorf("%s (%s): table_validation_failed = %d, want 0", c.name, c.body, countTableFailures(diags))
+		}
+	}
+	// The bare form is not vacuous: a wrong assertion over it still fails, so a pass
+	// above means the query really folded rather than collapsing to nothing.
+	fail := "Cards.where(power > 10).count() == 99"
+	belt := "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert " + fail + "\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) == 0 {
+		t.Errorf("wrong bare-form assertion (%s) must fail, got no failure (vacuous pass)", fail)
+	}
+}
+
 // TestValidateAllRowCountCap exercises a per-table validate all check end to end:
 // the count of loaded rows is evaluated in the in-memory SQLite engine and
 // compared to the cap. Under the cap the table passes; at or over it the check

@@ -220,18 +220,14 @@ Module
                 Method: "where"
                 Args:
                   FuncLiteral
-                    Params: "c"
+                    Params: "$columns"
                     Body:
                       Return
                         Value: Call
                           Receiver: FieldAccess
                             Receiver: ParamRef
-                              Name: "c"
-                              Type: App
-                                Def: "columns"
-                                Args:
-                                  Named
-                                    Def: "Cards"
+                              Name: "$columns"
+                              Type: ~
                             Field: "cost"
                             Type: App
                               Def: "column"
@@ -265,20 +261,9 @@ Module
                             Args:
                               Named
                                 Def: "Cards"
-                    Type: Func
-                      Params:
-                        App
-                          Def: "columns"
-                          Args:
-                            Named
-                              Def: "Cards"
-                      Result: App
-                        Def: "predicate"
-                        Args:
-                          Named
-                            Def: "Cards"
+                    Type: ~
                 Setter: false
-                Resolved: "relation.where(fn(columns<M>): predicate<M>)"
+                Resolved: "relation.where(predicate<M>)"
                 Subst:
                   Entry
                     Key: "M"
@@ -291,8 +276,8 @@ Module
                       Def: "Cards"
           Owner: "Cards"
         Method
-          Name: "rarity"
-          Anchor: "belt:/Cards#rarity"
+          Name: "by_rarity"
+          Anchor: "belt:/Cards#by_rarity"
           Public: true
           Extern: false
           Kind: 3
@@ -322,18 +307,14 @@ Module
                 Method: "where"
                 Args:
                   FuncLiteral
-                    Params: "c"
+                    Params: "$columns"
                     Body:
                       Return
                         Value: Call
                           Receiver: FieldAccess
                             Receiver: ParamRef
-                              Name: "c"
-                              Type: App
-                                Def: "columns"
-                                Args:
-                                  Named
-                                    Def: "Cards"
+                              Name: "$columns"
+                              Type: ~
                             Field: "rarity"
                             Type: App
                               Def: "column"
@@ -364,20 +345,9 @@ Module
                             Args:
                               Named
                                 Def: "Cards"
-                    Type: Func
-                      Params:
-                        App
-                          Def: "columns"
-                          Args:
-                            Named
-                              Def: "Cards"
-                      Result: App
-                        Def: "predicate"
-                        Args:
-                          Named
-                            Def: "Cards"
+                    Type: ~
                 Setter: false
-                Resolved: "relation.where(fn(columns<M>): predicate<M>)"
+                Resolved: "relation.where(predicate<M>)"
                 Subst:
                   Entry
                     Key: "M"
@@ -390,8 +360,8 @@ Module
                       Def: "Cards"
           Owner: "Cards"
         Method
-          Name: "top"
-          Anchor: "belt:/Cards#top"
+          Name: "priciest"
+          Anchor: "belt:/Cards#priciest"
           Public: true
           Extern: false
           Kind: 3
@@ -422,18 +392,14 @@ Module
                   Method: "order"
                   Args:
                     FuncLiteral
-                      Params: "c"
+                      Params: "$columns"
                       Body:
                         Return
                           Value: Call
                             Receiver: FieldAccess
                               Receiver: ParamRef
-                                Name: "c"
-                                Type: App
-                                  Def: "columns"
-                                  Args:
-                                    Named
-                                      Def: "Cards"
+                                Name: "$columns"
+                                Type: ~
                               Field: "cost"
                               Type: App
                                 Def: "column"
@@ -460,20 +426,9 @@ Module
                               Args:
                                 Named
                                   Def: "Cards"
-                      Type: Func
-                        Params:
-                          App
-                            Def: "columns"
-                            Args:
-                              Named
-                                Def: "Cards"
-                        Result: App
-                          Def: "ordering"
-                          Args:
-                            Named
-                              Def: "Cards"
+                      Type: ~
                   Setter: false
-                  Resolved: "relation.order(fn(columns<M>): ordering<M>)"
+                  Resolved: "relation.order(ordering<M>)"
                   Subst:
                     Entry
                       Key: "M"
@@ -529,12 +484,66 @@ Module
           AssertStmt
             Cond: Call
               Receiver: Call
-                Receiver: StaticCall
-                  Def: "Cards"
-                  Name: "expensive"
-                  Args: ~
-                  Resolved: ~
-                  Subst: ~
+                Receiver: Call
+                  Receiver: MasterRelation
+                    Master: "Cards"
+                    Type: App
+                      Def: "relation"
+                      Args:
+                        Named
+                          Def: "Cards"
+                  Method: "where"
+                  Args:
+                    FuncLiteral
+                      Params: "$columns"
+                      Body:
+                        Return
+                          Value: Call
+                            Receiver: FieldAccess
+                              Receiver: ParamRef
+                                Name: "$columns"
+                                Type: ~
+                              Field: "cost"
+                              Type: App
+                                Def: "column"
+                                Args:
+                                  Named
+                                    Def: "Cards"
+                                  Builtin
+                                    Name: "int"
+                            Method: "gt"
+                            Args:
+                              Adapt
+                                Value: IntLiteral
+                                  Text: "100"
+                                  Type: Builtin
+                                    Name: "nint"
+                                To: Builtin
+                                  Name: "int"
+                            Setter: false
+                            Resolved: "column.gt(T)"
+                            Subst:
+                              Entry
+                                Key: "M"
+                                Value: Named
+                                  Def: "Cards"
+                              Entry
+                                Key: "T"
+                                Value: Builtin
+                                  Name: "int"
+                            Type: App
+                              Def: "predicate"
+                              Args:
+                                Named
+                                  Def: "Cards"
+                      Type: ~
+                  Setter: false
+                  Resolved: "relation.where(predicate<M>)"
+                  Subst:
+                    Entry
+                      Key: "M"
+                      Value: Named
+                        Def: "Cards"
                   Type: App
                     Def: "relation"
                     Args:
@@ -562,6 +571,132 @@ Module
               Subst: ~
               Type: Builtin
                 Name: "bool"
+          AssertStmt
+            Cond: Call
+              Receiver: Call
+                Receiver: MasterRelation
+                  Master: "Cards"
+                  Type: App
+                    Def: "relation"
+                    Args:
+                      Named
+                        Def: "Cards"
+                Method: "sum"
+                Args:
+                  FuncLiteral
+                    Params: "$columns"
+                    Body:
+                      Return
+                        Value: FieldAccess
+                          Receiver: ParamRef
+                            Name: "$columns"
+                            Type: ~
+                          Field: "cost"
+                          Type: App
+                            Def: "column"
+                            Args:
+                              Named
+                                Def: "Cards"
+                              Builtin
+                                Name: "int"
+                    Type: ~
+                Setter: false
+                Resolved: "relation.sum(column<M, T>)"
+                Subst:
+                  Entry
+                    Key: "M"
+                    Value: Named
+                      Def: "Cards"
+                  Entry
+                    Key: "T"
+                    Value: Builtin
+                      Name: "int"
+                Type: Builtin
+                  Name: "nint"
+              Method: "eql"
+              Args:
+                IntLiteral
+                  Text: "350"
+                  Type: Builtin
+                    Name: "nint"
+              Setter: false
+              Resolved: ~
+              Subst: ~
+              Type: Builtin
+                Name: "bool"
+          AssertStmt
+            Cond: Call
+              Receiver: FieldAccess
+                Receiver: Call
+                  Receiver: Call
+                    Receiver: StaticCall
+                      Def: "Cards"
+                      Name: "priciest"
+                      Args:
+                        IntLiteral
+                          Text: "1"
+                          Type: Builtin
+                            Name: "nint"
+                      Resolved: ~
+                      Subst: ~
+                      Type: App
+                        Def: "relation"
+                        Args:
+                          Named
+                            Def: "Cards"
+                    Method: "to_list"
+                    Args: ~
+                    Setter: false
+                    Resolved: ~
+                    Subst:
+                      Entry
+                        Key: "M"
+                        Value: Named
+                          Def: "Cards"
+                    Type: App
+                      Def: "list"
+                      Args:
+                        Named
+                          Def: "Cards"
+                  Method: "get"
+                  Args:
+                    IntLiteral
+                      Text: "0"
+                      Type: Builtin
+                        Name: "nint"
+                  Setter: false
+                  Resolved: ~
+                  Subst:
+                    Entry
+                      Key: "K"
+                      Value: Builtin
+                        Name: "nint"
+                    Entry
+                      Key: "T"
+                      Value: Named
+                        Def: "Cards"
+                    Entry
+                      Key: "V"
+                      Value: Named
+                        Def: "Cards"
+                  Type: Union
+                    Members:
+                      Named
+                        Def: "Cards"
+                      Builtin
+                        Name: "error"
+                Field: "cost"
+                Type: ~
+              Method: "eql"
+              Args:
+                IntLiteral
+                  Text: "200"
+                  Type: Builtin
+                    Name: "nint"
+              Setter: false
+              Resolved: ~
+              Subst: ~
+              Type: ~
       Where: ~
   Funcs: ~
   Asserts: ~

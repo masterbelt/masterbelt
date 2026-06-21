@@ -508,6 +508,62 @@ func columnsFieldType(reg *builtin.Registry, recv ir.Type, name string) ir.Type 
 	return &ir.App{Def: colDef, Args: []ir.Type{master, ft}}
 }
 
+// relationColumns returns the columns<M> binding the rows of a relation<M> receiver
+// offer — the type a bare-column query argument (where(cost > 100)) reads its columns
+// off, built from the receiver so M is known before overload selection runs. ok is
+// false for any non-relation receiver, matching the relation builtin by identity so a
+// file's own generic relation<T> is not mistaken for the query algebra's.
+func relationColumns(reg *builtin.Registry, recv ir.Type) (ir.Type, bool) {
+	app, ok := recv.(*ir.App)
+	if !ok || app.Def == nil || len(app.Args) != 1 {
+		return nil, false
+	}
+	if def, ok := reg.Lookup(builtin.NameRelation); !ok || app.Def != def {
+		return nil, false
+	}
+	colsDef, ok := reg.Lookup(builtin.NameColumns)
+	if !ok || colsDef == nil {
+		return nil, false
+	}
+	return &ir.App{Def: colsDef, Args: []ir.Type{app.Args[0]}}, true
+}
+
+// MasterHasColumn reports whether a bare name reads a column of master M — a field of
+// M's row, the membership a bare-column query argument (where(cost > 100)) tests when
+// it omits the columns binding. It is the master twin of columnsFieldType, taking the
+// master definition the lowering knows directly rather than the columns<M> wrapper, so
+// the lowering reads a bare name as a column exactly where the checker types it as one
+// (a name that is no column stays unresolved, an undefined name).
+func MasterHasColumn(reg *builtin.Registry, master *ir.TypeDef, name string) bool {
+	if master == nil || master.Master == nil {
+		return false
+	}
+	colsDef, ok := reg.Lookup(builtin.NameColumns)
+	if !ok || colsDef == nil {
+		return false
+	}
+	cols := &ir.App{Def: colsDef, Args: []ir.Type{&ir.Named{Def: master}}}
+	return columnsFieldType(reg, cols, name) != ir.Invalid
+}
+
+// isQueryArgType reports whether t is one of the query algebra's bare-argument types
+// — predicate<M>, column<M, T>, or ordering<M> — the parameter shapes a bare-column
+// query argument fills (where(predicate), sum(column), order(ordering)). It is how a
+// relation method's columns context is recognized: a non-lambda argument is synthesized
+// in a columnsScope exactly when a candidate overload expects one of these.
+func isQueryArgType(reg *builtin.Registry, t ir.Type) bool {
+	app, ok := t.(*ir.App)
+	if !ok || app.Def == nil {
+		return false
+	}
+	for _, name := range []string{builtin.NamePredicate, builtin.NameColumn, builtin.NameOrdering} {
+		if def, ok := reg.Lookup(name); ok && app.Def == def {
+			return true
+		}
+	}
+	return false
+}
+
 // QueryColumns returns the columns a query binding of type recv (columns<M>) offers
 // and whether recv is the query binding at all. Each column is an ir.Field naming one
 // of master M's row fields, typed as the column<M, FieldType> a column access reads it

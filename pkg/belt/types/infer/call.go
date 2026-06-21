@@ -137,7 +137,7 @@ func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method str
 	// push the winner's parameter patterns into each one. An Invalid argument
 	// (its cause reported at its own node) also selects as fits-anything, so
 	// the suppression style survives overloading.
-	known := synthMethodArgs(e, recv, args, &bad, s, sink)
+	known := synthMethodArgs(e, recv, candidates, args, &bad, s, sink)
 
 	// A query column's comparison is valid only when its element type supports the
 	// same comparison as a value: column<M, T> offers the comparison operators for
@@ -152,6 +152,12 @@ func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method str
 	}
 
 	matches, _ := types.SelectOverload(reg, recv, method, known)
+	if len(matches) > 1 {
+		// A function-literal argument fits any parameter during selection, so a bare
+		// overload beside the lambda form (where) matches it too; drop the matches a
+		// literal cannot fill so the lambda form settles alone.
+		matches = dropLambdaArgNonFuncMatches(e, matches)
+	}
 	if len(matches) != 1 {
 		return reportMethodOverloadFailure(e, recv, method, args, matches, candidates, bad, s, sink)
 	}
@@ -233,14 +239,20 @@ func reportNoMethod(e *ast.CallExpr, recv ir.Type, method string, args []ir.Type
 // arguments left to right, filling args and the parallel known slice (nil for a
 // literal or an Invalid argument, so the overload settles before any literal is
 // checked). It flags bad when an argument is Invalid with no enum-member
-// fallback.
-func synthMethodArgs(e *ast.CallExpr, recv ir.Type, args []ir.Type, bad *bool, s scope, sink *Sink) []ir.Type {
+// fallback. A non-literal argument a relation method's bare overload expects in
+// columns position (where(cost > 100), sum(cost)) is synthesized in a columnsScope,
+// so a bare column name resolves before the overload settles.
+func synthMethodArgs(e *ast.CallExpr, recv ir.Type, candidates []*ir.Method, args []ir.Type, bad *bool, s scope, sink *Sink) []ir.Type {
 	known := make([]ir.Type, len(e.Arguments))
 	for i, a := range e.Arguments {
 		if _, isLit := a.(*ast.FuncLit); isLit {
 			continue
 		}
-		args[i] = check(a, s, sink)
+		argScope := s
+		if cs, ok := columnsArgScope(recv, candidates, i, s); ok {
+			argScope = cs
+		}
+		args[i] = check(a, argScope, sink)
 		if args[i] == ir.Invalid {
 			// A bare member of the receiver's enum (rarity == Legend) resolves
 			// against the enum after ordinary resolution fails, so a same-named
@@ -256,6 +268,61 @@ func synthMethodArgs(e *ast.CallExpr, recv ir.Type, args []ir.Type, bad *bool, s
 		known[i] = args[i]
 	}
 	return known
+}
+
+// columnsArgScope returns the columnsScope a relation method's bare-column argument
+// at position i is synthesized in, and whether one applies: the receiver is a
+// relation<M> and a candidate overload expects a query type (predicate<M>, column<M,
+// T>, ordering<M>) at that position — the bare overload of where/sum/min/max/order.
+// The scope reads a bare name as M's column of that name as a last resort, so
+// where(cost > 100) types cost as column<M, costType> before the overload settles.
+func columnsArgScope(recv ir.Type, candidates []*ir.Method, i int, s scope) (scope, bool) {
+	cols, ok := relationColumns(s.registry(), recv)
+	if !ok {
+		return s, false
+	}
+	for _, m := range candidates {
+		if i < len(m.Params) && isQueryArgType(s.registry(), m.Params[i].Type) {
+			return columnsScope{outer: s, columns: cols}, true
+		}
+	}
+	return s, false
+}
+
+// dropLambdaArgNonFuncMatches narrows an overloaded relation method's matches when an
+// argument is a function literal: a literal can inhabit only a function-typed
+// parameter, so a bare overload (where(predicate<M>) beside where(fn(c): predicate<M>))
+// must drop out, leaving the lambda form alone. Without it a literal argument — left
+// unsynthesized during selection, fitting any parameter — matches both the lambda and
+// the bare overload and the call is ambiguous. It only ever removes matches a literal
+// cannot fill, so a non-overloaded call and the bare form (a non-literal argument,
+// already typed by columnsArgScope) are untouched; an empty result is left to the
+// caller's overload-failure report.
+func dropLambdaArgNonFuncMatches(e *ast.CallExpr, matches []types.Overload) []types.Overload {
+	kept := matches[:0:0]
+	for _, m := range matches {
+		fits := true
+		for i, a := range e.Arguments {
+			if _, isLit := a.(*ast.FuncLit); !isLit {
+				continue
+			}
+			if i >= len(m.Method.Params) {
+				fits = false
+				break
+			}
+			if _, isFn := m.Method.Params[i].Type.(*ir.Func); !isFn {
+				fits = false
+				break
+			}
+		}
+		if fits {
+			kept = append(kept, m)
+		}
+	}
+	if len(kept) == 0 {
+		return matches
+	}
+	return kept
 }
 
 // queryComparisonMethods are the comparison operators a query column offers — the

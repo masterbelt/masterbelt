@@ -1,0 +1,305 @@
+# tree
+File
+  EnumDecl
+    Enum "enum"
+    Whitespace " "
+    Ident "Rarity"
+    Whitespace " "
+    LBrace "{"
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "common"
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "rare"
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "legend"
+    Newline "\n"
+    RBrace "}"
+  MasterDecl
+    Newline "\n"
+    Newline "\n"
+    MasterKeyword
+      Ident "master"
+    Whitespace " "
+    Ident "Cards"
+    Whitespace " "
+    LBrace "{"
+    MasterRecord
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "record"
+      Whitespace " "
+      RecordType
+        LBrace "{"
+        Whitespace " "
+        Field
+          Ident "id"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+        Comma ","
+        Whitespace " "
+        Field
+          Ident "cost"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+        Comma ","
+        Whitespace " "
+        Field
+          Ident "rarity"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "Rarity"
+        Whitespace " "
+        RBrace "}"
+    MasterScope
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "scope"
+      Whitespace " "
+      LBrace "{"
+      ScopeEntry
+        Newline "\n"
+        Whitespace "    "
+        Pub "pub"
+        Whitespace " "
+        Ident "expensive"
+        ParamList
+          LParen "("
+          RParen ")"
+        Whitespace " "
+        Arrow "->"
+        Whitespace " "
+        CallExpr
+          NameRef
+            Where "where"
+          LParen "("
+          BinaryExpr
+            NameRef
+              Ident "cost"
+            Whitespace " "
+            Gt ">"
+            Whitespace " "
+            Literal
+              Int "100"
+          RParen ")"
+      ScopeEntry
+        Newline "\n"
+        Whitespace "    "
+        Pub "pub"
+        Whitespace " "
+        Ident "by_rarity"
+        ParamList
+          LParen "("
+          Param
+            Ident "r"
+            Colon ":"
+            Whitespace " "
+            TypeName
+              Ident "Rarity"
+          RParen ")"
+        Whitespace " "
+        Arrow "->"
+        Whitespace " "
+        CallExpr
+          NameRef
+            Where "where"
+          LParen "("
+          BinaryExpr
+            NameRef
+              Ident "rarity"
+            Whitespace " "
+            EqEq "=="
+            Whitespace " "
+            NameRef
+              Ident "r"
+          RParen ")"
+      ScopeEntry
+        Newline "\n"
+        Whitespace "    "
+        Pub "pub"
+        Whitespace " "
+        Ident "priciest"
+        ParamList
+          LParen "("
+          Param
+            Ident "n"
+            Colon ":"
+            Whitespace " "
+            TypeName
+              Ident "nint"
+          RParen ")"
+        Whitespace " "
+        Arrow "->"
+        Whitespace " "
+        CallExpr
+          MemberExpr
+            CallExpr
+              NameRef
+                Ident "order"
+              LParen "("
+              CallExpr
+                MemberExpr
+                  NameRef
+                    Ident "cost"
+                  Dot "."
+                  Ident "desc"
+                LParen "("
+                RParen ")"
+              RParen ")"
+            Dot "."
+            Ident "limit"
+          LParen "("
+          NameRef
+            Ident "n"
+          RParen ")"
+      Newline "\n"
+      Whitespace "  "
+      RBrace "}"
+    MasterPrimary
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "primary"
+      Whitespace " "
+      Ident "id"
+    MasterValidate
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "validate"
+      Whitespace " "
+      LBrace "{"
+      ValidateClause
+        Newline "\n"
+        Whitespace "    "
+        MasterKeyword
+          Ident "all"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "      "
+          AssertStmt
+            Assert "assert"
+            Whitespace " "
+            BinaryExpr
+              CallExpr
+                MemberExpr
+                  CallExpr
+                    MemberExpr
+                      NameRef
+                        Ident "Cards"
+                      Dot "."
+                      Where "where"
+                    LParen "("
+                    BinaryExpr
+                      NameRef
+                        Ident "cost"
+                      Whitespace " "
+                      Gt ">"
+                      Whitespace " "
+                      Literal
+                        Int "100"
+                    RParen ")"
+                  Dot "."
+                  Ident "count"
+                LParen "("
+                RParen ")"
+              Whitespace " "
+              EqEq "=="
+              Whitespace " "
+              Literal
+                Int "2"
+          Newline "\n"
+          Whitespace "      "
+          AssertStmt
+            Assert "assert"
+            Whitespace " "
+            BinaryExpr
+              CallExpr
+                MemberExpr
+                  NameRef
+                    Ident "Cards"
+                  Dot "."
+                  Ident "sum"
+                LParen "("
+                NameRef
+                  Ident "cost"
+                RParen ")"
+              Whitespace " "
+              EqEq "=="
+              Whitespace " "
+              Literal
+                Int "350"
+          Newline "\n"
+          Whitespace "      "
+          AssertStmt
+            Assert "assert"
+            Whitespace " "
+            BinaryExpr
+              MemberExpr
+                IndexExpr
+                  CallExpr
+                    MemberExpr
+                      CallExpr
+                        MemberExpr
+                          NameRef
+                            Ident "Cards"
+                          Dot "."
+                          Ident "priciest"
+                        LParen "("
+                        Literal
+                          Int "1"
+                        RParen ")"
+                      Dot "."
+                      Ident "to_list"
+                    LParen "("
+                    RParen ")"
+                  LBracket "["
+                  Literal
+                    Int "0"
+                  RBracket "]"
+                Dot "."
+                Ident "cost"
+              Whitespace " "
+              EqEq "=="
+              Whitespace " "
+              Literal
+                Int "200"
+          Newline "\n"
+          Whitespace "    "
+          RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      RBrace "}"
+    MasterSource
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "source"
+      Whitespace " "
+      LBrace "{"
+      SourceEntry
+        Whitespace " "
+        Ident "csv"
+        Whitespace " "
+        String "\"cards.csv\""
+      Whitespace " "
+      RBrace "}"
+    Newline "\n"
+    RBrace "}"
+  Newline "\n"
+  EOF ""
+# diagnostics
