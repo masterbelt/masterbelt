@@ -200,11 +200,13 @@ func TestBareColumnStaticShadowOnlyDirect(t *testing.T) {
 
 // TestBareColumnStaticShadowedChainLink pins that the static-fn shadow check follows
 // every chain link, not just the outer call: a master with a static limit makes
-// Cards.limit(1) the static (returning a non-relation), so Cards.limit(1).where(cost > 0)
-// is a broken chain whose bare cost is a genuine undefined name.
+// Cards.limit(1) the static call, so Cards.limit(1).where(cost > 0) is not a relation
+// chain and its bare cost is a genuine undefined name — even when the static returns a
+// relation (so the chain still type-checks to relation<Cards>), the checker and the
+// reference check agree it is not the builtin chain.
 func TestBareColumnStaticShadowedChainLink(t *testing.T) {
 	src := "master Cards {\n  record { id: int, cost: int }\n" +
-		"  impl { pub static fn limit(n: nint): nint { return 0 } }\n  primary id\n" +
+		"  impl { pub static fn limit(n: nint): relation<Cards> { return Cards } }\n  primary id\n" +
 		"  validate {\n    all {\n      assert Cards.limit(1).where(cost > 0).count() == 0\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
 	_, diags := analyze(src)
 	if !hasCode(diags, CodeUndefinedName) {

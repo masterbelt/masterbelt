@@ -786,12 +786,17 @@ func (b bodyBinder) ColumnsArg(receiver ir.Value, method string, arg ast.Expr) i
 	// nested query) must not make the inner relation's column look already resolved.
 	probe := b
 	probe.columnsMaster = nil
+	probe.relation = false
 	if !probe.bareColumnArg(arg) {
 		return nil
 	}
 	cb := b
 	cb.columnsMaster = master
 	cb.columnsParam = columnsParamName
+	// Inside a columns argument the validate-all bare-count aggregate is out of scope (the
+	// subject is a row, not the relation), so a bare count there reads the column of that
+	// name rather than the row count — disabling the aggregate the way the checker does.
+	cb.relation = false
 	return &ir.FuncLiteral{
 		Params: []string{columnsParamName},
 		Body:   lower.Body([]ast.Stmt{&ast.ReturnStmt{Value: arg}}, cb),
@@ -810,18 +815,13 @@ func (b bodyBinder) bareColumnArg(arg ast.Expr) bool {
 	case *ast.Identifier:
 		return b.leafIdentifier(a) == nil
 	case *ast.CallExpr:
-		// An operator or method call is a bare-column expression when a column appears on
-		// either side: its receiver (cost > 100), or an argument (true && power > 10,
-		// where the receiver is a captured value but the argument bottoms out in a column).
-		if member, ok := a.Callee.(*ast.MemberExpr); ok && b.bareColumnArg(member.Receiver) {
-			return true
-		}
-		for _, arg := range a.Arguments {
-			if b.bareColumnArg(arg) {
-				return true
-			}
-		}
-		return false
+		// An operator or selector call is a bare-column expression when its receiver
+		// bottoms out in a column (cost > 100, cost.desc(), (cost > 0) && (power < 9)).
+		// The column is always the operator's receiver: a column comparison yields a
+		// predicate, so a captured value on the left (value && column-predicate) does not
+		// type, and the argument side need not be scanned.
+		member, ok := a.Callee.(*ast.MemberExpr)
+		return ok && b.bareColumnArg(member.Receiver)
 	case *ast.TernaryExpr:
 		// The condition is a bool, never a column comparison (a column comparison is a
 		// predicate, which the checker rejects as a ternary condition), so only the

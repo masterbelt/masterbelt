@@ -306,7 +306,16 @@ func columnsArgScope(method string, recvExpr ast.Expr, recv ir.Type, candidates 
 	if cs, ok := s.(columnsScope); ok {
 		return columnsScope{outer: cs.outer, columns: append([]ir.Type{cols}, cs.columns...)}, true
 	}
-	return columnsScope{outer: s, columns: []ir.Type{cols}}, true
+	// Inside a columns argument the subject is a row, not the relation, so the validate-all
+	// bare-count aggregate is not in scope — a bare count there is the column of that name
+	// (where(count > 0)), not the table's row count. Disable the aggregate fallback for the
+	// outer the columns scope reads through, so a column named count is reachable.
+	outer := s
+	if bs, ok := s.(BodyScope); ok && bs.Relation {
+		bs.Relation = false
+		outer = bs
+	}
+	return columnsScope{outer: outer, columns: []ir.Type{cols}}, true
 }
 
 // lowerableRelationReceiver reports whether a relation method's receiver expression is
@@ -331,10 +340,42 @@ func lowerableRelationReceiver(e ast.Expr, s scope) bool {
 		return s.nsReceiver(r.Receiver)
 	case *ast.CallExpr:
 		member, ok := r.Callee.(*ast.MemberExpr)
-		return ok && RelationReturningMethods[member.Member.Name] && lowerableRelationReceiver(member.Receiver, s)
+		if !ok || !RelationReturningMethods[member.Member.Name] {
+			return false
+		}
+		// A direct master call shadowed by a static fn of that name (Cards.limit(1) where
+		// the master declares a static limit) is the static call, lowering to an
+		// ir.StaticCall the lowering recovers no master from — so it is not a relation
+		// chain link, and the bare column uses the lambda form instead.
+		if masterStaticShadows(s, member.Receiver, member.Member.Name) {
+			return false
+		}
+		return lowerableRelationReceiver(member.Receiver, s)
 	default:
 		return false
 	}
+}
+
+// masterStaticShadows reports whether recv names a master that declares a static fn of
+// the given name — so a chain link X.method(...) is a static call (returning that fn's
+// result), not the relation method. It mirrors the reference check's static-shadow guard
+// on the checker side, keeping the columns-scope grant aligned with the lowering, which
+// recovers no master from a static call.
+func masterStaticShadows(s scope, recv ast.Expr, method string) bool {
+	id, ok := recv.(*ast.Identifier)
+	if !ok {
+		return false
+	}
+	def := s.universe()[id.Name]
+	if def == nil {
+		return false
+	}
+	for _, m := range def.Methods {
+		if m.Kind == ir.MethodStatic && m.Name == method {
+			return true
+		}
+	}
+	return false
 }
 
 // dropLambdaArgNonFuncMatches narrows an overloaded relation method's matches when an

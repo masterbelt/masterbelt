@@ -46,6 +46,37 @@ func run(t *testing.T, beltSrc string, bases map[string]string, files map[string
 	return load.File(prog, "skills.belt", root, bases, reg)
 }
 
+// semanticErrorCount returns the number of error-severity semantic diagnostics the
+// analyzer reports for beltSrc. load.File surfaces only the data-validation diagnostics,
+// so an expression the checker rejects (a min over a non-orderable column, a bool && a
+// predicate) loads without a table failure and a positive end-to-end gate would pass
+// over it; a positive gate must assert this is zero to catch a rejected bare form.
+func semanticErrorCount(beltSrc string) int {
+	prog := semantic.NewProgram()
+	prog.SetFile("skills.belt", abstract.NewDocument([]byte(beltSrc)), nil)
+	prog.Refresh()
+	n := 0
+	for _, d := range prog.Diagnostics(semantic.FileID("skills.belt")) {
+		if d.Severity == diagnostic.Error {
+			n++
+		}
+	}
+	return n
+}
+
+// barePasses asserts a positive bare-form belt is accepted by the analyzer (no semantic
+// error) and folds (no table validation failure) — both, so an expression the checker
+// rejects cannot pass on the absence of a table failure alone.
+func barePasses(t *testing.T, name, belt string, bases, files map[string]string) {
+	t.Helper()
+	if n := semanticErrorCount(belt); n != 0 {
+		t.Errorf("%s: %d semantic error(s), want 0", name, n)
+	}
+	if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("%s: table_validation_failed = %d, want 0", name, countTableFailures(diags))
+	}
+}
+
 // countTableFailures counts the per-table validate failures among the diagnostics.
 func countTableFailures(diags []diagnostic.Diagnostic) int {
 	n := 0
@@ -70,8 +101,6 @@ func TestValidateAllBareColumnForm(t *testing.T) {
 	pass := []struct{ name, body string }{
 		{"bare where", "Cards.where(power > 10).count() == 2"},
 		{"bare sum", "Cards.sum(power) == 55"},
-		{"bare min", "Cards.min(power) == 5"},
-		{"bare max", "Cards.max(power) == 30"},
 		{"bare order top", "Cards.order(power.desc()).to_list()[0].power == 30"},
 		{"bare chain", "Cards.where(power > 10).order(power.asc()).limit(1).to_list()[0].power == 20"},
 		{"bare equals lambda", "Cards.where(power > 10).count() == Cards.where(fn(c) -> c.power > 10).count()"},
@@ -79,10 +108,16 @@ func TestValidateAllBareColumnForm(t *testing.T) {
 	for _, c := range pass {
 		belt := "master Cards {\n  record { id: int, power: int }\n  primary id\n" +
 			"  validate {\n    all {\n      assert " + c.body + "\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
-		if _, diags := run(t, belt, bases, files); countTableFailures(diags) != 0 {
-			t.Errorf("%s (%s): table_validation_failed = %d, want 0", c.name, c.body, countTableFailures(diags))
-		}
+		barePasses(t, c.name, belt, bases, files)
 	}
+	// min and max return T | null (an empty relation has no extreme), so a bare selector
+	// is read through a match — the bare min(power)/max(power) the same column the lambda
+	// form names.
+	minMax := "master Cards {\n  record { id: int, power: int }\n" +
+		"  impl {\n    pub static fn lowest(): int { match Cards.min(power) { int n -> { return n } null e -> { return -1 } } }\n" +
+		"    pub static fn highest(): int { match Cards.max(power) { int n -> { return n } null e -> { return -1 } } }\n  }\n" +
+		"  primary id\n  validate {\n    all {\n      assert Cards.lowest() == 5\n      assert Cards.highest() == 30\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	barePasses(t, "bare min/max via match", minMax, bases, files)
 	// The bare form is not vacuous: a wrong assertion over it still fails, so a pass
 	// above means the query really folded rather than collapsing to nothing.
 	fail := "Cards.where(power > 10).count() == 99"
@@ -109,44 +144,40 @@ func TestValidateAllBareColumnContexts(t *testing.T) {
 	// lowers it through the placeholdering path so the checker's write-back fills it).
 	enumBelt := enumPre + "master Cards {\n  record { id: int, power: int, rarity: Rarity }\n  primary id\n" +
 		"  validate {\n    all {\n      assert Cards.where(rarity == legend).count() == 1\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
-	if _, diags := run(t, enumBelt, bases, files); countTableFailures(diags) != 0 {
-		t.Errorf("bare enum column compare: table_validation_failed, want 0")
-	}
+	barePasses(t, "bare enum column compare", enumBelt, bases, files)
 
 	// A query on a relation-valued parameter resolves the master through the parameter's
 	// type, so the bare column lowers off the synthesized binding rather than a hole.
 	paramBelt := "fn strong(r: relation<Cards>): nint {\n  return r.where(power > 10).count()\n}\n" +
 		enumPre + "master Cards {\n  record { id: int, power: int, rarity: Rarity }\n  primary id\n" +
 		"  validate {\n    all {\n      assert strong(Cards) == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
-	if _, diags := run(t, paramBelt, bases, files); countTableFailures(diags) != 0 {
-		t.Errorf("bare query on a relation parameter: table_validation_failed, want 0")
-	}
+	barePasses(t, "bare query on a relation parameter", paramBelt, bases, files)
 
 	// A bare-column query inside a function literal keeps the columns binding through the
 	// lambda boundary.
 	iifeBelt := enumPre + "master Cards {\n  record { id: int, power: int, rarity: Rarity }\n  primary id\n" +
 		"  validate {\n    all {\n      assert (fn(): nint { return Cards.where(power > 10).count() })() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
-	if _, diags := run(t, iifeBelt, bases, files); countTableFailures(diags) != 0 {
-		t.Errorf("bare query inside a function literal: table_validation_failed, want 0")
-	}
+	barePasses(t, "bare query inside a function literal", iifeBelt, bases, files)
 
 	// An explicit self receiver in a scope fn (self is the master's relation) reads its
 	// columns the same way the implicit self-call does.
 	selfBelt := enumPre + "master Cards {\n  record { id: int, power: int, rarity: Rarity }\n" +
 		"  scope { pub strong() -> self.where(power > 10) }\n  primary id\n" +
 		"  validate {\n    all {\n      assert Cards.strong().count() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
-	if _, diags := run(t, selfBelt, bases, files); countTableFailures(diags) != 0 {
-		t.Errorf("explicit self.where in a scope fn: table_validation_failed, want 0")
-	}
+	barePasses(t, "explicit self.where in a scope fn", selfBelt, bases, files)
 
-	// A predicate where the column is on the right of an operator whose receiver is a
-	// captured value (true && power > 10) is still rewritten: a bare column on either side
-	// of an operator makes the whole expression a bare-column predicate.
-	mixedBelt := enumPre + "master Cards {\n  record { id: int, power: int, rarity: Rarity }\n  primary id\n" +
-		"  validate {\n    all {\n      assert Cards.where(true && power > 10).count() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
-	if _, diags := run(t, mixedBelt, bases, files); countTableFailures(diags) != 0 {
-		t.Errorf("bare column on the right of an operator: table_validation_failed, want 0")
-	}
+	// A logical combination of bare comparisons folds: each operand bottoms out in a
+	// column, so the whole predicate is a bare-column expression.
+	andBelt := enumPre + "master Cards {\n  record { id: int, power: int, rarity: Rarity }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.where(power > 10 && power < 25).count() == 1\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	barePasses(t, "bare logical combination", andBelt, bases, files)
+
+	// A column named count is reachable inside a columns argument: the validate-all
+	// bare-count aggregate is the relation's, not a per-row value, so it does not shadow a
+	// real count column there. (The data has two rows with count > 0.)
+	countCol := "master Cards {\n  record { id: int, count: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.where(count > 0).count() == 2\n    }\n  }\n  source { csv \"counts.csv\" }\n}\n"
+	barePasses(t, "count column in columns argument", countCol, bases, map[string]string{"data/counts.csv": "id,count\n1,0\n2,5\n3,9\n"})
 }
 
 // TestValidateAllRowCountCap exercises a per-table validate all check end to end:
