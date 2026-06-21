@@ -1630,7 +1630,34 @@ func resolveEnumMembers(folder exprFolder, defs map[string]*ir.TypeDef, reg *bui
 		def.Enum.Members[i].Value = value
 		def.Enum.Members[i].ValueGraph = graph
 		reportEnumMemberValueErrors(reg, m, value, base, baseType, isString, at, diags)
+		// A written initializer whose expression does not type — a mismatched ternary,
+		// an operator on the wrong operands — is poisoned: the fold takes a branch
+		// regardless of the type error, so its value is withheld the way a top-level
+		// constant withholds a poisoned value, or the same pass's duplicate-value check
+		// would consume a value the type rules rejected. The check runs only in the
+		// reporting pass (at and diags non-nil): the memoizing pass has not resolved
+		// the file's constants, so a valid initializer reading one (A = Base) would
+		// type as invalid there and be withheld wrongly. A member whose value is bad
+		// only after a reported type error is broken either way, so the memoized
+		// definition keeping the folded value is harmless.
+		if m.Value != nil && at != nil && diags != nil && typeEnumInitializer(folder, m.Value, at, diags) == ir.Invalid {
+			def.Enum.Members[i].Value = nil
+		}
 	}
+}
+
+// typeEnumInitializer types an enum member's written initializer through the file's
+// constant scope — the same scope a top-level constant's initializer types in, since
+// an enum member, like a constant, has no receiver or parameters — and returns its
+// type, reporting the expression's type errors when a reporting sink is in play. It
+// is the type-check behind the poisoned-value withholding and the enum member's type
+// error reporting.
+func typeEnumInitializer(folder exprFolder, e ast.Expr, at func(ast.Node) span, diags *diagnostic.List) ir.Type {
+	var sink *infer.Sink
+	if at != nil && diags != nil {
+		sink = exprSink(at, diags, nil)
+	}
+	return infer.Check(e, typeEnv(folder), sink)
 }
 
 // reportEnumMemberValueErrors reports a member's value diagnostics: an integer
