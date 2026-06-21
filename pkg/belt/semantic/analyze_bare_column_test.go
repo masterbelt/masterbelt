@@ -182,6 +182,48 @@ func TestBareColumnStaticShadowOnlyDirect(t *testing.T) {
 	}
 }
 
+// TestBareColumnStaticShadowedChainLink pins that the static-fn shadow check follows
+// every chain link, not just the outer call: a master with a static limit makes
+// Cards.limit(1) the static (returning a non-relation), so Cards.limit(1).where(cost > 0)
+// is a broken chain whose bare cost is a genuine undefined name.
+func TestBareColumnStaticShadowedChainLink(t *testing.T) {
+	src := "master Cards {\n  record { id: int, cost: int }\n" +
+		"  impl { pub static fn limit(n: nint): nint { return 0 } }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.limit(1).where(cost > 0).count() == 0\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeUndefinedName) {
+		t.Errorf("a static limit breaks the chain, so cost is undefined: %v", codes(diags))
+	}
+}
+
+// TestBareColumnFieldReceiverReported pins that the bare form reads its columns only off a
+// named, qualified, parameter, self, or chained relation — not a member access on a value:
+// box.rel.where(power > 0) is read off a relation-valued field the lowering does not
+// recover a master from, so the bare power stays an undefined name.
+func TestBareColumnFieldReceiverReported(t *testing.T) {
+	src := "type Box = { rel: relation<Cards> }\n" +
+		"master Cards {\n  record { id: int, power: int }\n  primary id\n  source { csv \"cards.csv\" }\n}\n" +
+		"const b: Box = { rel: Cards }\n" +
+		"const n = b.rel.where(power > 0).count()\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeUndefinedName) {
+		t.Errorf("a bare column on a relation-valued field receiver must be undefined: %v", codes(diags))
+	}
+}
+
+// TestBareColumnMemberValueArgClean pins that a function value written as a member
+// expression (Cards.where(box.p) for a selector field box.p) selects the lambda overload
+// and type-checks cleanly — it is the predicate already, not a bare column to rewrite.
+func TestBareColumnMemberValueArgClean(t *testing.T) {
+	src := "type Box = { p: fn(c: columns<Cards>): predicate<Cards> }\n" +
+		"master Cards {\n  record { id: int, power: int }\n  primary id\n  source { csv \"cards.csv\" }\n}\n" +
+		"pub fn apply(box: Box): nint { return Cards.where(box.p).count() }\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeUndefinedName) || hasCode(diags, CodeNoMatchingOverload) {
+		t.Errorf("a function-value member argument must select the lambda overload cleanly: %v", codes(diags))
+	}
+}
+
 // TestBareColumnNestedInnerWins pins that a nested query binds a bare column to the inner
 // relation: in Cards.where(id > Other.where(cost > 0).count()) the inner cost is Other's,
 // not Cards', so with Cards.cost a bool and Other.cost an int the comparison stands rather

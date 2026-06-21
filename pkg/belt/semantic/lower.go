@@ -778,12 +778,11 @@ func (b bodyBinder) ColumnsArg(receiver ir.Value, method string, arg ast.Expr) i
 	if master == nil || !infer.ColumnsContextMethods[method] {
 		return nil
 	}
-	// A function-value argument (a parameter or constant bound to a selector) matches
-	// the lambda overload, not the bare one — it is already the predicate/selector, so
-	// it must not be wrapped in a synthesized columns lambda. A bare column is never a
-	// resolvable value (that is why it needs the columns binding), so an argument the
-	// outer binder already resolves is a value reference and lowers the ordinary way.
-	if id, ok := arg.(*ast.Identifier); ok && b.leafIdentifier(id) != nil {
+	// Only a bare-column expression is rewritten: a value argument (a function bound to a
+	// parameter, constant, or field, matching the lambda overload) is the predicate or
+	// selector already and lowers the ordinary way, so it must not be wrapped in a
+	// synthesized columns lambda.
+	if !b.bareColumnArg(arg) {
 		return nil
 	}
 	cb := b
@@ -792,6 +791,25 @@ func (b bodyBinder) ColumnsArg(receiver ir.Value, method string, arg ast.Expr) i
 	return &ir.FuncLiteral{
 		Params: []string{columnsParamName},
 		Body:   lower.Body([]ast.Stmt{&ast.ReturnStmt{Value: arg}}, cb),
+	}
+}
+
+// bareColumnArg reports whether arg is a bare-column expression to rewrite as a columns
+// lambda — a comparison or selector built from bare column names — rather than a value
+// the lambda overload takes (a function bound to a parameter/constant/field, a predicate
+// returned by a call). A bare name the binder does not otherwise resolve is a column; an
+// operator or selector call (cost > 100, cost.desc()) is one when its own receiver
+// bottoms out in a column; everything else — a resolvable name, a field access, a
+// function call — is a value.
+func (b bodyBinder) bareColumnArg(arg ast.Expr) bool {
+	switch a := arg.(type) {
+	case *ast.Identifier:
+		return b.leafIdentifier(a) == nil
+	case *ast.CallExpr:
+		member, ok := a.Callee.(*ast.MemberExpr)
+		return ok && b.bareColumnArg(member.Receiver)
+	default:
+		return false
 	}
 }
 

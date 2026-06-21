@@ -286,7 +286,7 @@ func synthMethodArgs(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method st
 // rather than wrapping it, so the inner relation's column wins where both masters share
 // a name while the enclosing body's bindings stay beneath the whole stack.
 func columnsArgScope(method string, recvExpr ast.Expr, recv ir.Type, candidates []*ir.Method, i int, s scope) (scope, bool) {
-	if !ColumnsContextMethods[method] || !lowerableRelationReceiver(recvExpr) {
+	if !ColumnsContextMethods[method] || !lowerableRelationReceiver(recvExpr, s) {
 		return s, false
 	}
 	cols, ok := relationColumns(s.registry(), recv)
@@ -311,21 +311,25 @@ func columnsArgScope(method string, recvExpr ast.Expr, recv ir.Type, candidates 
 
 // lowerableRelationReceiver reports whether a relation method's receiver expression is
 // one the lowering can recover a master from: implicit self, a name (a master, parameter,
-// or local), a qualified master, or a chain of relation-returning methods over one of
-// these. A function call or other expression is not — the bare-column form is read only
-// off these, so the checker grants its columns scope exactly where the lowering rewrites
-// it (a relation-returning function call's result is read off the lambda form instead).
-func lowerableRelationReceiver(e ast.Expr) bool {
+// or local), a namespace-qualified master, or a chain of relation-returning methods over
+// one of these. A function call, a field access on a value (box.rel), or another
+// expression is not — the bare-column form is read only off these, so the checker grants
+// its columns scope exactly where the lowering rewrites it (a relation-returning function
+// call or a relation-valued field is read off the lambda form instead).
+func lowerableRelationReceiver(e ast.Expr, s scope) bool {
 	switch r := e.(type) {
 	case nil:
 		return true // an implicit self-call (self omitted) in a scope or master static fn
 	case *ast.Identifier:
 		return true
 	case *ast.MemberExpr:
-		return true
+		// A namespace-qualified master (deck.Cards) lowers to a master relation; a member
+		// access on a value (box.rel) lowers to a field access the lowering does not read a
+		// master from, so only the namespace-qualified form is a lowerable receiver.
+		return s.nsReceiver(r.Receiver)
 	case *ast.CallExpr:
 		member, ok := r.Callee.(*ast.MemberExpr)
-		return ok && RelationReturningMethods[member.Member.Name] && lowerableRelationReceiver(member.Receiver)
+		return ok && RelationReturningMethods[member.Member.Name] && lowerableRelationReceiver(member.Receiver, s)
 	default:
 		return false
 	}

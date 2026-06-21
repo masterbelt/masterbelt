@@ -1185,6 +1185,14 @@ func relationReceiverMaster(fileID FileID, recv ast.Expr, q queries) *ir.TypeDef
 			// chained relation — so its bare column stays an undefined name, and the
 			// lambda form names the columns binding explicitly there.
 			if member, ok := r.Callee.(*ast.MemberExpr); ok && infer.RelationReturningMethods[member.Member.Name] {
+				// A direct master call link shadowed by a static fn (Cards.limit(1) for a
+				// master with a static limit) is the static, returning a non-relation, so
+				// the chain is broken and its bare column is not exempted.
+				if directMasterReceiver(member.Receiver) {
+					if base := relationReceiverMaster(fileID, member.Receiver, q); base != nil && masterHasStaticFn(base, member.Member.Name) {
+						return nil
+					}
+				}
 				recv = member.Receiver
 				continue
 			}
