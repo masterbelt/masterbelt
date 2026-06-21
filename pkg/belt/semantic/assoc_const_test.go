@@ -62,13 +62,40 @@ func TestAssocConstUnannotatedNotMistyped(t *testing.T) {
 	}
 }
 
-// TestGenericAssocConstNotMistyped pins that settling a generic type's associated
-// constant does not report a spurious mismatch: the owner's type parameters are in
-// scope, so a const on Box<T> annotated with T is not flagged.
-func TestGenericAssocConstNotMistyped(t *testing.T) {
-	src := "pub type Box<T> = T impl {\n  pub const Id: fn(T): T = fn(x) {\n    return x\n  }\n}\n"
+// TestFunctionLiteralAssocConstNotReported pins that a function-literal associated
+// constant is settled silently, not type-checked: checking a lambda body against its
+// pushed (generic) function type is a checker gap that would report a spurious
+// uninferable parameter, and such a constant's body is unchecked today regardless, so
+// settling it for the editor must report nothing — a generic Box<T>'s function-valued
+// constant settles clean.
+func TestFunctionLiteralAssocConstNotReported(t *testing.T) {
+	src := "pub type Box<T> = T impl {\n  pub const Id: fn(x: T): T = fn(y) {\n    return y\n  }\n}\n"
 	if _, diags := analyze(src); len(diags) != 0 {
-		t.Errorf("a generic type's assoc const should settle without a diagnostic; got %v", codes(diags))
+		t.Errorf("a function-literal assoc const should settle without a diagnostic; got %v", codes(diags))
+	}
+}
+
+// TestAssocConstInitializerReported pins that a non-function-literal associated
+// constant initializer is type-checked: an operator on mismatched operands and a
+// method call with no matching overload are reported as invalid_operation, the type
+// error the position carries — these were folded but never typed before, surfacing
+// only as the unclear "no compile-time value".
+func TestAssocConstInitializerReported(t *testing.T) {
+	op := "pub type T = nint impl {\n  pub const X: nint = \"abc\" * 2\n}\n"
+	if _, diags := analyze(op); !hasCode(diags, CodeInvalidOperation) {
+		t.Errorf("an operator type error in an assoc const initializer should be reported: %v", codes(diags))
+	}
+	overload := "pub type T = nint impl {\n  pub fn m(n: nint): self {\n    return self\n  }\n  pub const X: T = T(0).m(\"s\")\n}\n"
+	if _, diags := analyze(overload); !hasCode(diags, CodeInvalidOperation) {
+		t.Errorf("a no-overload method call in an assoc const initializer should be reported: %v", codes(diags))
+	}
+}
+
+// TestEnumMemberInitializerReported pins the enum-member twin: an operator type error
+// in an enum member's initializer is reported.
+func TestEnumMemberInitializerReported(t *testing.T) {
+	if _, diags := analyze("enum E {\n  a = \"x\" * 2\n}\n"); !hasCode(diags, CodeInvalidOperation) {
+		t.Errorf("an operator type error in an enum member initializer should be reported: %v", codes(diags))
 	}
 }
 

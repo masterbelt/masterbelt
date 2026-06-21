@@ -581,27 +581,35 @@ func (a *assembler) checkAssocConstRefs() {
 // streaming the overload selections and settled types into res so the write-back
 // annotates their retained value graphs the way it annotates a body's — giving the
 // editor the receiver types and selected overloads that hover and go-to-definition
-// read. The walk settles silently (resolutionSink, no diagnostics): these positions'
-// reference and conformance errors are already reported (checkAssocConstRefs,
-// reportEnumMemberValueErrors) and their value-range checks stay the fold's, and a
-// reporting walk here would surface the annotation resolver's own gaps on degenerate
-// generic forms — the full type-checking of these positions is its own follow-up. An
-// assoc const pushes its cleanly-resolved declared type to settle a function value's
-// parameter types; an enum member is settled without a pushed type.
+// read — and reporting the type errors a scalar, record, collection, or member-call
+// initializer carries (an operator on mismatched operands, a call with no matching
+// overload), which were folded but never typed before. A function-literal value is
+// settled silently instead: checking a lambda body against a pushed function type
+// (a generic owner parameter especially) is a checker gap that would report a
+// spurious uninferable parameter, and a function-typed constant's body is unchecked
+// today regardless — so its types still flow to the editor, without diagnostics. The
+// reference and stray-self checks are already reported (checkAssocConstRefs), an enum
+// member's conformance by reportEnumMemberValueErrors, and value ranges stay the
+// fold's, so nothing is reported twice.
 func (a *assembler) settleInitializerTypes() {
-	settleInitializers(a.module.Types, a.file.Enums, a.env, resolutionSink(a.res))
+	settleInitializers(a.module.Types, a.file.Enums, a.env, func(value ast.Expr) *infer.Sink {
+		if _, isFunc := value.(*ast.FuncLit); isFunc {
+			return resolutionSink(a.res)
+		}
+		return exprSink(a.at, a.diags, a.res)
+	})
 }
 
 // settleInitializers types every associated-constant and enum-member initializer
-// through env, streaming the facts to sink. It is shared by the assemble pass (whose
-// sink feeds the IR write-back) and the editor's type-query walk (whose sink captures
-// the expression types), so the two settle these positions identically. The const
-// scope resolves a top-level constant reference — the receiver of an initializer
-// member call (C.inc()) — which a body scope would not type; a generic owner type
-// parameter is not in this scope, but the walk is silent, so a degenerate generic
-// form is left partly untyped rather than reported (the full type-checking of these
-// positions is its own follow-up).
-func settleInitializers(defs []*ir.TypeDef, enums []*ast.EnumDecl, env infer.Env, sink *infer.Sink) {
+// through env, streaming the facts to the sink sinkFor returns for that value. It is
+// shared by the assemble pass (whose sink feeds the IR write-back, reporting on the
+// forms it type-checks) and the editor's type-query walk (whose sink captures the
+// expression types), so the two settle these positions identically. The const scope
+// resolves a top-level constant reference — the receiver of an initializer member
+// call (C.inc()) — which a body scope would not type; a generic owner type parameter
+// is not in this scope, so a value reading it is settled without a pushed expectation
+// (below) and the assemble pass settles a function literal silently.
+func settleInitializers(defs []*ir.TypeDef, enums []*ast.EnumDecl, env infer.Env, sinkFor func(ast.Expr) *infer.Sink) {
 	for _, def := range defs {
 		for _, ac := range def.Consts {
 			if ac == nil || ac.Syntax == nil || ac.Syntax.Value == nil {
@@ -614,16 +622,16 @@ func settleInitializers(defs []*ir.TypeDef, enums []*ast.EnumDecl, env infer.Env
 			// (a generic parameter the annotation resolver left unresolved on a
 			// degenerate form) is no usable expectation. Both are settled without one.
 			if ac.Syntax.Type != nil && !ir.HasInvalid(ac.Type) {
-				infer.CheckAgainst(ac.Syntax.Value, ac.Type, env, sink)
+				infer.CheckAgainst(ac.Syntax.Value, ac.Type, env, sinkFor(ac.Syntax.Value))
 			} else {
-				infer.Check(ac.Syntax.Value, env, sink)
+				infer.Check(ac.Syntax.Value, env, sinkFor(ac.Syntax.Value))
 			}
 		}
 	}
 	for _, ed := range enums {
 		for _, m := range ed.Members {
 			if m.Value != nil {
-				infer.Check(m.Value, env, sink)
+				infer.Check(m.Value, env, sinkFor(m.Value))
 			}
 		}
 	}
