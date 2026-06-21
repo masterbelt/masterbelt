@@ -164,6 +164,54 @@ File
           NameRef
             Ident "n"
           RParen ")"
+      ScopeEntry
+        Newline "\n"
+        Whitespace "    "
+        Pub "pub"
+        Whitespace " "
+        Ident "tier"
+        ParamList
+          LParen "("
+          Param
+            Ident "high"
+            Colon ":"
+            Whitespace " "
+            TypeName
+              Ident "bool"
+          RParen ")"
+        Whitespace " "
+        Arrow "->"
+        Whitespace " "
+        CallExpr
+          NameRef
+            Where "where"
+          LParen "("
+          TernaryExpr
+            NameRef
+              Ident "high"
+            Whitespace " "
+            Question "?"
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "cost"
+              Whitespace " "
+              Gt ">"
+              Whitespace " "
+              Literal
+                Int "200"
+            Whitespace " "
+            Colon ":"
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "cost"
+              Whitespace " "
+              Gt ">"
+              Whitespace " "
+              Literal
+                Int "100"
+          RParen ")"
       Newline "\n"
       Whitespace "  "
       RBrace "}"

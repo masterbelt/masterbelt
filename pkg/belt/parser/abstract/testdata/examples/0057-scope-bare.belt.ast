@@ -176,6 +176,61 @@ File
                 Arguments:
                   Identifier
                     Name: "n"
+        MethodDecl
+          Doc: ~
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Name: "tier"
+          TypeParams: ~
+          Params:
+            ParamDef
+              Name: "high"
+              Type: NamedType
+                Namespace: ""
+                Name: "bool"
+                Args: ~
+                Projections: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "relation"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "Cards"
+                Args: ~
+                Projections: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: Identifier
+                  Name: "where"
+                Arguments:
+                  TernaryExpr
+                    Cond: Identifier
+                      Name: "high"
+                    Then: CallExpr
+                      Callee: MemberExpr
+                        Receiver: Identifier
+                          Name: "cost"
+                        Member: Identifier
+                          Name: "gt"
+                      Arguments:
+                        IntLit
+                          Text: "200"
+                          Base: 0
+                    Else: CallExpr
+                      Callee: MemberExpr
+                        Receiver: Identifier
+                          Name: "cost"
+                        Member: Identifier
+                          Name: "gt"
+                      Arguments:
+                        IntLit
+                          Text: "100"
+                          Base: 0
       Consts: ~
       Impls: ~
       Primary: "id"

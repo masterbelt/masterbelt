@@ -10,6 +10,7 @@ master Cards {
     pub expensive() -> where(cost > 100)
     pub by_rarity(r: Rarity) -> where(rarity == r)
     pub priciest(n: nint) -> order(cost.desc()).limit(n)
+    pub tier(high: bool) -> where(high ? cost > 200 : cost > 100)
   }
   primary id
   validate {

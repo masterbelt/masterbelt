@@ -458,6 +458,141 @@ Module
                     Named
                       Def: "Cards"
           Owner: "Cards"
+        Method
+          Name: "tier"
+          Anchor: "belt:/Cards#tier"
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Doc: ~
+          TypeParams: ~
+          Params:
+            Param
+              Name: "high"
+              Type: Builtin
+                Name: "bool"
+          Result: App
+            Def: "relation"
+            Args:
+              Named
+                Def: "Cards"
+          Body:
+            Return
+              Value: Call
+                Receiver: MasterRelation
+                  Master: "Cards"
+                  Type: App
+                    Def: "relation"
+                    Args:
+                      Named
+                        Def: "Cards"
+                Method: "where"
+                Args:
+                  FuncLiteral
+                    Params: "$columns"
+                    Body:
+                      Return
+                        Value: Ternary
+                          Cond: ParamRef
+                            Name: "high"
+                            Type: Builtin
+                              Name: "bool"
+                          Then: Call
+                            Receiver: FieldAccess
+                              Receiver: ParamRef
+                                Name: "$columns"
+                                Type: ~
+                              Field: "cost"
+                              Type: App
+                                Def: "column"
+                                Args:
+                                  Named
+                                    Def: "Cards"
+                                  Builtin
+                                    Name: "int"
+                            Method: "gt"
+                            Args:
+                              Adapt
+                                Value: IntLiteral
+                                  Text: "200"
+                                  Type: Builtin
+                                    Name: "nint"
+                                To: Builtin
+                                  Name: "int"
+                            Setter: false
+                            Resolved: "column.gt(T)"
+                            Subst:
+                              Entry
+                                Key: "M"
+                                Value: Named
+                                  Def: "Cards"
+                              Entry
+                                Key: "T"
+                                Value: Builtin
+                                  Name: "int"
+                            Type: App
+                              Def: "predicate"
+                              Args:
+                                Named
+                                  Def: "Cards"
+                          Else: Call
+                            Receiver: FieldAccess
+                              Receiver: ParamRef
+                                Name: "$columns"
+                                Type: ~
+                              Field: "cost"
+                              Type: App
+                                Def: "column"
+                                Args:
+                                  Named
+                                    Def: "Cards"
+                                  Builtin
+                                    Name: "int"
+                            Method: "gt"
+                            Args:
+                              Adapt
+                                Value: IntLiteral
+                                  Text: "100"
+                                  Type: Builtin
+                                    Name: "nint"
+                                To: Builtin
+                                  Name: "int"
+                            Setter: false
+                            Resolved: "column.gt(T)"
+                            Subst:
+                              Entry
+                                Key: "M"
+                                Value: Named
+                                  Def: "Cards"
+                              Entry
+                                Key: "T"
+                                Value: Builtin
+                                  Name: "int"
+                            Type: App
+                              Def: "predicate"
+                              Args:
+                                Named
+                                  Def: "Cards"
+                          Type: App
+                            Def: "predicate"
+                            Args:
+                              Named
+                                Def: "Cards"
+                    Type: ~
+                Setter: false
+                Resolved: "relation.where(predicate<M>)"
+                Subst:
+                  Entry
+                    Key: "M"
+                    Value: Named
+                      Def: "Cards"
+                Type: App
+                  Def: "relation"
+                  Args:
+                    Named
+                      Def: "Cards"
+          Owner: "Cards"
       Consts: ~
       Builtin: false
       Interface: ~
