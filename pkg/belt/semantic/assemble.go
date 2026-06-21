@@ -1154,7 +1154,15 @@ func relationReceiverMaster(fileID FileID, recv ast.Expr, q queries) *ir.TypeDef
 			}
 			return nil
 		case *ast.CallExpr:
-			if member, ok := r.Callee.(*ast.MemberExpr); ok {
+			// A chain continues only through a method that returns a relation, so a
+			// query written after an aggregate (Cards.count().where(...)) does not
+			// resolve to Cards: the chain is invalid and its bare column is a genuine
+			// undefined name rather than an exempted column. A receiver that is not such
+			// a chain (a relation-returning function call, say) is not recognized — the
+			// bare form reads its columns off a named, qualified, parameter, self, or
+			// chained relation — so its bare column stays an undefined name, and the
+			// lambda form names the columns binding explicitly there.
+			if member, ok := r.Callee.(*ast.MemberExpr); ok && infer.RelationReturningMethods[member.Member.Name] {
 				recv = member.Receiver
 				continue
 			}

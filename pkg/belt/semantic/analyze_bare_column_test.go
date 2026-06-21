@@ -126,17 +126,45 @@ func TestBareColumnEnumMemberResolves(t *testing.T) {
 	}
 }
 
-// TestBareColumnRowSelfPrecedence pins that in a row context (an instance method whose
-// self is a row) a bare column in a query wins over a same-named row field, so the query
-// type-checks as a column predicate rather than failing because the row's scalar field
-// was read. It is the gate for the columns-over-self precedence.
-func TestBareColumnRowSelfPrecedence(t *testing.T) {
-	src := "master Cards {\n  record { id: int, power: int }\n" +
-		"  impl {\n    pub get strong(): nint { return Cards.where(power > 10).count() }\n  }\n" +
-		"  primary id\n  source { csv \"cards.csv\" }\n}\n"
+// TestBareColumnFunctionValueArg pins that a function-value argument to a query method
+// (where(p) for a parameter p of the selector type) matches the lambda overload and
+// type-checks cleanly — it is the predicate already, not a bare column to rewrite.
+func TestBareColumnFunctionValueArg(t *testing.T) {
+	src := "fn counted(p: fn(c: columns<Cards>): predicate<Cards>): nint {\n  return Cards.where(p).count()\n}\n" +
+		"master Cards {\n  record { id: int, power: int }\n  primary id\n  source { csv \"cards.csv\" }\n}\n"
 	_, diags := analyze(src)
-	if hasCode(diags, CodeUndefinedName) || hasCode(diags, CodeNoMatchingOverload) || hasCode(diags, CodeInvalidOperation) {
-		t.Errorf("a bare column in a row-context query must win over the row field: %v", codes(diags))
+	if hasCode(diags, CodeUndefinedName) || hasCode(diags, CodeNoMatchingOverload) {
+		t.Errorf("a function-value where argument must type-check via the lambda overload: %v", codes(diags))
+	}
+}
+
+// TestBareColumnInvalidChainReported pins that the column exemption follows only a
+// relation-returning chain: a query method written after an aggregate
+// (Cards.count().where(cost > 0)) is an invalid chain, so its bare name is a genuine
+// undefined name rather than an exempted column. It is the gate for the relation-
+// returning chain restriction.
+func TestBareColumnInvalidChainReported(t *testing.T) {
+	src := "master Cards {\n  record { id: int, cost: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.count().where(cost > 0) == 0\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeUndefinedName) {
+		t.Errorf("a bare column after an aggregate is an invalid chain, undefined: %v", codes(diags))
+	}
+}
+
+// TestBareColumnFunctionReceiverReported pins the bare form's receiver scope: it reads
+// its columns off a named, qualified, parameter, self, or chained relation — not an
+// arbitrary relation-returning function call, whose result type is not resolved where
+// the column lowers. A bare column on such a receiver stays an undefined name (the
+// lambda form names the binding explicitly there), so the checker, lowering, and
+// reference check agree rather than accepting a query that would not fold.
+func TestBareColumnFunctionReceiverReported(t *testing.T) {
+	src := "fn cards(): relation<Cards> { return Cards }\n" +
+		"master Cards {\n  record { id: int, cost: int }\n  primary id\n" +
+		"  validate {\n    all {\n      assert cards().where(cost > 0).count() == 0\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeUndefinedName) {
+		t.Errorf("a bare column on a function-call relation receiver must be reported undefined: %v", codes(diags))
 	}
 }
 

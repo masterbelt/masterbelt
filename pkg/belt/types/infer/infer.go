@@ -109,6 +109,11 @@ type scope interface {
 	// body is perfectly inferred, where an unpinned method-local variable (the
 	// R of map at a call site) is uninferable.
 	rigid(name string) bool
+	// constShadows reports whether id names a top-level constant in scope — a
+	// reference the body leaf leaves Invalid (the constant is typed by the
+	// write-back, not the leaf), so a columns scope must not read such a name as a
+	// column: the constant shadows it, the way it shadows self omission.
+	constShadows(id *ast.Identifier) bool
 	// tscope is the generic type-parameter scope in effect — the enclosing
 	// declaration's type parameters, each mapped to its bound — that a written
 	// type annotation in this scope (a lambda parameter or result, a let, a
@@ -580,6 +585,16 @@ func ColumnEnumMember(reg *builtin.Registry, master *ir.TypeDef, colName, member
 // columns scope the lowering would then fail to rewrite.
 var ColumnsContextMethods = map[string]bool{
 	"where": true, "sum": true, "min": true, "max": true, "order": true,
+}
+
+// RelationReturningMethods are the relation methods that return another relation, so a
+// chain over them stays a relation a later query method reads its columns off
+// (Cards.where(...).order(...).where(cost > 0)). An aggregate or materializer (count,
+// sum, min, max, to_list) ends the relation, so a query method written after one is an
+// invalid chain — recognizing only these as continuable keeps a bare column in
+// Cards.count().where(...) from being read against the master a broken chain names.
+var RelationReturningMethods = map[string]bool{
+	"where": true, "order": true, "limit": true, "offset": true,
 }
 
 // isQueryArgType reports whether t is one of the query algebra's bare-argument types

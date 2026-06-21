@@ -10,7 +10,6 @@ package infer
 
 import (
 	"github.com/masterbelt/masterbelt/pkg/belt/builtin"
-	"github.com/masterbelt/masterbelt/pkg/belt/types"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
@@ -128,6 +127,16 @@ func (s funcScope) nsReceiver(recv ast.Expr) bool {
 	return s.outer.nsReceiver(recv)
 }
 
+// constShadows inherits the enclosing context's constant shadows: a lambda body reads
+// a top-level constant exactly as its enclosing body does, unless the lambda binds the
+// name itself (then it is a local, not the constant).
+func (s funcScope) constShadows(id *ast.Identifier) bool {
+	if s.shadows(id.Name) {
+		return false
+	}
+	return s.outer.constShadows(id)
+}
+
 // columnsScope types an argument written in a relation method's columns context —
 // the bare-column form of a query, where(cost > 100) or sum(cost), the columns
 // binding omitted the way a method body omits self. It wraps the call site's scope,
@@ -159,41 +168,23 @@ func (s columnsScope) qualified() func(namespace, name string) *ir.TypeDef {
 func (s columnsScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl { return s.outer.fnMember(m) }
 
 func (s columnsScope) leaf(e ast.Expr) ir.Type {
-	id, isID := e.(*ast.Identifier)
-	col := ir.Invalid
-	if isID {
-		col = columnsFieldType(s.registry(), s.columns, id.Name)
+	if t := s.outer.leaf(e); t != ir.Invalid {
+		return t // a local, parameter, master, type, or self member of the same name wins
 	}
-	outer := s.outer.leaf(e)
-	if col == ir.Invalid {
-		return outer // not a column of M: the outer reading stands (a typo stays undefined)
+	// Last resort: a bare name that resolves no other way reads M's column of that name
+	// — the columns binding omitted, exactly as a bare self member reads self. The outer
+	// leaf returns Invalid for a name shadowed by a constant or a rigid type parameter
+	// (both typed elsewhere), so those are excluded here, the way the lowering reads the
+	// constant first; a name that is no column of M stays Invalid, a typo still undefined.
+	if id, ok := e.(*ast.Identifier); ok && !s.outer.constShadows(id) && !s.outer.rigid(id.Name) {
+		if ct := columnsFieldType(s.registry(), s.columns, id.Name); ct != ir.Invalid {
+			return ct
+		}
 	}
-	// The name is a column of M. It reads as the column unless the outer scope binds it
-	// to a local, parameter, constant, or type — those win, the way they win over self
-	// omission. The implicit-self reading does not: a query argument names the table
-	// column, not the current row's field, so a column wins over a same-named self
-	// member (the outer resolves it only because self omission read the row field).
-	if outer == ir.Invalid || outerReadsSelfMember(s.outer, id, outer) {
-		return col
-	}
-	return outer
+	return ir.Invalid
 }
 
-// outerReadsSelfMember reports whether scope s resolves identifier id only through self
-// omission — the name is a readable member of s's receiver and the resolved type is that
-// member's. It tells a columns scope that the outer reading is the row's field (which a
-// column wins over) rather than a local, parameter, constant, or type (which wins over a
-// column). id is nil for a non-identifier leaf, which never reads a self member.
-func outerReadsSelfMember(s scope, id *ast.Identifier, resolved ir.Type) bool {
-	if id == nil {
-		return false
-	}
-	self := s.self()
-	if self == ir.Invalid || !IsReadableMember(s.registry(), self, id.Name) {
-		return false
-	}
-	return types.Identical(resolved, memberReadType(s.registry(), self, id.Name))
-}
+func (s columnsScope) constShadows(id *ast.Identifier) bool { return s.outer.constShadows(id) }
 
 // metatype is the type of a reified type value — the builtin `type` (type :
 // type), the type a bare type name carries in value position. It is built fresh
@@ -222,6 +213,11 @@ func (s constScope) self() ir.Type { return ir.Invalid }
 
 // rigid reports whether name is one of the owner type parameters in scope.
 func (s constScope) rigid(name string) bool { _, ok := s.params[name]; return ok }
+
+// constShadows: a constant initializer resolves a sibling constant through its leaf
+// (which returns the constant's type, not Invalid), so the columns-scope guard never
+// needs it here — a constant reference does not look unbound in this scope.
+func (s constScope) constShadows(*ast.Identifier) bool { return false }
 
 // tscope is the owner type-parameter scope a lambda in the initializer resolves its
 // annotations through — nil for a top-level constant.
@@ -421,6 +417,13 @@ func (s BodyScope) self() ir.Type {
 func (s BodyScope) rigid(name string) bool {
 	_, ok := s.TScope[name]
 	return ok
+}
+
+// constShadows reports whether id names a top-level constant in scope — the reference
+// this scope's leaf leaves Invalid (typed by the write-back), so a columns scope reads
+// the constant rather than a same-named column.
+func (s BodyScope) constShadows(id *ast.Identifier) bool {
+	return s.ConstShadows != nil && s.ConstShadows(id)
 }
 
 // tscope is the body's generic type-parameter scope — the enclosing function's
