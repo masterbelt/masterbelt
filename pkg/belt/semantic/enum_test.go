@@ -10,9 +10,9 @@ import (
 
 // enumDef returns the resolved enum definition of the given name in the module,
 // or nil.
-func enumDef(m *ir.Module, name string) *ir.TypeDef {
+func enumDef(m *ir.Module) *ir.TypeDef {
 	for _, t := range m.Types {
-		if t.Name == name && t.Enum != nil {
+		if t.Name == "E" && t.Enum != nil {
 			return t
 		}
 	}
@@ -48,7 +48,7 @@ func TestEnumValueRules(t *testing.T) {
 			if len(diags) != 0 {
 				t.Fatalf("unexpected diagnostics: %v", diags)
 			}
-			def := enumDef(m, "E")
+			def := enumDef(m)
 			if def == nil {
 				t.Fatalf("enum E not resolved: %+v", m.Types)
 			}
@@ -64,7 +64,7 @@ func TestEnumBaseDefaultsToInt(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
-	if def := enumDef(m, "E"); def == nil || def.Enum.Base != "nint" {
+	if def := enumDef(m); def == nil || def.Enum.Base != "nint" {
 		t.Fatalf("base = %v, want nint", def)
 	}
 }
@@ -74,7 +74,7 @@ func TestEnumComparisonMethods(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
-	def := enumDef(m, "E")
+	def := enumDef(m)
 	want := map[string]bool{"eql": true, "neq": true, "lt": true, "lteq": true, "gt": true, "gteq": true}
 	got := map[string]bool{}
 	for _, mth := range def.Methods {
@@ -102,6 +102,8 @@ func TestEnumDiagnostics(t *testing.T) {
 		{"implicit dup value", "enum E {\n  A = 1, B, C = 1\n}\n", CodeDuplicateEnumValue},
 		{"string default dup", "enum E: string {\n  Common\n  X = \"Common\"\n}\n", CodeDuplicateEnumValue},
 		{"nint base string value", "enum E: sbyte {\n  A = \"x\"\n}\n", CodeTypeMismatch},
+		{"member operator error", "enum E {\n  A = \"x\" * 2\n}\n", CodeInvalidOperation},
+		{"member ternary mismatch", "enum E {\n  A = true ? 1 : \"s\"\n}\n", CodeTernaryBranchMismatch},
 		{"unknown qualified member", "enum R {\n  A\n}\nconst x: R = R.Bogus\n", CodeUnknownEnumMember},
 		{"unknown bare member", "enum R {\n  A\n}\nconst y: R = Bogus\n", CodeUnknownEnumMember},
 	}
@@ -112,6 +114,76 @@ func TestEnumDiagnostics(t *testing.T) {
 				t.Errorf("src %q: want %s, got %v", tc.src, tc.want, codes(diags))
 			}
 		})
+	}
+}
+
+// TestEnumPoisonedValueWithheld pins that a member whose initializer does not type
+// has its folded value withheld, so it does not feed the duplicate-value check: a
+// mismatched ternary that folds to 1 beside a member b = 1 reports the type error but
+// not a spurious duplicate, because the poisoned member's value is withheld.
+func TestEnumPoisonedValueWithheld(t *testing.T) {
+	src := "enum E {\n  a = true ? 1 : \"s\"\n  b = 1\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeTernaryBranchMismatch) {
+		t.Errorf("the poisoned member's type error should be reported: %v", codes(diags))
+	}
+	if hasCode(diags, CodeDuplicateEnumValue) {
+		t.Errorf("the poisoned member's withheld value must not trip the duplicate-value check: %v", codes(diags))
+	}
+}
+
+// TestEnumValueErrorWithheld pins that a member whose value fails the base — a
+// mismatched kind or an out-of-range value — is poisoned too, not only one whose
+// expression draws an operator error: two members both rejected by the base do not
+// then collide as a duplicate value.
+func TestEnumValueErrorWithheld(t *testing.T) {
+	if _, diags := analyze("enum E {\n  A = \"x\"\n  B = \"x\"\n}\n"); hasCode(diags, CodeDuplicateEnumValue) {
+		t.Errorf("base-mismatched members must be withheld, not duplicate-checked: %v", codes(diags))
+	}
+	if _, diags := analyze("enum E: byte {\n  A = 256\n  B = 256\n}\n"); hasCode(diags, CodeDuplicateEnumValue) {
+		t.Errorf("overflowing members must be withheld, not duplicate-checked: %v", codes(diags))
+	}
+}
+
+// TestEnumPoisonResetsAutoNumbering pins that a poisoned member does not advance the
+// auto-numbering counter: A = true ? 5 : "s" is withheld, so the implicit B continues
+// from before A (0), not from the rejected 5, and a later C = 6 is not a duplicate.
+func TestEnumPoisonResetsAutoNumbering(t *testing.T) {
+	src := "enum E {\n  A = true ? 5 : \"s\"\n  B\n  C = 6\n}\n"
+	if _, diags := analyze(src); hasCode(diags, CodeDuplicateEnumValue) {
+		t.Errorf("a poisoned value must not advance auto-numbering into a later member: %v", codes(diags))
+	}
+}
+
+// TestEnumNestedErrorWithheld pins that a member is poisoned by a type error nested
+// under a valid outer type — a function literal with an ill-typed body that still
+// returns the base type, called — so the poisoning keys off a reported diagnostic, not
+// the outer expression's type. The member's value is withheld, so a sibling b = 1 is
+// not reported as a duplicate.
+func TestEnumNestedErrorWithheld(t *testing.T) {
+	src := "enum E {\n  a = (fn(): nint {\n    let x: nint = \"s\"\n    return 1\n  })()\n  b = 1\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeTypeMismatch) {
+		t.Errorf("the nested type error should be reported: %v", codes(diags))
+	}
+	if hasCode(diags, CodeDuplicateEnumValue) {
+		t.Errorf("a member with a nested type error must be withheld, not duplicate-checked: %v", codes(diags))
+	}
+}
+
+// TestEnumConstReferenceValueKept pins that a valid member referencing a constant is
+// not withheld: A = Base (Base a sbyte constant) keeps its value, since the type
+// check runs in the reporting pass where the constant is resolved — a member that
+// types cleanly is never poisoned.
+func TestEnumConstReferenceValueKept(t *testing.T) {
+	src := "const Base: sbyte = 4\nenum E: sbyte {\n  A = Base\n  B\n}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("a const-reference member should settle clean: %v", codes(diags))
+	}
+	def := enumDef(m)
+	if def.Enum.Members[0].Value == nil || def.Enum.Members[0].Value.String() != "4" {
+		t.Errorf("A = Base should keep value 4, got %v", def.Enum.Members[0].Value)
 	}
 }
 
