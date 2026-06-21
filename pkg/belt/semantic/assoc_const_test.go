@@ -62,16 +62,20 @@ func TestAssocConstUnannotatedNotMistyped(t *testing.T) {
 	}
 }
 
-// TestFunctionLiteralAssocConstNotReported pins that a function-literal associated
-// constant is settled silently, not type-checked: checking a lambda body against its
-// pushed (generic) function type is a checker gap that would report a spurious
-// uninferable parameter, and such a constant's body is unchecked today regardless, so
-// settling it for the editor must report nothing — a generic Box<T>'s function-valued
-// constant settles clean.
-func TestFunctionLiteralAssocConstNotReported(t *testing.T) {
-	src := "pub type Box<T> = T impl {\n  pub const Id: fn(x: T): T = fn(y) {\n    return y\n  }\n}\n"
-	if _, diags := analyze(src); len(diags) != 0 {
-		t.Errorf("a function-literal assoc const should settle without a diagnostic; got %v", codes(diags))
+// TestGenericFuncLitAssocConstNotReported pins that a generic type's associated
+// constant holding a function literal is settled silently, not type-checked: the
+// owner's type parameter is pushed into the lambda but is not rigid in the const
+// scope, a checker gap that would report a spurious uninferable parameter, so a
+// generic Box<T>'s function-valued constant settles clean. A function literal nested
+// in a record value of a generic constant is covered the same way.
+func TestGenericFuncLitAssocConstNotReported(t *testing.T) {
+	top := "pub type Box<T> = T impl {\n  pub const Id: fn(x: T): T = fn(y) {\n    return y\n  }\n}\n"
+	if _, diags := analyze(top); len(diags) != 0 {
+		t.Errorf("a generic function-literal assoc const should settle without a diagnostic; got %v", codes(diags))
+	}
+	nested := "pub type Box<T> = { v: T } impl {\n  pub const Mk: { make: fn(x: T): T } = { make: fn(y) {\n    return y\n  } }\n}\n"
+	if _, diags := analyze(nested); len(diags) != 0 {
+		t.Errorf("a generic constant's record holding a function literal should settle without a diagnostic; got %v", codes(diags))
 	}
 }
 
@@ -91,11 +95,18 @@ func TestAssocConstInitializerReported(t *testing.T) {
 	}
 }
 
-// TestEnumMemberInitializerReported pins the enum-member twin: an operator type error
-// in an enum member's initializer is reported.
-func TestEnumMemberInitializerReported(t *testing.T) {
-	if _, diags := analyze("enum E {\n  a = \"x\" * 2\n}\n"); !hasCode(diags, CodeInvalidOperation) {
-		t.Errorf("an operator type error in an enum member initializer should be reported: %v", codes(diags))
+// TestAssocConstBadAnnotationNoRecordPileOn pins that an associated constant whose
+// annotation failed to resolve and whose value is an inferred record reports only the
+// unknown type, not an uninferable_record on top: the failed annotation would have
+// supplied the record's type, so the pile-on is suppressed, as the top-level const
+// path does.
+func TestAssocConstBadAnnotationNoRecordPileOn(t *testing.T) {
+	_, diags := analyze("pub type T = nint impl {\n  pub const X: Missing = { x: 1 }\n}\n")
+	if !hasCode(diags, CodeUnknownType) {
+		t.Fatalf("a missing annotation type should be reported: %v", codes(diags))
+	}
+	if hasCode(diags, CodeUninferableRecord) {
+		t.Errorf("a record under a failed annotation must not also report uninferable_record: %v", codes(diags))
 	}
 }
 

@@ -618,8 +618,9 @@ func runCheckWalks(db *database, fileID FileID, file *ast.File, sink *infer.Sink
 	// the editor the same way the assemble pass does, so a member call's receiver or
 	// a function literal inside one carries a type in the editor's queries too. The
 	// editor captures every form through the one sink (it reports nothing), where the
-	// assemble pass reports on the forms it type-checks.
-	settleInitializers(q.typeDefs(fileID), file.Enums, env, func(ast.Expr) *infer.Sink { return sink })
+	// assemble pass reports on the associated constants it type-checks.
+	settleInitializers(q.typeDefs(fileID), file.Enums, env,
+		func(bool, ast.Expr, bool) *infer.Sink { return sink }, sink)
 	funcs := buildFuncSymbols(file)
 	qualifiedFuncs := qualifiedFuncsFrom(q, q.importsOf(fileID))
 	constShadows := constShadowsFrom(q, fileID)
