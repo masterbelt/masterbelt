@@ -415,7 +415,7 @@ func TestCheckAgainstArityAndInference(t *testing.T) {
 	subst := map[string]ir.Type{}
 	got = checkType(
 		funcLit([]*ast.ParamDef{param("x", nil)}, nil, ret(binary(ident("x"), "lt", intLit("0")))),
-		fnT(&ir.TypeVar{Name: "R"}, intT), constScope{env}, subst, r3.sink())
+		fnT(&ir.TypeVar{Name: "R"}, intT), constScope{env: env}, subst, r3.sink())
 	if got.String() != "fn(nint): bool" {
 		t.Errorf("solved literal = %s, want fn(nint): bool", got)
 	}
@@ -430,7 +430,7 @@ func TestCheckAgainstArityAndInference(t *testing.T) {
 	var r4 report
 	got = checkType(
 		funcLit([]*ast.ParamDef{param("x", nil)}, nil),
-		fnT(&ir.TypeVar{Name: "R"}, intT), constScope{env}, map[string]ir.Type{}, r4.sink())
+		fnT(&ir.TypeVar{Name: "R"}, intT), constScope{env: env}, map[string]ir.Type{}, r4.sink())
 	if got.String() != "fn(nint): invalid" {
 		t.Errorf("unsolved literal = %s, want fn(nint): invalid", got)
 	}

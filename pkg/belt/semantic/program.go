@@ -620,7 +620,7 @@ func runCheckWalks(db *database, fileID FileID, file *ast.File, sink *infer.Sink
 	// editor captures every form through the one sink (it reports nothing), where the
 	// assemble pass reports on the associated constants it type-checks.
 	settleInitializers(q.typeDefs(fileID), file.Enums, env,
-		func(bool, ast.Expr, bool) *infer.Sink { return sink }, sink)
+		func(bool) *infer.Sink { return sink }, sink)
 	funcs := buildFuncSymbols(file)
 	qualifiedFuncs := qualifiedFuncsFrom(q, q.importsOf(fileID))
 	constShadows := constShadowsFrom(q, fileID)

@@ -142,7 +142,7 @@ func Decl(decl *ast.ConstDecl, env Env) ir.Type {
 // rules driven bidirectionally (callType), so a function-literal argument is
 // typed against the parameter it is passed to.
 func Expr(e ast.Expr, env Env) ir.Type {
-	return exprType(e, constScope{env})
+	return exprType(e, constScope{env: env})
 }
 
 // exprType is the one inference walk. The shared forms are typed here; the

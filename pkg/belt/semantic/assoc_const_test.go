@@ -63,11 +63,11 @@ func TestAssocConstUnannotatedNotMistyped(t *testing.T) {
 }
 
 // TestGenericFuncLitAssocConstNotReported pins that a generic type's associated
-// constant holding a function literal is settled silently, not type-checked: the
-// owner's type parameter is pushed into the lambda but is not rigid in the const
-// scope, a checker gap that would report a spurious uninferable parameter, so a
-// generic Box<T>'s function-valued constant settles clean. A function literal nested
-// in a record value of a generic constant is covered the same way.
+// constant holding a function literal whose parameter reads the owner's type
+// parameter settles clean: the constant is checked in the owner's type-parameter
+// scope, so T is a rigid type variable the lambda parameter resolves to, not a
+// spuriously uninferable one. It holds for a function-valued constant and for a
+// function literal nested in a record value.
 func TestGenericFuncLitAssocConstNotReported(t *testing.T) {
 	top := "pub type Box<T> = T impl {\n  pub const Id: fn(x: T): T = fn(y) {\n    return y\n  }\n}\n"
 	if _, diags := analyze(top); len(diags) != 0 {
@@ -76,6 +76,23 @@ func TestGenericFuncLitAssocConstNotReported(t *testing.T) {
 	nested := "pub type Box<T> = { v: T } impl {\n  pub const Mk: { make: fn(x: T): T } = { make: fn(y) {\n    return y\n  } }\n}\n"
 	if _, diags := analyze(nested); len(diags) != 0 {
 		t.Errorf("a generic constant's record holding a function literal should settle without a diagnostic; got %v", codes(diags))
+	}
+}
+
+// TestGenericAssocConstSiblingReported pins that a real type error beside a function
+// literal in a generic constant is still reported: checking in the owner's type scope
+// resolves the lambda parameter cleanly, so the sibling "x" * 2 is reported as the
+// invalid operation it is — the lambda no longer suppresses the whole initializer.
+func TestGenericAssocConstSiblingReported(t *testing.T) {
+	src := "pub type Box<T> = { v: T } impl {\n" +
+		"  pub const Mk: { bad: nint, make: fn(x: T): T } = { bad: \"x\" * 2, make: fn(y) {\n    return y\n  } }\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeInvalidOperation) {
+		t.Errorf("a type error beside a function literal in a generic constant should be reported: %v", codes(diags))
+	}
+	// And the lambda itself stays clean — the owner scope makes its parameter rigid.
+	if hasCode(diags, CodeUninferableParameter) {
+		t.Errorf("the function literal beside it must not report a spurious uninferable parameter: %v", codes(diags))
 	}
 }
 

@@ -587,15 +587,7 @@ func (a *assembler) checkAssocConstRefs() {
 // reported (checkAssocConstRefs) and value ranges stay the fold's, so nothing is
 // reported twice.
 func (a *assembler) settleInitializerTypes() {
-	silent := resolutionSink(a.res)
-	assocSink := func(generic bool, value ast.Expr, annotationInvalid bool) *infer.Sink {
-		// A generic type's associated constant holding a function literal would push
-		// the owner's type parameter into the lambda, which the const scope does not
-		// make rigid — a spurious uninferable parameter — so it is settled silently;
-		// everything else is type-checked.
-		if generic && containsFuncLit(value) {
-			return silent
-		}
+	assocSink := func(annotationInvalid bool) *infer.Sink {
 		sink := exprSink(a.at, a.diags, a.res)
 		if annotationInvalid {
 			// The annotation failed to resolve (reported at its own site); with no
@@ -610,7 +602,7 @@ func (a *assembler) settleInitializerTypes() {
 	// reporting its type errors needs the broken-value withholding the enum value
 	// resolution does not yet do (a type-invalid member still folds and feeds the
 	// duplicate-value check), so enum-member reporting is its own follow-up.
-	settleInitializers(a.module.Types, a.file.Enums, a.env, assocSink, silent)
+	settleInitializers(a.module.Types, a.file.Enums, a.env, assocSink, resolutionSink(a.res))
 }
 
 // settleInitializers types every associated-constant initializer through assocSink
@@ -618,13 +610,14 @@ func (a *assembler) settleInitializerTypes() {
 // sinks. It is shared by the assemble pass (whose sinks feed the IR write-back,
 // reporting on the associated constants it type-checks) and the editor's type-query
 // walk (whose one sink captures the expression types and reports nothing), so the two
-// settle these positions identically. assocSink decides per constant whether to report
-// — a generic owner type parameter is not in the const scope, so it is settled
-// silently when read by a function literal, and an annotation that failed to resolve
-// suppresses its inferred-record pile-on.
-func settleInitializers(defs []*ir.TypeDef, enums []*ast.EnumDecl, env infer.Env, assocSink func(generic bool, value ast.Expr, annotationInvalid bool) *infer.Sink, enumSink *infer.Sink) {
+// settle these positions identically. An associated constant is checked in the owning
+// type's generic-parameter scope, so a value reading the owner's parameter — a function
+// literal whose parameter is T — resolves it the way a method body does rather than
+// reporting it uninferable; assocSink only suppresses the inferred-record pile-on of a
+// constant whose annotation failed to resolve.
+func settleInitializers(defs []*ir.TypeDef, enums []*ast.EnumDecl, env infer.Env, assocSink func(annotationInvalid bool) *infer.Sink, enumSink *infer.Sink) {
 	for _, def := range defs {
-		generic := len(def.Params) > 0
+		tscope := ownerTScope(def)
 		for _, ac := range def.Consts {
 			if ac == nil || ac.Syntax == nil || ac.Syntax.Value == nil {
 				continue
@@ -636,11 +629,11 @@ func settleInitializers(defs []*ir.TypeDef, enums []*ast.EnumDecl, env infer.Env
 			// (a generic parameter the annotation resolver left unresolved on a
 			// degenerate form) is no usable expectation. Both are settled without one.
 			annotationInvalid := ac.Syntax.Type != nil && ir.HasInvalid(ac.Type)
-			sink := assocSink(generic, ac.Syntax.Value, annotationInvalid)
+			sink := assocSink(annotationInvalid)
 			if ac.Syntax.Type != nil && !ir.HasInvalid(ac.Type) {
-				infer.CheckAgainst(ac.Syntax.Value, ac.Type, env, sink)
+				infer.CheckConstAgainst(ac.Syntax.Value, ac.Type, env, tscope, sink)
 			} else {
-				infer.Check(ac.Syntax.Value, env, sink)
+				infer.CheckConst(ac.Syntax.Value, env, tscope, sink)
 			}
 		}
 	}
@@ -653,21 +646,19 @@ func settleInitializers(defs []*ir.TypeDef, enums []*ast.EnumDecl, env infer.Env
 	}
 }
 
-// containsFuncLit reports whether e is or contains a function literal at its own
-// scope — a value (a record field, a collection entry, a call argument) the type
-// checker would push an expected type into. A function literal nested inside another
-// literal's body is its own scope, which the expression walk does not descend into,
-// so it is not counted.
-func containsFuncLit(e ast.Expr) bool {
-	found := false
-	ast.WalkExprs(e, func(inner ast.Expr) bool {
-		if _, ok := inner.(*ast.FuncLit); ok {
-			found = true
-			return false
-		}
-		return true
-	})
-	return found
+// ownerTScope is the generic type-parameter scope a type's own members see — each
+// owner parameter mapped to its resolved bound — or nil for a non-generic type. An
+// associated constant is checked through it so a value reading the owner's parameter
+// resolves it to a rigid type variable, the way a method body of the same type does.
+func ownerTScope(def *ir.TypeDef) infer.TypeScope {
+	if len(def.Params) == 0 {
+		return nil
+	}
+	ts := make(infer.TypeScope, len(def.Params))
+	for _, p := range def.Params {
+		ts[p.Name] = p.Bound
+	}
+	return ts
 }
 
 // writeBack binds the checker-selected overloads, the settled types, and the
