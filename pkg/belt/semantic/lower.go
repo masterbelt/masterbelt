@@ -781,8 +781,12 @@ func (b bodyBinder) ColumnsArg(receiver ir.Value, method string, arg ast.Expr) i
 	// Only a bare-column expression is rewritten: a value argument (a function bound to a
 	// parameter, constant, or field, matching the lambda overload) is the predicate or
 	// selector already and lowers the ordinary way, so it must not be wrapped in a
-	// synthesized columns lambda.
-	if !b.bareColumnArg(arg) {
+	// synthesized columns lambda. The classification runs with no columns master, so a
+	// bare column reads as unresolved: an enclosing query's columns master (this is a
+	// nested query) must not make the inner relation's column look already resolved.
+	probe := b
+	probe.columnsMaster = nil
+	if !probe.bareColumnArg(arg) {
 		return nil
 	}
 	cb := b
@@ -819,6 +823,9 @@ func (b bodyBinder) bareColumnArg(arg ast.Expr) bool {
 		}
 		return false
 	case *ast.TernaryExpr:
+		// The condition is a bool, never a column comparison (a column comparison is a
+		// predicate, which the checker rejects as a ternary condition), so only the
+		// branches can bottom out in a column.
 		return b.bareColumnArg(a.Then) || b.bareColumnArg(a.Else)
 	case *ast.AwaitExpr:
 		return b.bareColumnArg(a.Value)

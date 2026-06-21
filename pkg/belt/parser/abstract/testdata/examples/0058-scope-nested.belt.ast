@@ -1,0 +1,125 @@
+File
+  Uses: ~
+  Decls: ~
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~
+  Masters:
+    MasterDecl
+      Doc: ~
+      Public: false
+      Name: "Other"
+      Record: RecordType
+        Fields:
+          FieldDef
+            Name: "id"
+            Type: NamedType
+              Namespace: ""
+              Name: "int"
+              Args: ~
+              Projections: ~
+          FieldDef
+            Name: "power"
+            Type: NamedType
+              Namespace: ""
+              Name: "int"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+      Primary: "id"
+      Sources:
+        SourceEntry
+          Format: "csv"
+          Locator: "other.csv"
+          Options: ~
+      Validations: ~
+    MasterDecl
+      Doc: ~
+      Public: false
+      Name: "Cards"
+      Record: RecordType
+        Fields:
+          FieldDef
+            Name: "id"
+            Type: NamedType
+              Namespace: ""
+              Name: "int"
+              Args: ~
+              Projections: ~
+          FieldDef
+            Name: "power"
+            Type: NamedType
+              Namespace: ""
+              Name: "int"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: ~
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Name: "busy"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "relation"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "Cards"
+                Args: ~
+                Projections: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: Identifier
+                  Name: "where"
+                Arguments:
+                  CallExpr
+                    Callee: MemberExpr
+                      Receiver: Identifier
+                        Name: "power"
+                      Member: Identifier
+                        Name: "gt"
+                    Arguments:
+                      CallExpr
+                        Callee: MemberExpr
+                          Receiver: CallExpr
+                            Callee: MemberExpr
+                              Receiver: Identifier
+                                Name: "Other"
+                              Member: Identifier
+                                Name: "where"
+                            Arguments:
+                              CallExpr
+                                Callee: MemberExpr
+                                  Receiver: Identifier
+                                    Name: "power"
+                                  Member: Identifier
+                                    Name: "gt"
+                                Arguments:
+                                  IntLit
+                                    Text: "50"
+                                    Base: 0
+                          Member: Identifier
+                            Name: "count"
+                        Arguments: ~
+      Consts: ~
+      Impls: ~
+      Primary: "id"
+      Sources:
+        SourceEntry
+          Format: "csv"
+          Locator: "cards.csv"
+          Options: ~
+      Validations: ~

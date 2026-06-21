@@ -1,0 +1,172 @@
+# tree
+File
+  MasterDecl
+    MasterKeyword
+      Ident "master"
+    Whitespace " "
+    Ident "Other"
+    Whitespace " "
+    LBrace "{"
+    MasterRecord
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "record"
+      Whitespace " "
+      RecordType
+        LBrace "{"
+        Whitespace " "
+        Field
+          Ident "id"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+        Comma ","
+        Whitespace " "
+        Field
+          Ident "power"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+        Whitespace " "
+        RBrace "}"
+    MasterPrimary
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "primary"
+      Whitespace " "
+      Ident "id"
+    MasterSource
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "source"
+      Whitespace " "
+      LBrace "{"
+      SourceEntry
+        Whitespace " "
+        Ident "csv"
+        Whitespace " "
+        String "\"other.csv\""
+      Whitespace " "
+      RBrace "}"
+    Newline "\n"
+    RBrace "}"
+  MasterDecl
+    Newline "\n"
+    Newline "\n"
+    MasterKeyword
+      Ident "master"
+    Whitespace " "
+    Ident "Cards"
+    Whitespace " "
+    LBrace "{"
+    MasterRecord
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "record"
+      Whitespace " "
+      RecordType
+        LBrace "{"
+        Whitespace " "
+        Field
+          Ident "id"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+        Comma ","
+        Whitespace " "
+        Field
+          Ident "power"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+        Whitespace " "
+        RBrace "}"
+    MasterScope
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "scope"
+      Whitespace " "
+      LBrace "{"
+      ScopeEntry
+        Newline "\n"
+        Whitespace "    "
+        Pub "pub"
+        Whitespace " "
+        Ident "busy"
+        ParamList
+          LParen "("
+          RParen ")"
+        Whitespace " "
+        Arrow "->"
+        Whitespace " "
+        CallExpr
+          NameRef
+            Where "where"
+          LParen "("
+          BinaryExpr
+            NameRef
+              Ident "power"
+            Whitespace " "
+            Gt ">"
+            Whitespace " "
+            CallExpr
+              MemberExpr
+                CallExpr
+                  MemberExpr
+                    NameRef
+                      Ident "Other"
+                    Dot "."
+                    Where "where"
+                  LParen "("
+                  BinaryExpr
+                    NameRef
+                      Ident "power"
+                    Whitespace " "
+                    Gt ">"
+                    Whitespace " "
+                    Literal
+                      Int "50"
+                  RParen ")"
+                Dot "."
+                Ident "count"
+              LParen "("
+              RParen ")"
+          RParen ")"
+      Newline "\n"
+      Whitespace "  "
+      RBrace "}"
+    MasterPrimary
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "primary"
+      Whitespace " "
+      Ident "id"
+    MasterSource
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "source"
+      Whitespace " "
+      LBrace "{"
+      SourceEntry
+        Whitespace " "
+        Ident "csv"
+        Whitespace " "
+        String "\"cards.csv\""
+      Whitespace " "
+      RBrace "}"
+    Newline "\n"
+    RBrace "}"
+  Newline "\n"
+  EOF ""
+# diagnostics
