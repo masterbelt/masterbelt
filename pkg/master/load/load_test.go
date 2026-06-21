@@ -139,14 +139,13 @@ func TestValidateAllBareColumnContexts(t *testing.T) {
 		t.Errorf("explicit self.where in a scope fn: table_validation_failed, want 0")
 	}
 
-	// A query on a parameter typed by a nominal relation alias reads its columns through
-	// the alias, the same the lowering recovers the master from the underlying relation.
-	aliasBelt := enumPre + "type CardRel = relation<Cards>\n" +
-		"fn strong(r: CardRel): nint { return r.where(power > 10).count() }\n" +
-		"master Cards {\n  record { id: int, power: int, rarity: Rarity }\n  primary id\n" +
-		"  validate {\n    all {\n      assert strong(Cards) == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
-	if _, diags := run(t, aliasBelt, bases, files); countTableFailures(diags) != 0 {
-		t.Errorf("bare query on a relation alias parameter: table_validation_failed, want 0")
+	// A predicate where the column is on the right of an operator whose receiver is a
+	// captured value (true && power > 10) is still rewritten: a bare column on either side
+	// of an operator makes the whole expression a bare-column predicate.
+	mixedBelt := enumPre + "master Cards {\n  record { id: int, power: int, rarity: Rarity }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.where(true && power > 10).count() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	if _, diags := run(t, mixedBelt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("bare column on the right of an operator: table_validation_failed, want 0")
 	}
 }
 

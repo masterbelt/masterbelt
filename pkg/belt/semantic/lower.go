@@ -806,8 +806,18 @@ func (b bodyBinder) bareColumnArg(arg ast.Expr) bool {
 	case *ast.Identifier:
 		return b.leafIdentifier(a) == nil
 	case *ast.CallExpr:
-		member, ok := a.Callee.(*ast.MemberExpr)
-		return ok && b.bareColumnArg(member.Receiver)
+		// An operator or method call is a bare-column expression when a column appears on
+		// either side: its receiver (cost > 100), or an argument (true && power > 10,
+		// where the receiver is a captured value but the argument bottoms out in a column).
+		if member, ok := a.Callee.(*ast.MemberExpr); ok && b.bareColumnArg(member.Receiver) {
+			return true
+		}
+		for _, arg := range a.Arguments {
+			if b.bareColumnArg(arg) {
+				return true
+			}
+		}
+		return false
 	case *ast.TernaryExpr:
 		return b.bareColumnArg(a.Then) || b.bareColumnArg(a.Else)
 	case *ast.AwaitExpr:
@@ -852,17 +862,6 @@ func (b bodyBinder) relationMaster(v ir.Value) *ir.TypeDef {
 // receiver's type, so a query on a relation parameter or local finds the columns it
 // reads the way a query on a named master does.
 func relationTypeMaster(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
-	// A nominal alias of a relation (type CardRel = relation<Cards>) carries the
-	// relation as its body, so peel any alias to the relation it stands for — a query
-	// on a parameter typed by the alias reads the columns the underlying relation offers,
-	// the way the checker reads them through the alias.
-	for {
-		named, ok := t.(*ir.Named)
-		if !ok || named.Def == nil || named.Def.Body == nil {
-			break
-		}
-		t = named.Def.Body
-	}
 	app, ok := t.(*ir.App)
 	if !ok || app.Def == nil || len(app.Args) != 1 {
 		return nil
