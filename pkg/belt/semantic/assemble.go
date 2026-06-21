@@ -1110,13 +1110,14 @@ func columnsCallMaster(fileID FileID, member *ast.MemberExpr, q queries) *ir.Typ
 	return m
 }
 
-// directMasterReceiver reports whether a query method's receiver names a master directly
-// — a bare or namespace-qualified name — rather than a relation produced by a chain. A
-// static fn shadows the relation method only on a direct call; on a chain the receiver is
-// already a relation value.
+// directMasterReceiver reports whether a query method's receiver names a master through
+// a bare identifier — the only receiver a static fn shadows. A static call resolves only
+// through an identifier receiver (Cards.where), never a namespace-qualified one
+// (deck.Cards.where, which is the relation method) nor a chain (already a relation value),
+// so the static-fn shadow guard applies to a bare master name alone.
 func directMasterReceiver(recv ast.Expr) bool {
 	switch recv.(type) {
-	case *ast.Identifier, *ast.MemberExpr:
+	case *ast.Identifier:
 		return true
 	default:
 		return false

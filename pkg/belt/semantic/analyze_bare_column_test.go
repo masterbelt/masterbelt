@@ -287,3 +287,17 @@ func TestBareColumnNamespaceValueShadow(t *testing.T) {
 		t.Errorf("a value shadowing the namespace makes cost an undefined name: %v", codes(diags))
 	}
 }
+
+// TestBareColumnQualifiedStaticNotShadowed pins that a static fn named like a query
+// method does not shadow the relation method on a namespace-qualified master: a static
+// call resolves only through an identifier receiver, so deck.Cards.where(cost > 0) is the
+// relation where and cost is an exempted column, not an undefined name.
+func TestBareColumnQualifiedStaticNotShadowed(t *testing.T) {
+	diags := analyzeProject(t, map[string]string{
+		"cards.belt": "pub master Cards {\n  record { id: int, cost: int }\n  impl { pub static fn where(b: bool): nint { return 0 } }\n  primary id\n  source { csv \"cards.csv\" }\n}\n",
+		"main.belt":  "use deck from \"cards.belt\"\nassert deck.Cards.where(cost > 0).count() == 0\n",
+	})
+	if hasCode(diags, CodeUndefinedName) {
+		t.Errorf("a static fn does not shadow a qualified relation method, cost is a column: %v", codes(diags))
+	}
+}
