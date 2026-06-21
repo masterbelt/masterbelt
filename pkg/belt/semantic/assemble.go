@@ -1024,16 +1024,6 @@ func reportRefIssues(fileID FileID, e ast.Expr, q queries, at func(ast.Node) spa
 		})
 }
 
-// columnsContextRefMethods are the relation methods whose argument is a columns
-// expression — the bare-column overloads (where, sum, min, max, order). A bare name in
-// one of these arguments that names a column of the relation's master is a resolved
-// reference, exempt from the undefined-name report the way a self member is. They
-// mirror the lowering's set, so the reference check and the lowering agree on which
-// arguments read columns.
-var columnsContextRefMethods = map[string]bool{
-	"where": true, "sum": true, "min": true, "max": true, "order": true,
-}
-
 // bareColumnIdents collects the identifiers in e that read a column of the relation a
 // query method is called on — the bare-column form (Cards.where(cost > 100)), so the
 // reference check exempts a column the way it exempts a self member. The walk tracks
@@ -1041,8 +1031,10 @@ var columnsContextRefMethods = map[string]bool{
 // relation the method is called on, while its receiver and every other position read in
 // the outer context (nil at the top), so a nested correlated query (where(cost >
 // Other.sum(price))) resolves price against Other and cost against the outer master. A
-// name that is no column of the master in force is left unrecorded and so still
-// reported.
+// bare enum member compared against an enum column (where(rarity == legend)) is exempted
+// too, resolved through the column's element type the way the checker resolves it. A
+// name that is no column (nor such a member) of the master in force is left unrecorded
+// and so still reported.
 func bareColumnIdents(fileID FileID, e ast.Expr, q queries) map[*ast.Identifier]bool {
 	out := map[*ast.Identifier]bool{}
 	var walk func(e ast.Expr, master *ir.TypeDef)
@@ -1053,8 +1045,8 @@ func bareColumnIdents(fileID FileID, e ast.Expr, q queries) map[*ast.Identifier]
 				out[n] = true
 			}
 		case *ast.CallExpr:
-			if member, ok := n.Callee.(*ast.MemberExpr); ok && columnsContextRefMethods[member.Member.Name] {
-				if m := relationReceiverMaster(fileID, member.Receiver, q); m != nil {
+			if member, ok := n.Callee.(*ast.MemberExpr); ok {
+				if m := columnsCallMaster(fileID, member, q); m != nil {
 					// The receiver reads in the outer context; each argument reads the
 					// columns of the relation the method is called on.
 					walk(member.Receiver, master)
@@ -1063,6 +1055,7 @@ func bareColumnIdents(fileID FileID, e ast.Expr, q queries) map[*ast.Identifier]
 					}
 					return
 				}
+				exemptColumnEnumArgs(out, q.registry(), master, member, n.Arguments)
 			}
 			walk(n.Callee, master)
 			for _, a := range n.Arguments {
@@ -1094,19 +1087,70 @@ func bareColumnIdents(fileID FileID, e ast.Expr, q queries) map[*ast.Identifier]
 	return out
 }
 
+// columnsCallMaster returns the master a columns-context query call (member) reads its
+// argument columns off — the relation the method is called on — or nil when the call is
+// not a bare-column query. It is nil unless the method is one of the columns-context
+// names, the receiver names a master's relation, and the master does not declare a
+// static fn of that name (which would make Cards.where(...) a static call, not a query,
+// so its argument is ordinary and a bare column there is a genuine undefined name).
+func columnsCallMaster(fileID FileID, member *ast.MemberExpr, q queries) *ir.TypeDef {
+	if !infer.ColumnsContextMethods[member.Member.Name] {
+		return nil
+	}
+	m := relationReceiverMaster(fileID, member.Receiver, q)
+	if m == nil || masterHasStaticFn(m, member.Member.Name) {
+		return nil
+	}
+	return m
+}
+
+// exemptColumnEnumArgs exempts a bare enum member compared against an enum column
+// (rarity == legend, lowered to rarity.eql(legend)) — the argument identifiers that name
+// a member of the column's element enum — so the reference check resolves it through the
+// column the way the checker does rather than reporting an undefined name. It runs in a
+// columns context (master set) on a call whose receiver is a bare column identifier.
+func exemptColumnEnumArgs(out map[*ast.Identifier]bool, reg *builtin.Registry, master *ir.TypeDef, member *ast.MemberExpr, args []ast.Expr) {
+	if master == nil {
+		return
+	}
+	col, ok := member.Receiver.(*ast.Identifier)
+	if !ok || !infer.MasterHasColumn(reg, master, col.Name) {
+		return
+	}
+	for _, a := range args {
+		if id, ok := a.(*ast.Identifier); ok && infer.ColumnEnumMember(reg, master, col.Name, id.Name) {
+			out[id] = true
+		}
+	}
+}
+
+// masterHasStaticFn reports whether master declares a static fn of the given name — so a
+// call Cards.where(...) on a master that declares a static where is recognized as a
+// static call rather than a relation query, and its argument is not exempted as columns.
+func masterHasStaticFn(master *ir.TypeDef, name string) bool {
+	for _, m := range master.Methods {
+		if m.Kind == ir.MethodStatic && m.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 // relationReceiverMaster returns the master the relation a query method is called on is
-// over — a master named directly (Cards.where) or reached through a chain of query
-// methods (Cards.where(...).order(...)) — or nil when the receiver does not name a
-// master's relation, so a same-named user method on a non-relation type is not mistaken
-// for one. It walks the receiver chain to its base name and reads that name's master
-// from the universe.
+// over — a master named directly (Cards.where), through an imported namespace
+// (deck.Cards.where), or reached through a chain of query methods
+// (Cards.where(...).order(...)) — or nil when the receiver does not name a master's
+// relation, so a same-named user method on a non-relation type is not mistaken for one.
+// It walks the receiver chain to its base name and reads that name's master from the
+// universe (or, for a qualified name, the imported namespace).
 func relationReceiverMaster(fileID FileID, recv ast.Expr, q queries) *ir.TypeDef {
 	for {
 		switch r := recv.(type) {
 		case *ast.Identifier:
-			def := q.universe(fileID)[r.Name]
-			if def != nil && def.Master != nil {
-				return def
+			return masterDefOf(q.universe(fileID)[r.Name])
+		case *ast.MemberExpr:
+			if ns, ok := r.Receiver.(*ast.Identifier); ok {
+				return masterDefOf(qualifiedFrom(q, q.importsOf(fileID))(ns.Name, r.Member.Name))
 			}
 			return nil
 		case *ast.CallExpr:
@@ -1119,6 +1163,15 @@ func relationReceiverMaster(fileID FileID, recv ast.Expr, q queries) *ir.TypeDef
 			return nil
 		}
 	}
+}
+
+// masterDefOf returns def when it names a master, else nil — the membership a relation
+// receiver must satisfy.
+func masterDefOf(def *ir.TypeDef) *ir.TypeDef {
+	if def != nil && def.Master != nil {
+		return def
+	}
+	return nil
 }
 
 // reportTypeMemberIssue validates a type-member read — T.member or the

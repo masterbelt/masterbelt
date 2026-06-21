@@ -528,22 +528,58 @@ func relationColumns(reg *builtin.Registry, recv ir.Type) (ir.Type, bool) {
 	return &ir.App{Def: colsDef, Args: []ir.Type{app.Args[0]}}, true
 }
 
-// MasterHasColumn reports whether a bare name reads a column of master M — a field of
-// M's row, the membership a bare-column query argument (where(cost > 100)) tests when
-// it omits the columns binding. It is the master twin of columnsFieldType, taking the
-// master definition the lowering knows directly rather than the columns<M> wrapper, so
-// the lowering reads a bare name as a column exactly where the checker types it as one
-// (a name that is no column stays unresolved, an undefined name).
-func MasterHasColumn(reg *builtin.Registry, master *ir.TypeDef, name string) bool {
+// MasterColumnType returns the column<M, T> a bare name reads in master M's columns
+// context — the field's value type lifted into column mode — or ir.Invalid when M's row
+// has no field of that name. It is the master twin of columnsFieldType, taking the
+// master definition the lowering and the reference check know directly rather than the
+// columns<M> wrapper.
+func MasterColumnType(reg *builtin.Registry, master *ir.TypeDef, name string) ir.Type {
 	if master == nil || master.Master == nil {
-		return false
+		return ir.Invalid
 	}
 	colsDef, ok := reg.Lookup(builtin.NameColumns)
 	if !ok || colsDef == nil {
-		return false
+		return ir.Invalid
 	}
 	cols := &ir.App{Def: colsDef, Args: []ir.Type{&ir.Named{Def: master}}}
-	return columnsFieldType(reg, cols, name) != ir.Invalid
+	return columnsFieldType(reg, cols, name)
+}
+
+// MasterHasColumn reports whether a bare name reads a column of master M — a field of
+// M's row, the membership a bare-column query argument (where(cost > 100)) tests when
+// it omits the columns binding. The lowering reads a bare name as a column exactly where
+// the checker types it as one (a name that is no column stays unresolved, an undefined
+// name).
+func MasterHasColumn(reg *builtin.Registry, master *ir.TypeDef, name string) bool {
+	return MasterColumnType(reg, master, name) != ir.Invalid
+}
+
+// ColumnEnumMember reports whether memberName names a member of the enum that is the
+// element type of master M's column colName — the resolution a bare enum member in a
+// column comparison (where(rarity == legend)) takes through the column's element type,
+// not the surrounding expectation. It is how the reference check exempts such a member
+// the way the checker resolves it, so a bare enum member in a bare-column query is not
+// reported as an undefined name.
+func ColumnEnumMember(reg *builtin.Registry, master *ir.TypeDef, colName, memberName string) bool {
+	ct := MasterColumnType(reg, master, colName)
+	if ct == ir.Invalid {
+		return false
+	}
+	elem, ok := queryColumnElem(reg, ct)
+	if !ok {
+		return false
+	}
+	return enumMemberExpectation(elem, memberName) != nil
+}
+
+// ColumnsContextMethods are the relation methods whose argument is a columns
+// expression — the ones with a bare overload (where(predicate<M>), sum/min/max(column
+// <M, T>), order(ordering<M>)). The checker grants a columns scope only to these, and
+// the lowering synthesizes a columns lambda only for these, so the two agree: a user
+// method on a relation alias whose parameter happens to be a predicate does not get a
+// columns scope the lowering would then fail to rewrite.
+var ColumnsContextMethods = map[string]bool{
+	"where": true, "sum": true, "min": true, "max": true, "order": true,
 }
 
 // isQueryArgType reports whether t is one of the query algebra's bare-argument types

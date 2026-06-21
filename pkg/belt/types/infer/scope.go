@@ -10,6 +10,7 @@ package infer
 
 import (
 	"github.com/masterbelt/masterbelt/pkg/belt/builtin"
+	"github.com/masterbelt/masterbelt/pkg/belt/types"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
@@ -158,18 +159,40 @@ func (s columnsScope) qualified() func(namespace, name string) *ir.TypeDef {
 func (s columnsScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl { return s.outer.fnMember(m) }
 
 func (s columnsScope) leaf(e ast.Expr) ir.Type {
-	if t := s.outer.leaf(e); t != ir.Invalid {
-		return t // a local, parameter, constant, or type of the same name wins
+	id, isID := e.(*ast.Identifier)
+	col := ir.Invalid
+	if isID {
+		col = columnsFieldType(s.registry(), s.columns, id.Name)
 	}
-	// Last resort: a bare name that resolves no other way reads M's column of that
-	// name — the columns binding omitted, exactly as a bare self member reads self.
-	// A name that is no column of M stays Invalid, so a typo is still undefined.
-	if id, ok := e.(*ast.Identifier); ok {
-		if ct := columnsFieldType(s.registry(), s.columns, id.Name); ct != ir.Invalid {
-			return ct
-		}
+	outer := s.outer.leaf(e)
+	if col == ir.Invalid {
+		return outer // not a column of M: the outer reading stands (a typo stays undefined)
 	}
-	return ir.Invalid
+	// The name is a column of M. It reads as the column unless the outer scope binds it
+	// to a local, parameter, constant, or type — those win, the way they win over self
+	// omission. The implicit-self reading does not: a query argument names the table
+	// column, not the current row's field, so a column wins over a same-named self
+	// member (the outer resolves it only because self omission read the row field).
+	if outer == ir.Invalid || outerReadsSelfMember(s.outer, id, outer) {
+		return col
+	}
+	return outer
+}
+
+// outerReadsSelfMember reports whether scope s resolves identifier id only through self
+// omission — the name is a readable member of s's receiver and the resolved type is that
+// member's. It tells a columns scope that the outer reading is the row's field (which a
+// column wins over) rather than a local, parameter, constant, or type (which wins over a
+// column). id is nil for a non-identifier leaf, which never reads a self member.
+func outerReadsSelfMember(s scope, id *ast.Identifier, resolved ir.Type) bool {
+	if id == nil {
+		return false
+	}
+	self := s.self()
+	if self == ir.Invalid || !IsReadableMember(s.registry(), self, id.Name) {
+		return false
+	}
+	return types.Identical(resolved, memberReadType(s.registry(), self, id.Name))
 }
 
 // metatype is the type of a reified type value — the builtin `type` (type :

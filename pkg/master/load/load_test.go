@@ -93,6 +93,44 @@ func TestValidateAllBareColumnForm(t *testing.T) {
 	}
 }
 
+// TestValidateAllBareColumnContexts exercises the bare-column form in the contexts that
+// reach the columns binding only through the receiver's type or a wrapper — an enum
+// column comparison, a query on a relation-valued parameter, and a query inside a
+// function literal. Each folds to the same query the named-master lambda form does, so
+// the columns binding is carried through every one (a red→green gate over the relation
+// master resolution, the synthesized lambda's enum write-back, and the function-literal
+// columns forwarding).
+func TestValidateAllBareColumnContexts(t *testing.T) {
+	bases := map[string]string{"csv": "data"}
+	files := map[string]string{"data/cards.csv": "id,power,rarity\n1,5,common\n2,30,legend\n3,20,common\n"}
+	enumPre := "enum Rarity {\n  common\n  rare\n  legend\n}\n"
+
+	// A bare enum member compared against an enum column folds (the synthesized lambda
+	// lowers it through the placeholdering path so the checker's write-back fills it).
+	enumBelt := enumPre + "master Cards {\n  record { id: int, power: int, rarity: Rarity }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.where(rarity == legend).count() == 1\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	if _, diags := run(t, enumBelt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("bare enum column compare: table_validation_failed, want 0")
+	}
+
+	// A query on a relation-valued parameter resolves the master through the parameter's
+	// type, so the bare column lowers off the synthesized binding rather than a hole.
+	paramBelt := "fn strong(r: relation<Cards>): nint {\n  return r.where(power > 10).count()\n}\n" +
+		enumPre + "master Cards {\n  record { id: int, power: int, rarity: Rarity }\n  primary id\n" +
+		"  validate {\n    all {\n      assert strong(Cards) == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	if _, diags := run(t, paramBelt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("bare query on a relation parameter: table_validation_failed, want 0")
+	}
+
+	// A bare-column query inside a function literal keeps the columns binding through the
+	// lambda boundary.
+	iifeBelt := enumPre + "master Cards {\n  record { id: int, power: int, rarity: Rarity }\n  primary id\n" +
+		"  validate {\n    all {\n      assert (fn(): nint { return Cards.where(power > 10).count() })() == 2\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	if _, diags := run(t, iifeBelt, bases, files); countTableFailures(diags) != 0 {
+		t.Errorf("bare query inside a function literal: table_validation_failed, want 0")
+	}
+}
+
 // TestValidateAllRowCountCap exercises a per-table validate all check end to end:
 // the count of loaded rows is evaluated in the in-memory SQLite engine and
 // compared to the cap. Under the cap the table passes; at or over it the check

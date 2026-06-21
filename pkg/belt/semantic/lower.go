@@ -626,6 +626,18 @@ func (b bodyBinder) leafIdentifier(e *ast.Identifier) ir.Value {
 		}
 		return &ir.TypeValue{Reified: reifyType(def), Syntax: e}
 	}
+	// In a relation method's columns context the bare name reads M's column — the
+	// bare-column form of a query (where(cost > 100), sum(cost)), the columns binding
+	// omitted the way self is. It lowers to the same field access the lambda form's
+	// c.cost does, off the synthesized columns binding, so the SQL driver reads the
+	// column identically. Membership-tested, so a name that is no column stays
+	// unresolved. It wins over the implicit-self reading below: a query argument names
+	// the table column, not the current row's field, so a row method that issues a
+	// bare-column query filters on the column rather than capturing a scalar — while a
+	// local, parameter, constant, or type of the same name (claimed above) still wins.
+	if b.columnsMaster != nil && infer.MasterHasColumn(b.reg, b.columnsMaster, e.Name) {
+		return &ir.FieldAccess{Receiver: &ir.ParamRef{Name: b.columnsParam}, Field: e.Name, Syntax: e}
+	}
 	// Last resort: a bare name that resolves no other way reads a readable member
 	// of self (a field or getter), lowering to the same self.X access the explicit
 	// form does so power and self.power desugar identically. The membership test is
@@ -640,15 +652,6 @@ func (b bodyBinder) leafIdentifier(e *ast.Identifier) ir.Value {
 	// it; only count means the aggregate, and only here.
 	if b.relation && e.Name == infer.RelationCountName {
 		return &ir.RelationCount{Type: infer.RelationCountType(), Syntax: e}
-	}
-	// In a relation method's columns context the bare name reads M's column — the
-	// bare-column form of a query (where(cost > 100), sum(cost)), the columns binding
-	// omitted the way self is. It lowers to the same field access the lambda form's
-	// c.cost does, off the synthesized columns binding, so the SQL driver reads the
-	// column identically. Last resort and membership-tested, so a local/parameter of
-	// the same name shadows it and a name that is no column stays unresolved.
-	if b.columnsMaster != nil && infer.MasterHasColumn(b.reg, b.columnsMaster, e.Name) {
-		return &ir.FieldAccess{Receiver: &ir.ParamRef{Name: b.columnsParam}, Field: e.Name, Syntax: e}
 	}
 	return nil
 }
@@ -763,23 +766,18 @@ func (b bodyBinder) leafIdentCall(e *ast.CallExpr, callee *ast.Identifier, sub f
 // binding never collides with a user parameter and the columns stay private to it.
 const columnsParamName = "$columns"
 
-// columnsContextMethods are the relation methods whose argument is a columns
-// expression — the ones with a bare overload (where(predicate<M>), sum/min/max(column
-// <M, T>), order(ordering<M>)). A bare-column argument to one of these lowers as the
-// synthesized columns form; every other method's argument lowers the ordinary way.
-var columnsContextMethods = map[string]bool{
-	"where": true, "sum": true, "min": true, "max": true, "order": true,
-}
-
 // ColumnsArg lowers a relation method's non-lambda argument as a bare-column query
 // argument — where(cost > 100) as fn($columns) -> $columns.cost > 100, the columns
 // binding synthesized so the bare names read M's columns. It returns nil when the
 // receiver is not a relation or the method takes no columns argument, so the argument
 // lowers the ordinary way. The synthesized lambda is the shape the query driver
-// already reads (the lambda form's twin), so the bare and bound forms lower alike.
+// already reads (the lambda form's twin), so the bare and bound forms lower alike. Its
+// body lowers through the placeholdering return path, so a bare enum member a column
+// comparison resolves (rarity == legend) becomes a placeholder the checker's write-back
+// fills, exactly as the lambda form's return does.
 func (b bodyBinder) ColumnsArg(receiver ir.Value, method string, arg ast.Expr) ir.Value {
-	master := relationMaster(receiver)
-	if master == nil || !columnsContextMethods[method] {
+	master := b.relationMaster(receiver)
+	if master == nil || !infer.ColumnsContextMethods[method] {
 		return nil
 	}
 	cb := b
@@ -787,27 +785,53 @@ func (b bodyBinder) ColumnsArg(receiver ir.Value, method string, arg ast.Expr) i
 	cb.columnsParam = columnsParamName
 	return &ir.FuncLiteral{
 		Params: []string{columnsParamName},
-		Body:   []ir.Stmt{&ir.Return{Value: lower.Value(arg, cb)}},
+		Body:   lower.Body([]ast.Stmt{&ast.ReturnStmt{Value: arg}}, cb),
 	}
 }
 
 // relationMaster returns the master a lowered relation value is over — a master used
-// whole (MasterRelation) or narrowed by a chain of query methods (an ir.Call whose
-// receiver eventually reaches one) — or nil when the value is not a relation. It is how
-// a bare-column argument finds the columns it reads: the master of the relation the
-// method is called on, whether named (Cards.where) or reached through a chain
-// (Cards.where(...).order(...)).
-func relationMaster(v ir.Value) *ir.TypeDef {
+// whole (MasterRelation), a relation-valued parameter or local (read through its
+// resolved type), or a relation narrowed by a chain of query methods (an ir.Call whose
+// receiver eventually reaches one of these) — or nil when the value is not a relation.
+// It is how a bare-column argument finds the columns it reads: the master of the
+// relation the method is called on, whether named (Cards.where), bound to a parameter
+// (r.where for r: relation<Cards>), or reached through a chain.
+func (b bodyBinder) relationMaster(v ir.Value) *ir.TypeDef {
 	for {
 		switch n := v.(type) {
 		case *ir.MasterRelation:
 			return n.Master
 		case *ir.Call:
 			v = n.Receiver
+		case *ir.ParamRef:
+			return relationTypeMaster(b.reg, b.paramTypes[n.Name])
+		case *ir.LocalRef:
+			return relationTypeMaster(b.reg, b.locals[n.Name])
+		case *ir.SelfValue:
+			return relationTypeMaster(b.reg, b.selfType)
 		default:
 			return nil
 		}
 	}
+}
+
+// relationTypeMaster returns the master a relation<M> type is over — the def of its M —
+// or nil when t is not a relation type. It reads the master off a relation-valued
+// receiver's type, so a query on a relation parameter or local finds the columns it
+// reads the way a query on a named master does.
+func relationTypeMaster(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
+	app, ok := t.(*ir.App)
+	if !ok || app.Def == nil || len(app.Args) != 1 {
+		return nil
+	}
+	if def, ok := reg.Lookup(builtin.NameRelation); !ok || app.Def != def {
+		return nil
+	}
+	named, ok := app.Args[0].(*ir.Named)
+	if !ok || named.Def == nil || named.Def.Master == nil {
+		return nil
+	}
+	return named.Def
 }
 
 // selfReceiver is the value an implicit self-call's receiver denotes in this body: a
@@ -944,6 +968,15 @@ func enterFunc(outer lower.Binder, params []*ast.ParamDef) funcBinder {
 		scope.paramTypes[p.Name] = scope.r.ResolveType(p.Type, scope.tscope)
 	}
 	return funcBinder{outer: outer, scope: scope}
+}
+
+// ColumnsArg forwards the bare-column query lowering to the lambda's own body scope,
+// which carries the lambda's parameters — so a bare-column query inside a function
+// literal body (a lambda-wrapped assert, a helper closure) lowers its columns the same
+// way a method body does, rather than losing the columns context at the lambda
+// boundary and leaving the column an unresolved name.
+func (b funcBinder) ColumnsArg(receiver ir.Value, method string, arg ast.Expr) ir.Value {
+	return b.scope.ColumnsArg(receiver, method, arg)
 }
 
 // funcTypeContext returns the type-resolution context a lambda body settles its

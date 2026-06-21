@@ -87,3 +87,68 @@ func TestBareColumnShadowedByParameter(t *testing.T) {
 		t.Errorf("a parameter shadowing a column must resolve, columns still available: %v", codes(diags))
 	}
 }
+
+// TestBareColumnStaticFnShadow pins that a master that declares a static fn of a query
+// method name makes the call a static call, not a relation query: the argument is
+// ordinary, so a bare name in it that is not in scope is a genuine undefined name rather
+// than an exempted column. It is the gate for the reference check's static-fn guard.
+func TestBareColumnStaticFnShadow(t *testing.T) {
+	src := "master Cards {\n  record { id: int, cost: int }\n" +
+		"  impl { pub static fn where(b: bool): nint { return 0 } }\n" +
+		"  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.where(cost > 0) == 0\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeUndefinedName) {
+		t.Errorf("a static fn shadowing where makes cost an undefined name: %v", codes(diags))
+	}
+}
+
+// TestBareColumnEnumMemberResolves pins that a bare enum member compared against an enum
+// column (where(rarity == legend)) is resolved through the column's element type, not
+// reported as undefined — the reference check mirroring the checker's column-comparison
+// enum resolution.
+func TestBareColumnEnumMemberResolves(t *testing.T) {
+	src := "enum Rarity { common\n  rare\n  legend }\n" +
+		"master Cards {\n  record { id: int, rarity: Rarity }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.where(rarity == legend).count() == 0\n" +
+		"      assert Cards.where(rarity == bogusmember).count() == 0\n" +
+		"    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	_, diags := analyze(src)
+	// legend resolves; bogusmember does not — exactly one undefined name, the typo.
+	n := 0
+	for _, c := range codes(diags) {
+		if c == CodeUndefinedName {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("legend must resolve and bogusmember must not: undefined_name count = %d, want 1 (%v)", n, codes(diags))
+	}
+}
+
+// TestBareColumnRowSelfPrecedence pins that in a row context (an instance method whose
+// self is a row) a bare column in a query wins over a same-named row field, so the query
+// type-checks as a column predicate rather than failing because the row's scalar field
+// was read. It is the gate for the columns-over-self precedence.
+func TestBareColumnRowSelfPrecedence(t *testing.T) {
+	src := "master Cards {\n  record { id: int, power: int }\n" +
+		"  impl {\n    pub get strong(): nint { return Cards.where(power > 10).count() }\n  }\n" +
+		"  primary id\n  source { csv \"cards.csv\" }\n}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeUndefinedName) || hasCode(diags, CodeNoMatchingOverload) || hasCode(diags, CodeInvalidOperation) {
+		t.Errorf("a bare column in a row-context query must win over the row field: %v", codes(diags))
+	}
+}
+
+// TestBareColumnQualifiedMaster pins that a query through an imported master
+// (deck.Cards.where(cost > 0)) exempts its bare columns the way a local master does, so a
+// column read across a namespace is not reported as an undefined name.
+func TestBareColumnQualifiedMaster(t *testing.T) {
+	diags := analyzeProject(t, map[string]string{
+		"cards.belt": "pub master Cards {\n  record { id: int, cost: int }\n  primary id\n  source { csv \"cards.csv\" }\n}\n",
+		"main.belt":  "use deck from \"cards.belt\"\nassert deck.Cards.where(cost > 0).count() == 0\n",
+	})
+	if hasCode(diags, CodeUndefinedName) {
+		t.Errorf("a bare column on a qualified master must not be undefined: %v", codes(diags))
+	}
+}

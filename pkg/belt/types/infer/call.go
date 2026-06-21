@@ -137,7 +137,7 @@ func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method str
 	// push the winner's parameter patterns into each one. An Invalid argument
 	// (its cause reported at its own node) also selects as fits-anything, so
 	// the suppression style survives overloading.
-	known := synthMethodArgs(e, recv, candidates, args, &bad, s, sink)
+	known := synthMethodArgs(e, recv, method, candidates, args, &bad, s, sink)
 
 	// A query column's comparison is valid only when its element type supports the
 	// same comparison as a value: column<M, T> offers the comparison operators for
@@ -242,14 +242,14 @@ func reportNoMethod(e *ast.CallExpr, recv ir.Type, method string, args []ir.Type
 // fallback. A non-literal argument a relation method's bare overload expects in
 // columns position (where(cost > 100), sum(cost)) is synthesized in a columnsScope,
 // so a bare column name resolves before the overload settles.
-func synthMethodArgs(e *ast.CallExpr, recv ir.Type, candidates []*ir.Method, args []ir.Type, bad *bool, s scope, sink *Sink) []ir.Type {
+func synthMethodArgs(e *ast.CallExpr, recv ir.Type, method string, candidates []*ir.Method, args []ir.Type, bad *bool, s scope, sink *Sink) []ir.Type {
 	known := make([]ir.Type, len(e.Arguments))
 	for i, a := range e.Arguments {
 		if _, isLit := a.(*ast.FuncLit); isLit {
 			continue
 		}
 		argScope := s
-		if cs, ok := columnsArgScope(recv, candidates, i, s); ok {
+		if cs, ok := columnsArgScope(method, recv, candidates, i, s); ok {
 			argScope = cs
 		}
 		args[i] = check(a, argScope, sink)
@@ -271,12 +271,19 @@ func synthMethodArgs(e *ast.CallExpr, recv ir.Type, candidates []*ir.Method, arg
 }
 
 // columnsArgScope returns the columnsScope a relation method's bare-column argument
-// at position i is synthesized in, and whether one applies: the receiver is a
-// relation<M> and a candidate overload expects a query type (predicate<M>, column<M,
-// T>, ordering<M>) at that position — the bare overload of where/sum/min/max/order.
-// The scope reads a bare name as M's column of that name as a last resort, so
-// where(cost > 100) types cost as column<M, costType> before the overload settles.
-func columnsArgScope(recv ir.Type, candidates []*ir.Method, i int, s scope) (scope, bool) {
+// at position i is synthesized in, and whether one applies: the call names one of the
+// columns-context methods (where/sum/min/max/order), the receiver is a relation<M>, and
+// a candidate overload expects a query type (predicate<M>, column<M, T>, ordering<M>)
+// at that position. The scope reads a bare name as M's column of that name as a last
+// resort, so where(cost > 100) types cost as column<M, costType> before the overload
+// settles. The method-name gate keeps the trigger aligned with the lowering, which
+// synthesizes a columns lambda only for these methods — so a user relation-alias method
+// whose parameter is a predicate is not granted a columns scope the lowering would fail
+// to rewrite.
+func columnsArgScope(method string, recv ir.Type, candidates []*ir.Method, i int, s scope) (scope, bool) {
+	if !ColumnsContextMethods[method] {
+		return s, false
+	}
 	cols, ok := relationColumns(s.registry(), recv)
 	if !ok {
 		return s, false
