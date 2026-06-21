@@ -137,7 +137,7 @@ func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method str
 	// push the winner's parameter patterns into each one. An Invalid argument
 	// (its cause reported at its own node) also selects as fits-anything, so
 	// the suppression style survives overloading.
-	known := synthMethodArgs(e, recv, method, candidates, args, &bad, s, sink)
+	known := synthMethodArgs(e, recvExpr, recv, method, candidates, args, &bad, s, sink)
 
 	// A query column's comparison is valid only when its element type supports the
 	// same comparison as a value: column<M, T> offers the comparison operators for
@@ -242,14 +242,14 @@ func reportNoMethod(e *ast.CallExpr, recv ir.Type, method string, args []ir.Type
 // fallback. A non-literal argument a relation method's bare overload expects in
 // columns position (where(cost > 100), sum(cost)) is synthesized in a columnsScope,
 // so a bare column name resolves before the overload settles.
-func synthMethodArgs(e *ast.CallExpr, recv ir.Type, method string, candidates []*ir.Method, args []ir.Type, bad *bool, s scope, sink *Sink) []ir.Type {
+func synthMethodArgs(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method string, candidates []*ir.Method, args []ir.Type, bad *bool, s scope, sink *Sink) []ir.Type {
 	known := make([]ir.Type, len(e.Arguments))
 	for i, a := range e.Arguments {
 		if _, isLit := a.(*ast.FuncLit); isLit {
 			continue
 		}
 		argScope := s
-		if cs, ok := columnsArgScope(method, recv, candidates, i, s); ok {
+		if cs, ok := columnsArgScope(method, recvExpr, recv, candidates, i, s); ok {
 			argScope = cs
 		}
 		args[i] = check(a, argScope, sink)
@@ -272,28 +272,63 @@ func synthMethodArgs(e *ast.CallExpr, recv ir.Type, method string, candidates []
 
 // columnsArgScope returns the columnsScope a relation method's bare-column argument
 // at position i is synthesized in, and whether one applies: the call names one of the
-// columns-context methods (where/sum/min/max/order), the receiver is a relation<M>, and
-// a candidate overload expects a query type (predicate<M>, column<M, T>, ordering<M>)
-// at that position. The scope reads a bare name as M's column of that name as a last
-// resort, so where(cost > 100) types cost as column<M, costType> before the overload
-// settles. The method-name gate keeps the trigger aligned with the lowering, which
-// synthesizes a columns lambda only for these methods — so a user relation-alias method
-// whose parameter is a predicate is not granted a columns scope the lowering would fail
-// to rewrite.
-func columnsArgScope(method string, recv ir.Type, candidates []*ir.Method, i int, s scope) (scope, bool) {
-	if !ColumnsContextMethods[method] {
+// columns-context methods (where/sum/min/max/order), the receiver is a lowerable
+// relation<M> (recvExpr), and a candidate overload expects a query type (predicate<M>,
+// column<M, T>, ordering<M>) at that position. The scope reads a bare name as M's column
+// of that name as a last resort, so where(cost > 100) types cost as column<M, costType>
+// before the overload settles. The method-name gate and the receiver gate keep the
+// trigger aligned with the lowering, which synthesizes a columns lambda only for these
+// methods and only off a master the lowered receiver names — so a query the lowering
+// cannot rewrite (a user relation-alias method, a relation-returning function call) is
+// not accepted as a bare-column form here.
+//
+// A nested query's scope prepends its columns to the enclosing columns scope's stack
+// rather than wrapping it, so the inner relation's column wins where both masters share
+// a name while the enclosing body's bindings stay beneath the whole stack.
+func columnsArgScope(method string, recvExpr ast.Expr, recv ir.Type, candidates []*ir.Method, i int, s scope) (scope, bool) {
+	if !ColumnsContextMethods[method] || !lowerableRelationReceiver(recvExpr) {
 		return s, false
 	}
 	cols, ok := relationColumns(s.registry(), recv)
 	if !ok {
 		return s, false
 	}
+	hasQueryParam := false
 	for _, m := range candidates {
 		if i < len(m.Params) && isQueryArgType(s.registry(), m.Params[i].Type) {
-			return columnsScope{outer: s, columns: cols}, true
+			hasQueryParam = true
+			break
 		}
 	}
-	return s, false
+	if !hasQueryParam {
+		return s, false
+	}
+	if cs, ok := s.(columnsScope); ok {
+		return columnsScope{outer: cs.outer, columns: append([]ir.Type{cols}, cs.columns...)}, true
+	}
+	return columnsScope{outer: s, columns: []ir.Type{cols}}, true
+}
+
+// lowerableRelationReceiver reports whether a relation method's receiver expression is
+// one the lowering can recover a master from: implicit self, a name (a master, parameter,
+// or local), a qualified master, or a chain of relation-returning methods over one of
+// these. A function call or other expression is not — the bare-column form is read only
+// off these, so the checker grants its columns scope exactly where the lowering rewrites
+// it (a relation-returning function call's result is read off the lambda form instead).
+func lowerableRelationReceiver(e ast.Expr) bool {
+	switch r := e.(type) {
+	case nil:
+		return true // an implicit self-call (self omitted) in a scope or master static fn
+	case *ast.Identifier:
+		return true
+	case *ast.MemberExpr:
+		return true
+	case *ast.CallExpr:
+		member, ok := r.Callee.(*ast.MemberExpr)
+		return ok && RelationReturningMethods[member.Member.Name] && lowerableRelationReceiver(member.Receiver)
+	default:
+		return false
+	}
 }
 
 // dropLambdaArgNonFuncMatches narrows an overloaded relation method's matches when an

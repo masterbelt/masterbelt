@@ -168,6 +168,35 @@ func TestBareColumnFunctionReceiverReported(t *testing.T) {
 	}
 }
 
+// TestBareColumnStaticShadowOnlyDirect pins that a static fn shadows the relation method
+// only on a direct master call: a chain (Cards.limit(1).where(cost > 0)) dispatches to the
+// relation limit returns, so where is the relation method there and cost is an exempted
+// column even though the master declares a static where.
+func TestBareColumnStaticShadowOnlyDirect(t *testing.T) {
+	src := "master Cards {\n  record { id: int, cost: int }\n" +
+		"  impl { pub static fn where(b: bool): nint { return 0 } }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.limit(1).where(cost > 0).count() == 0\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeUndefinedName) {
+		t.Errorf("a chained where is the relation method, so cost must be an exempted column: %v", codes(diags))
+	}
+}
+
+// TestBareColumnNestedInnerWins pins that a nested query binds a bare column to the inner
+// relation: in Cards.where(id > Other.where(cost > 0).count()) the inner cost is Other's,
+// not Cards', so with Cards.cost a bool and Other.cost an int the comparison stands rather
+// than being rejected against the outer bool column. It is the gate for the inner-first
+// columns stack.
+func TestBareColumnNestedInnerWins(t *testing.T) {
+	src := "master Other {\n  record { id: int, cost: int }\n  primary id\n  source { csv \"other.csv\" }\n}\n" +
+		"master Cards {\n  record { id: int, cost: bool }\n  primary id\n" +
+		"  validate {\n    all {\n      assert Cards.where(id > Other.where(cost > 0).count()).count() == 0\n    }\n  }\n  source { csv \"cards.csv\" }\n}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeUndefinedName) || hasCode(diags, CodeInvalidOperation) {
+		t.Errorf("the inner cost must bind to Other (int), not the outer Cards (bool): %v", codes(diags))
+	}
+}
+
 // TestBareColumnQualifiedMaster pins that a query through an imported master
 // (deck.Cards.where(cost > 0)) exempts its bare columns the way a local master does, so a
 // column read across a namespace is not reported as an undefined name.
@@ -178,5 +207,23 @@ func TestBareColumnQualifiedMaster(t *testing.T) {
 	})
 	if hasCode(diags, CodeUndefinedName) {
 		t.Errorf("a bare column on a qualified master must not be undefined: %v", codes(diags))
+	}
+}
+
+// TestBareColumnNamespaceValueShadow pins that a value of the same name as a namespace
+// import shadows it: with a const named deck, deck.Cards reads the const's field, not the
+// imported master, so cost in deck.Cards.where(cost > 0) is not exempted as a column but
+// reported — the bare-column exemption honors the namespace shadow the way qualified
+// projections do.
+func TestBareColumnNamespaceValueShadow(t *testing.T) {
+	diags := analyzeProject(t, map[string]string{
+		"cards.belt": "pub master Cards {\n  record { id: int, cost: int }\n  primary id\n  source { csv \"cards.csv\" }\n}\n",
+		"main.belt": "use deck from \"cards.belt\"\n" +
+			"pub type Box = { Cards: { id: nint } }\n" +
+			"const deck: Box = { Cards: { id: 1 } }\n" +
+			"assert deck.Cards.where(cost > 0) == 0\n",
+	})
+	if !hasCode(diags, CodeUndefinedName) {
+		t.Errorf("a value shadowing the namespace makes cost an undefined name: %v", codes(diags))
 	}
 }

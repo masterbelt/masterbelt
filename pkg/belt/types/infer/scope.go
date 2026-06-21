@@ -139,17 +139,20 @@ func (s funcScope) constShadows(id *ast.Identifier) bool {
 
 // columnsScope types an argument written in a relation method's columns context —
 // the bare-column form of a query, where(cost > 100) or sum(cost), the columns
-// binding omitted the way a method body omits self. It wraps the call site's scope,
-// delegating every form to it, and adds only a last-resort reading: a bare name the
-// enclosing scope does not bind reads master M's column of that name (cost →
-// column<M, costType>). The fallback is last resort, so a local, parameter,
-// constant, or type of the same name still wins — only an otherwise-undefined name
-// that is a column becomes one. columns is the columns<M> the receiver's relation<M>
-// offers, built from the receiver before the argument is synthesized (M is the
-// receiver's binding, not the argument's, so it is known before overload selection).
+// binding omitted the way a method body omits self. It wraps the enclosing non-columns
+// scope, delegating every form to it, and adds only a last-resort reading: a bare name
+// the enclosing scope does not bind reads master M's column of that name (cost →
+// column<M, costType>). The fallback is last resort, so a local, parameter, constant,
+// type, or self member of the same name still wins.
+//
+// columns is a stack of the columns<M> in scope, innermost first: a nested query
+// (Cards.where(id > Other.where(cost > 0).count())) prepends Other's columns over
+// Cards', so the inner relation's column wins where both masters share a name. outer is
+// always the non-columns scope beneath the whole stack, so the enclosing body's
+// bindings are read before any column, however deep the nesting.
 type columnsScope struct {
 	outer   scope
-	columns ir.Type
+	columns []ir.Type
 }
 
 func (s columnsScope) registry() *builtin.Registry           { return s.outer.registry() }
@@ -176,9 +179,13 @@ func (s columnsScope) leaf(e ast.Expr) ir.Type {
 	// leaf returns Invalid for a name shadowed by a constant or a rigid type parameter
 	// (both typed elsewhere), so those are excluded here, the way the lowering reads the
 	// constant first; a name that is no column of M stays Invalid, a typo still undefined.
+	// The columns are read innermost first, so a nested query's column wins over an
+	// enclosing one where both masters share the name.
 	if id, ok := e.(*ast.Identifier); ok && !s.outer.constShadows(id) && !s.outer.rigid(id.Name) {
-		if ct := columnsFieldType(s.registry(), s.columns, id.Name); ct != ir.Invalid {
-			return ct
+		for _, cols := range s.columns {
+			if ct := columnsFieldType(s.registry(), cols, id.Name); ct != ir.Invalid {
+				return ct
+			}
 		}
 	}
 	return ir.Invalid

@@ -1098,10 +1098,29 @@ func columnsCallMaster(fileID FileID, member *ast.MemberExpr, q queries) *ir.Typ
 		return nil
 	}
 	m := relationReceiverMaster(fileID, member.Receiver, q)
-	if m == nil || masterHasStaticFn(m, member.Member.Name) {
+	if m == nil {
+		return nil
+	}
+	// A static fn shadows the relation method only on a direct master call (Cards.where):
+	// a chain (Cards.limit(1).where) dispatches to the relation limit returns, so where is
+	// the relation method there regardless of a same-named static.
+	if directMasterReceiver(member.Receiver) && masterHasStaticFn(m, member.Member.Name) {
 		return nil
 	}
 	return m
+}
+
+// directMasterReceiver reports whether a query method's receiver names a master directly
+// — a bare or namespace-qualified name — rather than a relation produced by a chain. A
+// static fn shadows the relation method only on a direct call; on a chain the receiver is
+// already a relation value.
+func directMasterReceiver(recv ast.Expr) bool {
+	switch recv.(type) {
+	case *ast.Identifier, *ast.MemberExpr:
+		return true
+	default:
+		return false
+	}
 }
 
 // exemptColumnEnumArgs exempts a bare enum member compared against an enum column
@@ -1149,7 +1168,10 @@ func relationReceiverMaster(fileID FileID, recv ast.Expr, q queries) *ir.TypeDef
 		case *ast.Identifier:
 			return masterDefOf(q.universe(fileID)[r.Name])
 		case *ast.MemberExpr:
-			if ns, ok := r.Receiver.(*ast.Identifier); ok {
+			// A value of the same name shadows the namespace import (a const named deck
+			// makes deck.Cards read the const's field, not the imported master), so the
+			// qualified-master reading applies only when the receiver names no value.
+			if ns, ok := r.Receiver.(*ast.Identifier); ok && q.resolve(fileID, ns) == nil {
 				return masterDefOf(qualifiedFrom(q, q.importsOf(fileID))(ns.Name, r.Member.Name))
 			}
 			return nil
