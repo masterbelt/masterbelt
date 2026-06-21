@@ -132,6 +132,22 @@ func TestEnumPoisonedValueWithheld(t *testing.T) {
 	}
 }
 
+// TestEnumNestedErrorWithheld pins that a member is poisoned by a type error nested
+// under a valid outer type — a function literal with an ill-typed body that still
+// returns the base type, called — so the poisoning keys off a reported diagnostic, not
+// the outer expression's type. The member's value is withheld, so a sibling b = 1 is
+// not reported as a duplicate.
+func TestEnumNestedErrorWithheld(t *testing.T) {
+	src := "enum E {\n  a = (fn(): nint {\n    let x: nint = \"s\"\n    return 1\n  })()\n  b = 1\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeTypeMismatch) {
+		t.Errorf("the nested type error should be reported: %v", codes(diags))
+	}
+	if hasCode(diags, CodeDuplicateEnumValue) {
+		t.Errorf("a member with a nested type error must be withheld, not duplicate-checked: %v", codes(diags))
+	}
+}
+
 // TestEnumConstReferenceValueKept pins that a valid member referencing a constant is
 // not withheld: A = Base (Base a sbyte constant) keeps its value, since the type
 // check runs in the reporting pass where the constant is resolved — a member that
