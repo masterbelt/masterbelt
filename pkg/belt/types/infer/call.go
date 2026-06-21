@@ -320,6 +320,8 @@ func lowerableRelationReceiver(e ast.Expr, s scope) bool {
 	switch r := e.(type) {
 	case nil:
 		return true // an implicit self-call (self omitted) in a scope or master static fn
+	case *ast.SelfExpr:
+		return true // an explicit self.where in a master static fn, the twin of the implicit form
 	case *ast.Identifier:
 		return true
 	case *ast.MemberExpr:
@@ -356,10 +358,21 @@ func dropLambdaArgNonFuncMatches(e *ast.CallExpr, matches []types.Overload) []ty
 				fits = false
 				break
 			}
-			if _, isFn := m.Method.Params[i].Type.(*ir.Func); !isFn {
-				fits = false
-				break
+			// A literal can inhabit a function-typed parameter or a bare type-variable one
+			// (a generic T a literal solves), so only a concrete parameter — the bare
+			// overload's predicate<M>/column<M, T>/ordering<M>, a type constructor, not a
+			// variable — drops the match. This keeps a generic overload viable beside a
+			// function-typed one for an ordinary method, so the filter narrows only the
+			// bare-query overload set (whose parameters are concrete query types).
+			pt := m.Method.Params[i].Type
+			if _, isFn := pt.(*ir.Func); isFn {
+				continue
 			}
+			if _, isVar := pt.(*ir.TypeVar); isVar {
+				continue
+			}
+			fits = false
+			break
 		}
 		if fits {
 			kept = append(kept, m)

@@ -852,6 +852,17 @@ func (b bodyBinder) relationMaster(v ir.Value) *ir.TypeDef {
 // receiver's type, so a query on a relation parameter or local finds the columns it
 // reads the way a query on a named master does.
 func relationTypeMaster(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
+	// A nominal alias of a relation (type CardRel = relation<Cards>) carries the
+	// relation as its body, so peel any alias to the relation it stands for — a query
+	// on a parameter typed by the alias reads the columns the underlying relation offers,
+	// the way the checker reads them through the alias.
+	for {
+		named, ok := t.(*ir.Named)
+		if !ok || named.Def == nil || named.Def.Body == nil {
+			break
+		}
+		t = named.Def.Body
+	}
 	app, ok := t.(*ir.App)
 	if !ok || app.Def == nil || len(app.Args) != 1 {
 		return nil

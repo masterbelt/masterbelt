@@ -519,6 +519,17 @@ func columnsFieldType(reg *builtin.Registry, recv ir.Type, name string) ir.Type 
 // false for any non-relation receiver, matching the relation builtin by identity so a
 // file's own generic relation<T> is not mistaken for the query algebra's.
 func relationColumns(reg *builtin.Registry, recv ir.Type) (ir.Type, bool) {
+	// A nominal alias of a relation (type CardRel = relation<Cards>) carries the relation
+	// as its body, so peel any alias to the relation it stands for — a query on a value
+	// typed by the alias reads the columns the underlying relation offers, the same the
+	// lowering recovers the master from.
+	for {
+		named, ok := recv.(*ir.Named)
+		if !ok || named.Def == nil || named.Def.Body == nil {
+			break
+		}
+		recv = named.Def.Body
+	}
 	app, ok := recv.(*ir.App)
 	if !ok || app.Def == nil || len(app.Args) != 1 {
 		return nil, false

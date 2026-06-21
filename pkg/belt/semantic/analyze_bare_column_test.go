@@ -138,6 +138,22 @@ func TestBareColumnFunctionValueArg(t *testing.T) {
 	}
 }
 
+// TestLambdaFilterKeepsGenericOverload pins that the function-literal overload filter —
+// which drops a bare query overload (predicate<M>) so a lambda settles the function form
+// — leaves a generic type-variable parameter viable: f<U>(x: U) beside f(x: fn(): nint)
+// stays ambiguous for a literal argument rather than silently selecting the function
+// overload. It is the gate for limiting the filter to concrete (query-type) parameters.
+func TestLambdaFilterKeepsGenericOverload(t *testing.T) {
+	src := "pub type Holder = int impl {\n" +
+		"  pub fn pick<U>(x: U): nint { return 1 }\n" +
+		"  pub fn pick(x: fn(): nint): nint { return 2 }\n}\n" +
+		"pub fn apply(h: Holder): nint { return h.pick(fn() -> 7) }\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeAmbiguousOverload) {
+		t.Errorf("a generic overload must stay viable beside a function one (ambiguous): %v", codes(diags))
+	}
+}
+
 // TestBareColumnInvalidChainReported pins that the column exemption follows only a
 // relation-returning chain: a query method written after an aggregate
 // (Cards.count().where(cost > 0)) is an invalid chain, so its bare name is a genuine
