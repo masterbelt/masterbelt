@@ -113,6 +113,23 @@ type ForBinder interface {
 	ForLocal(name string, iter ast.Expr, of bool) (Binder, ir.Type)
 }
 
+// ColumnsBinder is the optional capability a body binder advertises to lower a
+// bare-column query argument — the columns binding omitted, a bare name reading
+// master M's column (where(cost > 100), sum(cost)). The lower package is type-blind,
+// so the semantic layer supplies this — the same way it supplies the let, enum,
+// match, and for capabilities — to recognize the relation a method is called on and
+// synthesize the columns binding.
+//
+// ColumnsArg lowers method's non-lambda argument arg on the already-lowered call
+// receiver as a columns expression, or returns nil when the receiver is not a
+// relation or the method takes no columns argument (the argument then lowers the
+// ordinary way). A function-literal argument — the explicit columns form — is never
+// offered here; it lowers through its own binder, so the bare and bound forms stay
+// distinct.
+type ColumnsBinder interface {
+	ColumnsArg(receiver ir.Value, method string, arg ast.Expr) ir.Value
+}
+
 // Value lowers an expression to its resolved IR value. The shared forms are
 // lowered here; the context-specific leaves go through b.Leaf.
 func Value(e ast.Expr, b Binder) ir.Value {
@@ -202,11 +219,23 @@ func callValue(e *ast.CallExpr, b Binder) ir.Value {
 		// non-member name falls through the wrapper, and a non-enum receiver
 		// invents no expectation.
 		argBinder := expectEnum(b, expectedEnumOf(b, member.Receiver))
+		recv := Value(member.Receiver, b)
+		cb, hasColumns := columnsBinderOf(b)
 		args := make([]ir.Value, len(e.Arguments))
 		for i, a := range e.Arguments {
+			// A bare-column argument to a relation method (Cards.where(cost > 100)) lowers
+			// as the columns form when the receiver is a relation — the columns binding
+			// synthesized so the bare names read M's columns. A function-literal argument
+			// (the explicit form) is never offered, so the bound form lowers as before.
+			if _, isLit := a.(*ast.FuncLit); !isLit && hasColumns {
+				if v := cb.ColumnsArg(recv, member.Member.Name, a); v != nil {
+					args[i] = v
+					continue
+				}
+			}
 			args[i] = Value(a, argBinder)
 		}
-		return &ir.Call{Receiver: Value(member.Receiver, b), Method: member.Member.Name, Args: args, Syntax: e}
+		return &ir.Call{Receiver: recv, Method: member.Member.Name, Args: args, Syntax: e}
 	}
 	// A callee that itself lowers to a value applies — a function-typed
 	// parameter (pred(value)), a local or constant bound to a fn value, an
@@ -538,4 +567,25 @@ func (b expectingEnum) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 // bound to the same binder.
 func sub(b Binder) func(ast.Expr) ir.Value {
 	return func(e ast.Expr) ir.Value { return Value(e, b) }
+}
+
+// columnsBinderOf finds the ColumnsBinder capability of a binder, looking through the
+// expected-enum and placeholdering wrappers that embed it — so a bare-column argument
+// in a returned or operator-argument position (which lowers through those wrappers)
+// still reaches the columns resolution. ok is false when no binder in the chain is a
+// ColumnsBinder (a const initializer, which never carries a relation method call).
+func columnsBinderOf(b Binder) (ColumnsBinder, bool) {
+	for {
+		if cb, ok := b.(ColumnsBinder); ok {
+			return cb, true
+		}
+		switch w := b.(type) {
+		case placeholdering:
+			b = w.Binder
+		case expectingEnum:
+			b = w.Binder
+		default:
+			return nil, false
+		}
+	}
 }

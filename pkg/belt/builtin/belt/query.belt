@@ -90,6 +90,12 @@ pub type relation<M> = builtin<M> impl {
   /// narrowing is SQL-expressible by construction.
   pub extern fn where(cond: fn(c: columns<M>): predicate<M>): relation<M>
 
+  /// Narrow the relation by a bare column condition — where(cost > 100) — the binding
+  /// omitted, the way a method body omits self. A bare name in the condition that
+  /// resolves no other way reads M's column of that name, so the condition is a
+  /// predicate<M> exactly as the bound form's body is; both lower to the same query.
+  pub extern fn where(cond: predicate<M>): relation<M>
+
   /// The number of rows in the relation.
   pub extern fn count(): nint
 
@@ -100,20 +106,33 @@ pub type relation<M> = builtin<M> impl {
   /// empty relation sums to zero.
   pub extern fn sum<T: numeric>(selector: fn(c: columns<M>): column<M, T>): nint
 
+  /// The sum of a bare column — sum(cost) — the binding omitted, the selector named
+  /// directly as M's column.
+  pub extern fn sum<T: numeric>(selector: column<M, T>): nint
+
   /// The least value of an orderable column over the relation's rows — the column
   /// the selector names, read from the row that sorts first by it. The result is
   /// that column's type or null: an empty relation has no least value.
   pub extern fn min<T: orderable>(selector: fn(c: columns<M>): column<M, T>): T | null
 
+  /// The least value of a bare column — min(cost) — the binding omitted.
+  pub extern fn min<T: orderable>(selector: column<M, T>): T | null
+
   /// The greatest value of an orderable column over the relation's rows — the twin
   /// of min, from the row that sorts last. Null for an empty relation.
   pub extern fn max<T: orderable>(selector: fn(c: columns<M>): column<M, T>): T | null
+
+  /// The greatest value of a bare column — max(cost) — the binding omitted.
+  pub extern fn max<T: orderable>(selector: column<M, T>): T | null
 
   /// Order the relation's rows by the column the selector names — c.cost.asc or
   /// c.cost.desc — the sort the materialized rows (to_list) come back in. The result
   /// is a relation, so it composes; ordering again makes the later key primary and
   /// the earlier one its tiebreaker.
   pub extern fn order(by: fn(c: columns<M>): ordering<M>): relation<M>
+
+  /// Order by a bare column's ordering — order(cost.desc) — the binding omitted.
+  pub extern fn order(by: ordering<M>): relation<M>
 
   /// Keep at most n of the relation's rows, in the relation's order. The result is
   /// a relation, so it composes — narrowed first, then limited, then materialized.

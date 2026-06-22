@@ -137,7 +137,7 @@ func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method str
 	// push the winner's parameter patterns into each one. An Invalid argument
 	// (its cause reported at its own node) also selects as fits-anything, so
 	// the suppression style survives overloading.
-	known := synthMethodArgs(e, recv, args, &bad, s, sink)
+	known := synthMethodArgs(e, recvExpr, recv, method, candidates, args, &bad, s, sink)
 
 	// A query column's comparison is valid only when its element type supports the
 	// same comparison as a value: column<M, T> offers the comparison operators for
@@ -152,6 +152,12 @@ func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method str
 	}
 
 	matches, _ := types.SelectOverload(reg, recv, method, known)
+	if len(matches) > 1 {
+		// A function-literal argument fits any parameter during selection, so a bare
+		// overload beside the lambda form (where) matches it too; drop the matches a
+		// literal cannot fill so the lambda form settles alone.
+		matches = dropLambdaArgNonFuncMatches(e, matches)
+	}
 	if len(matches) != 1 {
 		return reportMethodOverloadFailure(e, recv, method, args, matches, candidates, bad, s, sink)
 	}
@@ -233,14 +239,20 @@ func reportNoMethod(e *ast.CallExpr, recv ir.Type, method string, args []ir.Type
 // arguments left to right, filling args and the parallel known slice (nil for a
 // literal or an Invalid argument, so the overload settles before any literal is
 // checked). It flags bad when an argument is Invalid with no enum-member
-// fallback.
-func synthMethodArgs(e *ast.CallExpr, recv ir.Type, args []ir.Type, bad *bool, s scope, sink *Sink) []ir.Type {
+// fallback. A non-literal argument a relation method's bare overload expects in
+// columns position (where(cost > 100), sum(cost)) is synthesized in a columnsScope,
+// so a bare column name resolves before the overload settles.
+func synthMethodArgs(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method string, candidates []*ir.Method, args []ir.Type, bad *bool, s scope, sink *Sink) []ir.Type {
 	known := make([]ir.Type, len(e.Arguments))
 	for i, a := range e.Arguments {
 		if _, isLit := a.(*ast.FuncLit); isLit {
 			continue
 		}
-		args[i] = check(a, s, sink)
+		argScope := s
+		if cs, ok := columnsArgScope(method, recvExpr, recv, candidates, i, s); ok {
+			argScope = cs
+		}
+		args[i] = check(a, argScope, sink)
 		if args[i] == ir.Invalid {
 			// A bare member of the receiver's enum (rarity == Legend) resolves
 			// against the enum after ordinary resolution fails, so a same-named
@@ -256,6 +268,161 @@ func synthMethodArgs(e *ast.CallExpr, recv ir.Type, args []ir.Type, bad *bool, s
 		known[i] = args[i]
 	}
 	return known
+}
+
+// columnsArgScope returns the columnsScope a relation method's bare-column argument
+// at position i is synthesized in, and whether one applies: the call names one of the
+// columns-context methods (where/sum/min/max/order), the receiver is a lowerable
+// relation<M> (recvExpr), and a candidate overload expects a query type (predicate<M>,
+// column<M, T>, ordering<M>) at that position. The scope reads a bare name as M's column
+// of that name as a last resort, so where(cost > 100) types cost as column<M, costType>
+// before the overload settles. The method-name gate and the receiver gate keep the
+// trigger aligned with the lowering, which synthesizes a columns lambda only for these
+// methods and only off a master the lowered receiver names — so a query the lowering
+// cannot rewrite (a user relation-alias method, a relation-returning function call) is
+// not accepted as a bare-column form here.
+//
+// A nested query's scope prepends its columns to the enclosing columns scope's stack
+// rather than wrapping it, so the inner relation's column wins where both masters share
+// a name while the enclosing body's bindings stay beneath the whole stack.
+func columnsArgScope(method string, recvExpr ast.Expr, recv ir.Type, candidates []*ir.Method, i int, s scope) (scope, bool) {
+	if !ColumnsContextMethods[method] || !lowerableRelationReceiver(recvExpr, s) {
+		return s, false
+	}
+	cols, ok := relationColumns(s.registry(), recv)
+	if !ok {
+		return s, false
+	}
+	hasQueryParam := false
+	for _, m := range candidates {
+		if i < len(m.Params) && isQueryArgType(s.registry(), m.Params[i].Type) {
+			hasQueryParam = true
+			break
+		}
+	}
+	if !hasQueryParam {
+		return s, false
+	}
+	if cs, ok := s.(columnsScope); ok {
+		return columnsScope{outer: cs.outer, columns: append([]ir.Type{cols}, cs.columns...)}, true
+	}
+	// Inside a columns argument the subject is a row, not the relation, so the validate-all
+	// bare-count aggregate is not in scope — a bare count there is the column of that name
+	// (where(count > 0)), not the table's row count. Disable the aggregate fallback for the
+	// outer the columns scope reads through, so a column named count is reachable.
+	outer := s
+	if bs, ok := s.(BodyScope); ok && bs.Relation {
+		bs.Relation = false
+		outer = bs
+	}
+	return columnsScope{outer: outer, columns: []ir.Type{cols}}, true
+}
+
+// lowerableRelationReceiver reports whether a relation method's receiver expression is
+// one the lowering can recover a master from: implicit self, a name (a master, parameter,
+// or local), a namespace-qualified master, or a chain of relation-returning methods over
+// one of these. A function call, a field access on a value (box.rel), or another
+// expression is not — the bare-column form is read only off these, so the checker grants
+// its columns scope exactly where the lowering rewrites it (a relation-returning function
+// call or a relation-valued field is read off the lambda form instead).
+func lowerableRelationReceiver(e ast.Expr, s scope) bool {
+	switch r := e.(type) {
+	case nil:
+		return true // an implicit self-call (self omitted) in a scope or master static fn
+	case *ast.SelfExpr:
+		return true // an explicit self.where in a master static fn, the twin of the implicit form
+	case *ast.Identifier:
+		return true
+	case *ast.MemberExpr:
+		// A namespace-qualified master (deck.Cards) lowers to a master relation; a member
+		// access on a value (box.rel) lowers to a field access the lowering does not read a
+		// master from, so only the namespace-qualified form is a lowerable receiver.
+		return s.nsReceiver(r.Receiver)
+	case *ast.CallExpr:
+		member, ok := r.Callee.(*ast.MemberExpr)
+		if !ok || !RelationReturningMethods[member.Member.Name] {
+			return false
+		}
+		// A direct master call shadowed by a static fn of that name (Cards.limit(1) where
+		// the master declares a static limit) is the static call, lowering to an
+		// ir.StaticCall the lowering recovers no master from — so it is not a relation
+		// chain link, and the bare column uses the lambda form instead.
+		if masterStaticShadows(s, member.Receiver, member.Member.Name) {
+			return false
+		}
+		return lowerableRelationReceiver(member.Receiver, s)
+	default:
+		return false
+	}
+}
+
+// masterStaticShadows reports whether recv names a master that declares a static fn of
+// the given name — so a chain link X.method(...) is a static call (returning that fn's
+// result), not the relation method. It mirrors the reference check's static-shadow guard
+// on the checker side, keeping the columns-scope grant aligned with the lowering, which
+// recovers no master from a static call.
+func masterStaticShadows(s scope, recv ast.Expr, method string) bool {
+	id, ok := recv.(*ast.Identifier)
+	if !ok {
+		return false
+	}
+	def := s.universe()[id.Name]
+	if def == nil {
+		return false
+	}
+	for _, m := range def.Methods {
+		if m.Kind == ir.MethodStatic && m.Name == method {
+			return true
+		}
+	}
+	return false
+}
+
+// dropLambdaArgNonFuncMatches narrows an overloaded relation method's matches when an
+// argument is a function literal: a literal can inhabit only a function-typed
+// parameter, so a bare overload (where(predicate<M>) beside where(fn(c): predicate<M>))
+// must drop out, leaving the lambda form alone. Without it a literal argument — left
+// unsynthesized during selection, fitting any parameter — matches both the lambda and
+// the bare overload and the call is ambiguous. It only ever removes matches a literal
+// cannot fill, so a non-overloaded call and the bare form (a non-literal argument,
+// already typed by columnsArgScope) are untouched; an empty result is left to the
+// caller's overload-failure report.
+func dropLambdaArgNonFuncMatches(e *ast.CallExpr, matches []types.Overload) []types.Overload {
+	kept := matches[:0:0]
+	for _, m := range matches {
+		fits := true
+		for i, a := range e.Arguments {
+			if _, isLit := a.(*ast.FuncLit); !isLit {
+				continue
+			}
+			if i >= len(m.Method.Params) {
+				fits = false
+				break
+			}
+			// A literal can inhabit a function-typed parameter or a bare type-variable one
+			// (a generic T a literal solves), so only a concrete parameter — the bare
+			// overload's predicate<M>/column<M, T>/ordering<M>, a type constructor, not a
+			// variable — drops the match. This keeps a generic overload viable beside a
+			// function-typed one for an ordinary method, so the filter narrows only the
+			// bare-query overload set (whose parameters are concrete query types).
+			pt := m.Method.Params[i].Type
+			if _, isFn := pt.(*ir.Func); isFn {
+				continue
+			}
+			if _, isVar := pt.(*ir.TypeVar); isVar {
+				continue
+			}
+			fits = false
+			break
+		}
+		if fits {
+			kept = append(kept, m)
+		}
+	}
+	if len(kept) == 0 {
+		return matches
+	}
+	return kept
 }
 
 // queryComparisonMethods are the comparison operators a query column offers — the

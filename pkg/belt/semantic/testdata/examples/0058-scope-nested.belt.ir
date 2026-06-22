@@ -1,0 +1,217 @@
+Module
+  Consts: ~
+  Types:
+    TypeDef
+      Name: "Other"
+      Anchor: "belt:/Other"
+      Public: false
+      Doc: ~
+      Params: ~
+      Body: ~
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: MasterDef
+        Row: Record
+          Fields:
+            Field
+              Name: "id"
+              Type: Builtin
+                Name: "int"
+            Field
+              Name: "power"
+              Type: Builtin
+                Name: "int"
+        Primary: "id"
+        RowChecks: ~
+        AllChecks: ~
+      Where: ~
+    TypeDef
+      Name: "Cards"
+      Anchor: "belt:/Cards"
+      Public: false
+      Doc: ~
+      Params: ~
+      Body: ~
+      Methods:
+        Method
+          Name: "busy"
+          Anchor: "belt:/Cards#busy"
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Doc: ~
+          TypeParams: ~
+          Params: ~
+          Result: App
+            Def: "relation"
+            Args:
+              Named
+                Def: "Cards"
+          Body:
+            Return
+              Value: Call
+                Receiver: MasterRelation
+                  Master: "Cards"
+                  Type: App
+                    Def: "relation"
+                    Args:
+                      Named
+                        Def: "Cards"
+                Method: "where"
+                Args:
+                  FuncLiteral
+                    Params: "$columns"
+                    Body:
+                      Return
+                        Value: Call
+                          Receiver: FieldAccess
+                            Receiver: ParamRef
+                              Name: "$columns"
+                              Type: ~
+                            Field: "power"
+                            Type: App
+                              Def: "column"
+                              Args:
+                                Named
+                                  Def: "Cards"
+                                Builtin
+                                  Name: "int"
+                          Method: "gt"
+                          Args:
+                            Adapt
+                              Value: Call
+                                Receiver: Call
+                                  Receiver: MasterRelation
+                                    Master: "Other"
+                                    Type: App
+                                      Def: "relation"
+                                      Args:
+                                        Named
+                                          Def: "Other"
+                                  Method: "where"
+                                  Args:
+                                    FuncLiteral
+                                      Params: "$columns"
+                                      Body:
+                                        Return
+                                          Value: Call
+                                            Receiver: FieldAccess
+                                              Receiver: ParamRef
+                                                Name: "$columns"
+                                                Type: ~
+                                              Field: "power"
+                                              Type: App
+                                                Def: "column"
+                                                Args:
+                                                  Named
+                                                    Def: "Other"
+                                                  Builtin
+                                                    Name: "int"
+                                            Method: "gt"
+                                            Args:
+                                              Adapt
+                                                Value: IntLiteral
+                                                  Text: "50"
+                                                  Type: Builtin
+                                                    Name: "nint"
+                                                To: Builtin
+                                                  Name: "int"
+                                            Setter: false
+                                            Resolved: "column.gt(T)"
+                                            Subst:
+                                              Entry
+                                                Key: "M"
+                                                Value: Named
+                                                  Def: "Other"
+                                              Entry
+                                                Key: "T"
+                                                Value: Builtin
+                                                  Name: "int"
+                                            Type: App
+                                              Def: "predicate"
+                                              Args:
+                                                Named
+                                                  Def: "Other"
+                                      Type: ~
+                                  Setter: false
+                                  Resolved: "relation.where(predicate<M>)"
+                                  Subst:
+                                    Entry
+                                      Key: "M"
+                                      Value: Named
+                                        Def: "Other"
+                                  Type: App
+                                    Def: "relation"
+                                    Args:
+                                      Named
+                                        Def: "Other"
+                                Method: "count"
+                                Args: ~
+                                Setter: false
+                                Resolved: ~
+                                Subst:
+                                  Entry
+                                    Key: "M"
+                                    Value: Named
+                                      Def: "Other"
+                                Type: Builtin
+                                  Name: "nint"
+                              To: Builtin
+                                Name: "int"
+                          Setter: false
+                          Resolved: "column.gt(T)"
+                          Subst:
+                            Entry
+                              Key: "M"
+                              Value: Named
+                                Def: "Cards"
+                            Entry
+                              Key: "T"
+                              Value: Builtin
+                                Name: "int"
+                          Type: App
+                            Def: "predicate"
+                            Args:
+                              Named
+                                Def: "Cards"
+                    Type: ~
+                Setter: false
+                Resolved: "relation.where(predicate<M>)"
+                Subst:
+                  Entry
+                    Key: "M"
+                    Value: Named
+                      Def: "Cards"
+                Type: App
+                  Def: "relation"
+                  Args:
+                    Named
+                      Def: "Cards"
+          Owner: "Cards"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: MasterDef
+        Row: Record
+          Fields:
+            Field
+              Name: "id"
+              Type: Builtin
+                Name: "int"
+            Field
+              Name: "power"
+              Type: Builtin
+                Name: "int"
+        Primary: "id"
+        RowChecks: ~
+        AllChecks: ~
+      Where: ~
+  Funcs: ~
+  Asserts: ~

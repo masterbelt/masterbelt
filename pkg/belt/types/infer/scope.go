@@ -127,6 +127,72 @@ func (s funcScope) nsReceiver(recv ast.Expr) bool {
 	return s.outer.nsReceiver(recv)
 }
 
+// constShadows inherits the enclosing context's constant shadows: a lambda body reads
+// a top-level constant exactly as its enclosing body does, unless the lambda binds the
+// name itself (then it is a local, not the constant).
+func (s funcScope) constShadows(id *ast.Identifier) bool {
+	if s.shadows(id.Name) {
+		return false
+	}
+	return s.outer.constShadows(id)
+}
+
+// columnsScope types an argument written in a relation method's columns context —
+// the bare-column form of a query, where(cost > 100) or sum(cost), the columns
+// binding omitted the way a method body omits self. It wraps the enclosing non-columns
+// scope, delegating every form to it, and adds only a last-resort reading: a bare name
+// the enclosing scope does not bind reads master M's column of that name (cost →
+// column<M, costType>). The fallback is last resort, so a local, parameter, constant,
+// type, or self member of the same name still wins.
+//
+// columns is a stack of the columns<M> in scope, innermost first: a nested query
+// (Cards.where(id > Other.where(cost > 0).count())) prepends Other's columns over
+// Cards', so the inner relation's column wins where both masters share a name. outer is
+// always the non-columns scope beneath the whole stack, so the enclosing body's
+// bindings are read before any column, however deep the nesting.
+type columnsScope struct {
+	outer   scope
+	columns []ir.Type
+}
+
+func (s columnsScope) registry() *builtin.Registry           { return s.outer.registry() }
+func (s columnsScope) universe() map[string]*ir.TypeDef      { return s.outer.universe() }
+func (s columnsScope) self() ir.Type                         { return s.outer.self() }
+func (s columnsScope) rigid(name string) bool                { return s.outer.rigid(name) }
+func (s columnsScope) tscope() TypeScope                     { return s.outer.tscope() }
+func (s columnsScope) conv(id *ast.Identifier) ir.Type       { return s.outer.conv(id) }
+func (s columnsScope) fn(id *ast.Identifier) []*ast.FuncDecl { return s.outer.fn(id) }
+func (s columnsScope) nsReceiver(recv ast.Expr) bool         { return s.outer.nsReceiver(recv) }
+
+func (s columnsScope) qualified() func(namespace, name string) *ir.TypeDef {
+	return s.outer.qualified()
+}
+
+func (s columnsScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl { return s.outer.fnMember(m) }
+
+func (s columnsScope) leaf(e ast.Expr) ir.Type {
+	if t := s.outer.leaf(e); t != ir.Invalid {
+		return t // a local, parameter, master, type, or self member of the same name wins
+	}
+	// Last resort: a bare name that resolves no other way reads M's column of that name
+	// — the columns binding omitted, exactly as a bare self member reads self. The outer
+	// leaf returns Invalid for a name shadowed by a constant or a rigid type parameter
+	// (both typed elsewhere), so those are excluded here, the way the lowering reads the
+	// constant first; a name that is no column of M stays Invalid, a typo still undefined.
+	// The columns are read innermost first, so a nested query's column wins over an
+	// enclosing one where both masters share the name.
+	if id, ok := e.(*ast.Identifier); ok && !s.outer.constShadows(id) && !s.outer.rigid(id.Name) {
+		for _, cols := range s.columns {
+			if ct := columnsFieldType(s.registry(), cols, id.Name); ct != ir.Invalid {
+				return ct
+			}
+		}
+	}
+	return ir.Invalid
+}
+
+func (s columnsScope) constShadows(id *ast.Identifier) bool { return s.outer.constShadows(id) }
+
 // metatype is the type of a reified type value — the builtin `type` (type :
 // type), the type a bare type name carries in value position. It is built fresh
 // per call, like the other primitive types the scopes synthesize.
@@ -154,6 +220,11 @@ func (s constScope) self() ir.Type { return ir.Invalid }
 
 // rigid reports whether name is one of the owner type parameters in scope.
 func (s constScope) rigid(name string) bool { _, ok := s.params[name]; return ok }
+
+// constShadows: a constant initializer resolves a sibling constant through its leaf
+// (which returns the constant's type, not Invalid), so the columns-scope guard never
+// needs it here — a constant reference does not look unbound in this scope.
+func (s constScope) constShadows(*ast.Identifier) bool { return false }
 
 // tscope is the owner type-parameter scope a lambda in the initializer resolves its
 // annotations through — nil for a top-level constant.
@@ -353,6 +424,13 @@ func (s BodyScope) self() ir.Type {
 func (s BodyScope) rigid(name string) bool {
 	_, ok := s.TScope[name]
 	return ok
+}
+
+// constShadows reports whether id names a top-level constant in scope — the reference
+// this scope's leaf leaves Invalid (typed by the write-back), so a columns scope reads
+// the constant rather than a same-named column.
+func (s BodyScope) constShadows(id *ast.Identifier) bool {
+	return s.ConstShadows != nil && s.ConstShadows(id)
 }
 
 // tscope is the body's generic type-parameter scope — the enclosing function's

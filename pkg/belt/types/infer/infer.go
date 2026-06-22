@@ -109,6 +109,11 @@ type scope interface {
 	// body is perfectly inferred, where an unpinned method-local variable (the
 	// R of map at a call site) is uninferable.
 	rigid(name string) bool
+	// constShadows reports whether id names a top-level constant in scope — a
+	// reference the body leaf leaves Invalid (the constant is typed by the
+	// write-back, not the leaf), so a columns scope must not read such a name as a
+	// column: the constant shadows it, the way it shadows self omission.
+	constShadows(id *ast.Identifier) bool
 	// tscope is the generic type-parameter scope in effect — the enclosing
 	// declaration's type parameters, each mapped to its bound — that a written
 	// type annotation in this scope (a lambda parameter or result, a let, a
@@ -506,6 +511,108 @@ func columnsFieldType(reg *builtin.Registry, recv ir.Type, name string) ir.Type 
 		return ir.Invalid
 	}
 	return &ir.App{Def: colDef, Args: []ir.Type{master, ft}}
+}
+
+// relationColumns returns the columns<M> binding the rows of a relation<M> receiver
+// offer — the type a bare-column query argument (where(cost > 100)) reads its columns
+// off, built from the receiver so M is known before overload selection runs. ok is
+// false for any non-relation receiver, matching the relation builtin by identity so a
+// file's own generic relation<T> is not mistaken for the query algebra's.
+func relationColumns(reg *builtin.Registry, recv ir.Type) (ir.Type, bool) {
+	app, ok := recv.(*ir.App)
+	if !ok || app.Def == nil || len(app.Args) != 1 {
+		return nil, false
+	}
+	if def, ok := reg.Lookup(builtin.NameRelation); !ok || app.Def != def {
+		return nil, false
+	}
+	colsDef, ok := reg.Lookup(builtin.NameColumns)
+	if !ok || colsDef == nil {
+		return nil, false
+	}
+	return &ir.App{Def: colsDef, Args: []ir.Type{app.Args[0]}}, true
+}
+
+// MasterColumnType returns the column<M, T> a bare name reads in master M's columns
+// context — the field's value type lifted into column mode — or ir.Invalid when M's row
+// has no field of that name. It is the master twin of columnsFieldType, taking the
+// master definition the lowering and the reference check know directly rather than the
+// columns<M> wrapper.
+func MasterColumnType(reg *builtin.Registry, master *ir.TypeDef, name string) ir.Type {
+	if master == nil || master.Master == nil {
+		return ir.Invalid
+	}
+	colsDef, ok := reg.Lookup(builtin.NameColumns)
+	if !ok || colsDef == nil {
+		return ir.Invalid
+	}
+	cols := &ir.App{Def: colsDef, Args: []ir.Type{&ir.Named{Def: master}}}
+	return columnsFieldType(reg, cols, name)
+}
+
+// MasterHasColumn reports whether a bare name reads a column of master M — a field of
+// M's row, the membership a bare-column query argument (where(cost > 100)) tests when
+// it omits the columns binding. The lowering reads a bare name as a column exactly where
+// the checker types it as one (a name that is no column stays unresolved, an undefined
+// name).
+func MasterHasColumn(reg *builtin.Registry, master *ir.TypeDef, name string) bool {
+	return MasterColumnType(reg, master, name) != ir.Invalid
+}
+
+// ColumnEnumMember reports whether memberName names a member of the enum that is the
+// element type of master M's column colName — the resolution a bare enum member in a
+// column comparison (where(rarity == legend)) takes through the column's element type,
+// not the surrounding expectation. It is how the reference check exempts such a member
+// the way the checker resolves it, so a bare enum member in a bare-column query is not
+// reported as an undefined name.
+func ColumnEnumMember(reg *builtin.Registry, master *ir.TypeDef, colName, memberName string) bool {
+	ct := MasterColumnType(reg, master, colName)
+	if ct == ir.Invalid {
+		return false
+	}
+	elem, ok := queryColumnElem(reg, ct)
+	if !ok {
+		return false
+	}
+	return enumMemberExpectation(elem, memberName) != nil
+}
+
+// ColumnsContextMethods are the relation methods whose argument is a columns
+// expression — the ones with a bare overload (where(predicate<M>), sum/min/max(column
+// <M, T>), order(ordering<M>)). The checker grants a columns scope only to these, and
+// the lowering synthesizes a columns lambda only for these, so the two agree: a user
+// method on a relation alias whose parameter happens to be a predicate does not get a
+// columns scope the lowering would then fail to rewrite.
+var ColumnsContextMethods = map[string]bool{
+	"where": true, "sum": true, "min": true, "max": true, "order": true,
+}
+
+// RelationReturningMethods are the relation methods that return another relation, so a
+// chain over them stays a relation a later query method reads its columns off
+// (Cards.where(...).order(...).where(cost > 0)). An aggregate or materializer (count,
+// sum, min, max, to_list) ends the relation, so a query method written after one is an
+// invalid chain — recognizing only these as continuable keeps a bare column in
+// Cards.count().where(...) from being read against the master a broken chain names.
+var RelationReturningMethods = map[string]bool{
+	"where": true, "order": true, "limit": true, "offset": true,
+}
+
+// isQueryArgType reports whether t is one of the query algebra's bare-argument types
+// — predicate<M>, column<M, T>, or ordering<M> — the parameter shapes a bare-column
+// query argument fills (where(predicate), sum(column), order(ordering)). It is how a
+// relation method's columns context is recognized: a non-lambda argument is synthesized
+// in a columnsScope exactly when a candidate overload expects one of these.
+func isQueryArgType(reg *builtin.Registry, t ir.Type) bool {
+	app, ok := t.(*ir.App)
+	if !ok || app.Def == nil {
+		return false
+	}
+	for _, name := range []string{builtin.NamePredicate, builtin.NameColumn, builtin.NameOrdering} {
+		if def, ok := reg.Lookup(name); ok && app.Def == def {
+			return true
+		}
+	}
+	return false
 }
 
 // QueryColumns returns the columns a query binding of type recv (columns<M>) offers

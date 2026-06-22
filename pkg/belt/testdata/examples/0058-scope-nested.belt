@@ -1,0 +1,14 @@
+master Other {
+  record { id: int, power: int }
+  primary id
+  source { csv "other.csv" }
+}
+
+master Cards {
+  record { id: int, power: int }
+  scope {
+    pub busy() -> where(power > Other.where(power > 50).count())
+  }
+  primary id
+  source { csv "cards.csv" }
+}
