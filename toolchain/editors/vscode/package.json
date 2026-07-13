@@ -75,13 +75,13 @@
     "vscode:prepublish": "pnpm run package"
   },
   "dependencies": {
-    "vscode-languageclient": "^10.0.0"
+    "vscode-languageclient": "^10.1.0"
   },
   "devDependencies": {
-    "@types/node": "^25.9.3",
-    "@types/vscode": "^1.90.0",
+    "@types/node": "^26.1.1",
+    "@types/vscode": "^1.125.0",
     "esbuild": "^0.28.1",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vscode-oniguruma": "^2.0.1",
     "vscode-textmate": "^9.0.0"
   }
